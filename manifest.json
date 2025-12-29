@@ -1,0 +1,21 @@
+
+{
+  "short_name": "SmartReport",
+  "name": "Smart Report Mahasina",
+  "icons": [
+    {
+      "src": "https://drive.google.com/thumbnail?id=1bcmRcJff0_5WBiXdhbuEBzFn9kSnDU0Y&sz=w192",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://drive.google.com/thumbnail?id=1bcmRcJff0_5WBiXdhbuEBzFn9kSnDU0Y&sz=w512",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#065f46",
+  "background_color": "#ffffff"
+}

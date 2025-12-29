@@ -1,0 +1,9 @@
+{
+  "name": "Smart Report Mahasina",
+  "description": "A comprehensive pesantren management application for attendance, violations, and achievements tracking with role-based access control and data visualization.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
