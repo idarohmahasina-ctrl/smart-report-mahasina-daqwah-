@@ -28,8 +28,6 @@ type InfoCategory = 'Guru' | 'Siswa' | 'Jadwal' | 'ORSAM' | 'ORKLAS' | 'Peratura
 const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpdateData }) => {
   const [selectedCategory, setSelectedCategory] = useState<InfoCategory>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // States khusus filter santri
   const [studentSession, setStudentSession] = useState<SessionType | ''>('');
   const [studentClass, setStudentClass] = useState('');
 
@@ -85,7 +83,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
               else if (sessionStr === 'Hadis') sessionType = SessionType.HADIS;
               else if (sessionStr === 'Kitab') sessionType = SessionType.KITAB;
               else sessionType = SessionType.PENJURUSAN;
-              
               obj.sessionClasses[sessionType] = values[i];
             } else obj[h] = values[i];
           });
@@ -122,11 +119,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
         <div className="space-y-4">
           <label className="text-[10px] font-black text-emerald-800 uppercase tracking-widest ml-1">1. Pilih Sesi Kegiatan</label>
           <div className="relative">
-            <select 
-              value={studentSession} 
-              onChange={e => { setStudentSession(e.target.value as any); setStudentClass(''); }}
-              className="w-full pl-6 pr-12 py-5 bg-white border-2 border-emerald-200 rounded-2xl font-black text-xs uppercase outline-none appearance-none focus:border-emerald-600 shadow-sm transition-all"
-            >
+            <select value={studentSession} onChange={e => { setStudentSession(e.target.value as any); setStudentClass(''); }} className="w-full pl-6 pr-12 py-5 bg-white border-2 border-emerald-200 rounded-2xl font-black text-xs uppercase outline-none appearance-none focus:border-emerald-600 shadow-sm transition-all">
               <option value="">-- PILIH SESI --</option>
               {Object.values(SessionType).map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
             </select>
@@ -136,12 +129,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
         <div className="space-y-4">
           <label className="text-[10px] font-black text-emerald-800 uppercase tracking-widest ml-1">2. Pilih Kelas / Kelompok</label>
           <div className="relative">
-            <select 
-              disabled={!studentSession}
-              value={studentClass} 
-              onChange={e => setStudentClass(e.target.value)}
-              className="w-full pl-6 pr-12 py-5 bg-white border-2 border-emerald-200 rounded-2xl font-black text-xs uppercase outline-none appearance-none focus:border-emerald-600 shadow-sm disabled:opacity-30 transition-all"
-            >
+            <select disabled={!studentSession} value={studentClass} onChange={e => setStudentClass(e.target.value)} className="w-full pl-6 pr-12 py-5 bg-white border-2 border-emerald-200 rounded-2xl font-black text-xs uppercase outline-none appearance-none focus:border-emerald-600 shadow-sm disabled:opacity-30 transition-all">
               <option value="">-- PILIH KELAS --</option>
               {availableClassesForSession.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -149,7 +137,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
           </div>
         </div>
       </div>
-
       {studentSession && studentClass ? (
         <div className="space-y-8">
           <div className="flex justify-between items-center">
@@ -160,19 +147,16 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                   <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">Sesi Aktif: {studentSession}</p>
                </div>
             </div>
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{filteredStudents.length} Santri Mahasina</div>
           </div>
-
           <div className="relative">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
             <input type="text" placeholder="Cari santri..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-16 pr-8 py-5 bg-white border-2 border-slate-100 rounded-[2rem] outline-none focus:border-emerald-600 font-bold shadow-sm" />
           </div>
-
           <div className="bg-white rounded-[3rem] border-2 border-slate-50 shadow-sm overflow-hidden">
              <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">
                    <tr>
-                     <th className="px-10 py-7 text-left">Nama Lengkap & Kelas Formal</th>
+                     <th className="px-10 py-7 text-left">Nama Lengkap</th>
                      <th className="px-10 py-7">NIS</th>
                      <th className="px-10 py-7">Jenjang</th>
                      <th className="px-10 py-7">Gender</th>
@@ -181,12 +165,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                 <tbody className="divide-y divide-slate-100">
                    {filteredStudents.map(s => (
                      <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                       <td className="px-10 py-7">
-                          <p className="font-black text-slate-800 text-base">{s.name}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                             <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded border border-amber-100">Formal: {s.formalClass}</span>
-                          </div>
-                       </td>
+                       <td className="px-10 py-7 font-black text-slate-800 text-base">{s.name}</td>
                        <td className="px-10 py-7 text-center font-bold text-slate-500">{s.nis}</td>
                        <td className="px-10 py-7 text-center"><span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[9px] font-black">{s.level}</span></td>
                        <td className="px-10 py-7 text-center"><span className={`px-3 py-1 rounded-lg text-[9px] font-black ${s.gender === 'Putra' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'}`}>{s.gender.toUpperCase()}</span></td>
@@ -199,10 +178,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
       ) : (
         <div className="py-32 flex flex-col items-center justify-center text-center space-y-8 opacity-40">
            <div className="w-24 h-24 bg-slate-100 text-slate-400 rounded-[2.5rem] flex items-center justify-center"><Filter size={48} /></div>
-           <div>
-              <h3 className="text-xl font-black text-slate-800 uppercase">Menunggu Filter</h3>
-              <p className="text-xs font-bold text-slate-400 max-w-xs mt-2">Pilih Sesi dan Kelas untuk melihat daftar santri Mahasina yang terdaftar di dalamnya.</p>
-           </div>
+           <p className="text-xs font-bold text-slate-400 max-w-xs mt-2">Pilih Sesi dan Kelas untuk melihat daftar santri.</p>
         </div>
       )}
     </div>
@@ -231,25 +207,24 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
              <div className="p-12 bg-emerald-900 text-white flex justify-between items-center">
                 <div>
                   <h2 className="text-3xl font-black tracking-tighter uppercase">{selectedCategory}</h2>
-                  <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-[0.2em] mt-2 italic">Manajemen Master Data Mahasina</p>
+                  <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-[0.2em] mt-2 italic">Informasi Master Data Mahasina</p>
                 </div>
                 <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-emerald-400 backdrop-blur-md"><InfoIcon size={32}/></div>
              </div>
-             {selectedCategory === 'Siswa' ? renderStudentView() : <div className="p-20 text-center text-slate-300 font-bold uppercase italic tracking-widest">Detail data {selectedCategory} segera hadir.</div>}
+             {selectedCategory === 'Siswa' ? renderStudentView() : <div className="p-20 text-center text-slate-300 font-bold uppercase italic tracking-widest">Detail data {selectedCategory} dapat diunduh melalui tombol di atas.</div>}
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-4">
            {[
              { id: 'Guru', label: 'Data Pengajar', desc: 'Kelola SK & Mapel Sesi', icon: <User size={28}/> },
-             { id: 'Siswa', label: 'Data Santri', desc: 'Mapping Sesi & Kelas Dinamis', icon: <GraduationCap size={28}/> },
+             { id: 'Siswa', label: 'Data Santri', desc: 'Mapping Sesi & Kelas', icon: <GraduationCap size={28}/> },
              { id: 'Jadwal', label: 'Jadwal Pelajaran', desc: 'Atur KBM per Sesi & Waktu', icon: <BookOpen size={28}/> },
              { id: 'ORSAM', label: 'Data ORSAM', desc: 'Organisasi Santri Mahasina', icon: <Users size={28}/> },
              { id: 'ORKLAS', label: 'Data ORKLAS', desc: 'Kepengurusan Tiap Kelas', icon: <Layers size={28}/> },
              { id: 'Peraturan', label: 'Katalog Peraturan', desc: 'Daftar Poin & Sanksi Pondok', icon: <ShieldCheck size={28}/> },
            ].map(item => (
              <button key={item.id} onClick={() => setSelectedCategory(item.id as any)} className="group bg-white p-12 rounded-[3.5rem] border-2 border-transparent hover:border-emerald-600 hover:shadow-3xl transition-all text-left relative overflow-hidden shadow-sm">
-                <div className="absolute -right-8 -bottom-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">{item.icon}</div>
                 <div className="w-16 h-16 bg-emerald-50 group-hover:bg-emerald-700 group-hover:text-white rounded-2xl flex items-center justify-center mb-10 transition-all text-emerald-700 shadow-inner">{item.icon}</div>
                 <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">{item.label}</h3>
                 <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-4 leading-relaxed">{item.desc}</p>

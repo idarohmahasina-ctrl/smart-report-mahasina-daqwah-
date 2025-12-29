@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from './components/Layout.tsx';
 import Registration from './views/Registration.tsx';
 import Dashboard from './views/Dashboard.tsx';
@@ -20,9 +20,9 @@ import {
   TemplateItem,
   AcademicConfig
 } from './types.ts';
-import { getAppData, saveAppData, clearAppData, AppData, getSyncStatus, saveSyncStatus, getUsers } from './services/dataService.ts';
-import { ICONS, APP_LOGO, MOCK_STUDENTS, MOCK_TEACHERS, MOCK_SCHEDULE, MOCK_ORSAM, MOCK_ORKLAS, PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS } from './constants.tsx';
-import { RefreshCw } from 'lucide-react';
+import { getAppData, saveAppData, clearAppData, AppData, getSyncStatus, saveSyncStatus, getUsers, syncWithGDrive } from './services/dataService.ts';
+import { ICONS, APP_LOGO, MOCK_STUDENTS, MOCK_TEACHERS, MOCK_SCHEDULE, MOCK_ORSAM, MOCK_ORKLAS, PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS, CLASSES as DEFAULT_CLASSES } from './constants.tsx';
+import { RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 
 const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -45,7 +45,14 @@ const App: React.FC = () => {
   });
 
   const [loading, setLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+
+  // DYNAMIC CLASS LIST: Derived from actual student data
+  const availableClasses = useMemo(() => {
+    if (students.length === 0) return DEFAULT_CLASSES;
+    const uniqueClasses = Array.from(new Set(students.map(s => s.formalClass))).filter(Boolean).sort();
+    return uniqueClasses.length > 0 ? uniqueClasses : DEFAULT_CLASSES;
+  }, [students]);
 
   useEffect(() => {
     const data = getAppData();
@@ -76,16 +83,26 @@ const App: React.FC = () => {
     setLoading(false);
   }, []);
 
-  const triggerAutoSync = useCallback(() => {
+  const triggerAutoSync = useCallback(async () => {
     const status = getSyncStatus();
     const cloudConnected = localStorage.getItem('mahasina_cloud_connected') === 'true';
-    if (cloudConnected && status.autoSync && status.isNewLocal) {
-      setIsSyncing(true);
-      setTimeout(() => {
-        const now = new Date().toISOString();
-        saveSyncStatus({ ...status, pending: false, timestamp: now, isNewLocal: false });
-        setIsSyncing(false);
-      }, 2000);
+    const token = localStorage.getItem('mahasina_cloud_token');
+
+    if (cloudConnected && token && status.isNewLocal) {
+      setSyncState('syncing');
+      try {
+        const success = await syncWithGDrive(token);
+        if (success) {
+          setSyncState('success');
+          setTimeout(() => setSyncState('idle'), 3000);
+        } else {
+          setSyncState('error');
+          setTimeout(() => setSyncState('idle'), 5000);
+        }
+      } catch (e) {
+        setSyncState('error');
+        setTimeout(() => setSyncState('idle'), 5000);
+      }
     }
   }, []);
 
@@ -192,7 +209,7 @@ const App: React.FC = () => {
   }
 
   if (!profile) {
-    return <Registration onComplete={handleRegistrationComplete} />;
+    return <Registration onComplete={handleRegistrationComplete} availableClasses={availableClasses} />;
   }
 
   const renderContent = () => {
@@ -292,7 +309,8 @@ const App: React.FC = () => {
           <Settings 
             userEmail={profile.email} 
             academicConfig={academicConfig} 
-            onUpdateAcademic={handleUpdateAcademic} 
+            onUpdateAcademic={handleUpdateAcademic}
+            availableClasses={availableClasses}
           />
         );
       default:
@@ -302,10 +320,18 @@ const App: React.FC = () => {
 
   return (
     <>
-      {isSyncing && (
-        <div className="fixed bottom-10 right-10 z-[2000] bg-emerald-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-4">
-          <RefreshCw size={16} className="animate-spin" />
-          <span className="text-[10px] font-black uppercase tracking-widest">Sinkronisasi Cloud...</span>
+      {syncState !== 'idle' && (
+        <div className={`fixed bottom-10 right-10 z-[2000] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-4 transition-colors duration-500 ${
+          syncState === 'syncing' ? 'bg-indigo-600' : 
+          syncState === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+        } text-white`}>
+          {syncState === 'syncing' && <RefreshCw size={16} className="animate-spin" />}
+          {syncState === 'success' && <CheckCircle size={16} />}
+          {syncState === 'error' && <AlertCircle size={16} />}
+          <span className="text-[10px] font-black uppercase tracking-widest">
+            {syncState === 'syncing' ? 'Sinkronisasi Cloud...' : 
+             syncState === 'success' ? 'Sinkronisasi Berhasil' : 'Sinkronisasi Gagal'}
+          </span>
         </div>
       )}
       <Layout

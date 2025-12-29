@@ -3,13 +3,14 @@ import React, { useState } from 'react';
 import { UserRole, UserProfile } from '../types';
 import { APP_LOGO } from '../constants';
 import { registerUser, getUsers } from '../services/dataService';
-import { UserPlus, LogIn, Mail, User, Phone, AlertCircle } from 'lucide-react';
+import { UserPlus, LogIn, Mail, User, Phone, AlertCircle, Check } from 'lucide-react';
 
 interface RegistrationProps {
   onComplete: (profile: UserProfile) => void;
+  availableClasses: string[];
 }
 
-const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
+const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasses }) => {
   const [isLoginView, setIsLoginView] = useState(true);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -21,6 +22,15 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
 
   const [error, setError] = useState('');
 
+  const toggleClass = (cls: string) => {
+    const current = formData.classes;
+    if (current.includes(cls)) {
+      setFormData({ ...formData, classes: current.filter(c => c !== cls) });
+    } else {
+      setFormData({ ...formData, classes: [...current, cls] });
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -29,13 +39,11 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
 
     if (isLoginView) {
       const users = getUsers();
-      // Prioritaskan pencocokan email untuk sinkronisasi data dari Idaroh
       const user = users.find(u => u.email.toLowerCase().trim() === emailLower);
       
       if (user) {
         onComplete(user);
       } else if (emailLower === 'idarohmahasina@gmail.com') {
-        // Auto-create untuk Super Admin jika belum ada di database lokal
         const admin: UserProfile = {
           id: 'admin-master',
           fullName: 'Idaroh Pusat Mahasina',
@@ -52,6 +60,11 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
     } else {
       if (!formData.fullName || !formData.phone || !formData.email) {
         setError("Mohon lengkapi seluruh kolom pendaftaran.");
+        return;
+      }
+
+      if (formData.role === UserRole.MUSYRIF && formData.classes.length === 0) {
+        setError("Musyrif/ah wajib memilih minimal satu kelas binaan.");
         return;
       }
 
@@ -143,13 +156,35 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                  className="w-full px-5 py-4 border border-transparent bg-slate-50 rounded-2xl outline-none font-bold text-sm"
+                  className="w-full px-5 py-4 border border-transparent bg-slate-50 rounded-2xl outline-none font-bold text-sm appearance-none"
                 >
                   {Object.values(UserRole).map((role) => (
                     <option key={role} value={role}>{role}</option>
                   ))}
                 </select>
               </div>
+
+              {formData.role === UserRole.MUSYRIF && (
+                <div className="pt-4 space-y-3 animate-in fade-in slide-in-from-top-2">
+                  <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1">Pilih Kelas Binaan</label>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {availableClasses.map(cls => (
+                      <button
+                        key={cls}
+                        type="button"
+                        onClick={() => toggleClass(cls)}
+                        className={`py-3 rounded-xl text-[10px] font-black transition-all border-2 ${
+                          formData.classes.includes(cls)
+                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
+                          : 'bg-white border-slate-100 text-slate-400'
+                        }`}
+                      >
+                        {cls}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
 
