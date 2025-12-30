@@ -65,6 +65,7 @@ export const saveAppData = (data: Partial<AppData>) => {
   const newData = { ...current, ...data };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
   
+  // Mark as dirty so background sync knows it needs to run
   const status = getSyncStatus();
   localStorage.setItem(SYNC_KEY, JSON.stringify({ 
     ...status,
@@ -83,23 +84,22 @@ export const saveSyncStatus = (status: any) => {
   localStorage.setItem(SYNC_KEY, JSON.stringify(status));
 };
 
-// REAL GOOGLE DRIVE SYNC FUNCTIONS
 export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
   try {
     const data = getAppData();
     const fileName = 'mahasina_backup.json';
     
-    // 1. Search for existing file
     const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and trashed=false`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
+    
+    if (!searchRes.ok) throw new Error('Failed to search GDrive');
     const searchData = await searchRes.json();
     
     const fileContent = JSON.stringify(data);
     const metadata = { name: fileName, mimeType: 'application/json' };
     
     if (searchData.files && searchData.files.length > 0) {
-      // Update existing
       const fileId = searchData.files[0].id;
       await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
         method: 'PATCH',
@@ -107,7 +107,6 @@ export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
         body: fileContent
       });
     } else {
-      // Create new
       const form = new FormData();
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       form.append('file', new Blob([fileContent], { type: 'application/json' }));
@@ -119,11 +118,34 @@ export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
       });
     }
     
-    saveSyncStatus({ pending: false, timestamp: new Date().toISOString(), isNewLocal: false });
+    saveSyncStatus({ pending: false, timestamp: new Date().toISOString(), isNewLocal: false, autoSync: true });
     return true;
   } catch (error) {
     console.error('GDrive Sync Error:', error);
     return false;
+  }
+};
+
+export const downloadFromGDrive = async (accessToken: string): Promise<AppData | null> => {
+  try {
+    const fileName = 'mahasina_backup.json';
+    const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and trashed=false`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    const searchData = await searchRes.json();
+
+    if (searchData.files && searchData.files.length > 0) {
+      const fileId = searchData.files[0].id;
+      const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      const data = await fileRes.json();
+      return data;
+    }
+    return null;
+  } catch (error) {
+    console.error('GDrive Download Error:', error);
+    return null;
   }
 };
 

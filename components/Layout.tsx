@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ICONS, APP_LOGO } from '../constants.tsx';
 import { UserRole, AcademicConfig } from '../types.ts';
-import { Menu, X, Settings as SettingsIcon, Calendar, Cloud, CloudOff, RefreshCw, Coffee } from 'lucide-react';
+import { Menu, X, Settings as SettingsIcon, Calendar, Cloud, CloudOff, RefreshCw, Coffee, ShieldCheck } from 'lucide-react';
 import { getSyncStatus } from '../services/dataService.ts';
 
 interface LayoutProps {
@@ -138,14 +138,17 @@ const Layout: React.FC<LayoutProps> = ({
               >
                 {cloudStatus.connected ? (
                   <div className="flex items-center gap-1">
-                    <Cloud size={10} className="text-indigo-500" />
-                    <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">Cloud Active</span>
+                    <Cloud size={10} className={`${cloudStatus.pending ? 'text-amber-500 animate-pulse' : 'text-indigo-500'}`} />
+                    <span className={`text-[8px] font-black uppercase tracking-widest ${cloudStatus.pending ? 'text-amber-500' : 'text-indigo-500'}`}>
+                      {cloudStatus.pending ? 'Syncing...' : 'Cloud Active'}
+                    </span>
                     {cloudStatus.pending && <RefreshCw size={8} className="text-amber-500 animate-spin ml-1" />}
+                    {!cloudStatus.pending && <ShieldCheck size={8} className="text-indigo-400 ml-1" />}
                   </div>
                 ) : (
                   <div className="flex items-center gap-1 group-hover:scale-105 transition-transform">
                     <CloudOff size={10} className="text-slate-300" />
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Local Mode (Sync)</span>
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Local Mode (Off-sync)</span>
                   </div>
                 )}
               </button>

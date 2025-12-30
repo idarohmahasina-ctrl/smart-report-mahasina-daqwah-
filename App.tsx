@@ -47,11 +47,19 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
 
-  // DYNAMIC CLASS LIST: Derived from actual student data
+  // DYNAMIC CLASS LIST: Derived from actual student data uploaded in Information view
   const availableClasses = useMemo(() => {
-    if (students.length === 0) return DEFAULT_CLASSES;
-    const uniqueClasses = Array.from(new Set(students.map(s => s.formalClass))).filter(Boolean).sort();
-    return uniqueClasses.length > 0 ? uniqueClasses : DEFAULT_CLASSES;
+    // If we have actual students uploaded, extract unique formal classes
+    if (students && students.length > 0) {
+      // Fix: Explicitly type the Set as string to avoid 'unknown' inference in Array.from (Fixes errors on line 55 and 56)
+      const uniqueClasses = Array.from(new Set<string>(students.map(s => s.formalClass)))
+        .filter(cls => cls && cls.trim() !== '')
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+      
+      // Only use dynamic list if we found valid classes, otherwise fallback to default
+      return uniqueClasses.length > 0 ? uniqueClasses : DEFAULT_CLASSES;
+    }
+    return DEFAULT_CLASSES;
   }, [students]);
 
   useEffect(() => {
@@ -71,6 +79,7 @@ const App: React.FC = () => {
     setReports(data.reports || []);
     setTeacherAttendance(data.teacherAttendance || []);
     
+    // Use saved students if available, otherwise mock data for initial preview
     setStudents(data.students.length > 0 ? data.students : MOCK_STUDENTS);
     setTeachers(data.teachers.length > 0 ? data.teachers : MOCK_TEACHERS);
     setSchedules(data.schedules.length > 0 ? data.schedules : MOCK_SCHEDULE);
