@@ -6,7 +6,7 @@ import { registerUser, getUsers, syncWithGDrive } from '../services/dataService'
 import { 
   UserPlus, LogIn, Mail, User, Phone, AlertCircle, Check, Cloud, 
   ShieldCheck, ArrowRight, RefreshCw, AlertTriangle, Copy, Globe, HelpCircle,
-  Briefcase, CheckSquare, Square, Terminal
+  Briefcase, CheckSquare, Square, Terminal, ShieldAlert, Flag, X
 } from 'lucide-react';
 
 // Declare google global variable for Google Identity Services
@@ -33,19 +33,10 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
   });
 
   const [error, setError] = useState('');
-  const GOOGLE_CLIENT_ID = '382977690476-qqlbo0r0q27hprcjettr8l34t513pii4.apps.googleusercontent.com';
-
-  // Deteksi origin murni untuk Google Console
+  
+  // Client ID ustadz yang baru
+  const GOOGLE_CLIENT_ID = '769350037876-j7u6mul9fb3be11984h4jre7i9afsktd.apps.googleusercontent.com';
   const currentOrigin = window.location.origin.replace(/\/$/, "");
-
-  const toggleClass = (cls: string) => {
-    const current = [...formData.classes];
-    if (current.includes(cls)) {
-      setFormData({ ...formData, classes: current.filter(c => c !== cls) });
-    } else {
-      setFormData({ ...formData, classes: [...current, cls] });
-    }
-  };
 
   const handleInitialSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,22 +64,17 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
         setTempProfile(admin);
         setStep('cloud');
       } else {
-        setError('Email tidak terdaftar. Sila klik "KLIK REGISTRASI" di bawah jika Anda petugas baru.');
+        setError('Email tidak terdaftar di database lokal. Sila daftar sebagai petugas baru.');
       }
     } else {
       if (!formData.fullName || !formData.phone || !formData.email) {
-        setError("Mohon lengkapi seluruh kolom: Nama, Email, dan No. Telepon.");
+        setError("Mohon lengkapi seluruh kolom data diri.");
         return;
       }
 
       const users = getUsers();
       if (users.find(u => u.email.toLowerCase() === emailLower)) {
-        setError("Email sudah terdaftar. Sila login.");
-        return;
-      }
-
-      if (formData.role === UserRole.MUSYRIF && formData.classes.length === 0) {
-        setError("Musyrif/ah wajib memilih minimal satu Kelas Binaan.");
+        setError("Email sudah terdaftar. Sila gunakan menu login.");
         return;
       }
 
@@ -113,7 +99,7 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
 
   const handleCloudConnect = () => {
     if (typeof google === 'undefined') {
-      alert("Sistem Google sedang memuat... Mohon tunggu sebentar.");
+      alert("Sistem Google sedang memuat... Sila refresh halaman.");
       return;
     }
 
@@ -139,7 +125,7 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
               localStorage.setItem('mahasina_cloud_token', response.access_token);
               if (tempProfile) onComplete(tempProfile);
             } else {
-              alert("Gagal sinkronisasi database Idaroh. Sila coba kembali.");
+              alert("Gagal sinkronisasi Database Idaroh.");
             }
             setIsSyncing(false);
           }
@@ -148,12 +134,6 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
       client.requestAccessToken();
     } catch (e) {
       setShowTroubleshoot(true);
-    }
-  };
-
-  const handleSkipCloud = () => {
-    if (confirm("Peringatan: Tanpa Sinkronisasi Database Idaroh, laporan Anda tidak akan tercatat di sistem pusat Mahasina. Lanjutkan masuk Mode Lokal?")) {
-      if (tempProfile) onComplete(tempProfile);
     }
   };
 
@@ -181,11 +161,14 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
                  </div>
               </div>
 
-              <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
-                 <p className="text-[9px] font-black text-indigo-700 uppercase mb-2">💡 Tips Login Pertama:</p>
-                 <p className="text-[10px] text-indigo-800 leading-relaxed italic">
-                   Jika muncul layar "Google hasn't verified this app", klik <b>Advanced</b> lalu klik <b>Go to Smart Report Mahasina (unsafe)</b>.
-                 </p>
+              <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 flex gap-4">
+                 <ShieldAlert className="text-indigo-600 shrink-0" size={24} />
+                 <div>
+                    <p className="text-[9px] font-black text-indigo-700 uppercase mb-1">Tips Keamanan:</p>
+                    <p className="text-[10px] text-indigo-800 leading-relaxed italic">
+                      Gunakan Akun Google yang terdaftar di sistem Mahasina untuk keamanan data.
+                    </p>
+                 </div>
               </div>
            </div>
 
@@ -200,7 +183,7 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
               </button>
 
               <button 
-                onClick={handleSkipCloud}
+                onClick={() => tempProfile && onComplete(tempProfile)}
                 className="w-full py-4 text-slate-400 font-black text-[9px] uppercase tracking-widest hover:text-red-500 transition-all"
               >
                 Masuk Tanpa Sinkronisasi (Hanya Lokal)
@@ -208,27 +191,29 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
            </div>
 
            {showTroubleshoot && (
-             <div className="mt-8 p-6 bg-red-50 rounded-3xl border border-red-100 text-left animate-in slide-in-from-top-4 space-y-4">
-                <div className="flex items-center gap-2 mb-1">
-                   <AlertTriangle size={16} className="text-red-600" />
-                   <p className="text-[10px] font-black text-red-700 uppercase">Perlu Perbaikan Otorisasi Google</p>
+             <div className="mt-8 p-8 bg-slate-900 rounded-[2.5rem] text-left animate-in slide-in-from-top-4 space-y-6">
+                <div className="flex items-center gap-3">
+                   <AlertTriangle size={20} className="text-red-500" />
+                   <p className="text-[11px] font-black text-white uppercase tracking-widest">Login Error atau Diblokir?</p>
                 </div>
                 
-                <p className="text-[9px] text-red-600 font-medium leading-relaxed">
-                  Buka <b>Google Cloud Console</b>. Pastikan "Authorized JavaScript Origins" berisi URL ini (Tanpa miring di akhir):
-                </p>
-                
-                <div className="flex items-center gap-2 bg-white p-3 rounded-xl border border-red-200">
-                   <Globe size={14} className="text-slate-400" />
-                   <code className="text-[10px] font-black text-slate-700 flex-1 truncate">{currentOrigin}</code>
-                   <button onClick={() => { navigator.clipboard.writeText(currentOrigin); alert("URL disalin!"); }} className="p-2 hover:bg-slate-100 rounded-lg text-emerald-600">
-                      <Copy size={14} />
-                   </button>
-                </div>
-                
-                <div className="bg-slate-900 p-4 rounded-xl">
-                   <p className="text-[8px] text-slate-400 font-black uppercase mb-2 flex items-center gap-1"><Terminal size={10}/> App Client ID:</p>
-                   <code className="text-[8px] text-emerald-400 break-all font-mono leading-tight">{GOOGLE_CLIENT_ID}</code>
+                <div className="p-5 bg-emerald-900/20 border border-emerald-500/20 rounded-2xl space-y-4">
+                   <div className="flex items-center gap-2 text-emerald-400">
+                      <Check size={14}/>
+                      <p className="text-[9px] font-black uppercase">Wajib: JavaScript Origins</p>
+                   </div>
+                   <p className="text-[9px] text-slate-300 leading-relaxed">
+                     Pastikan URL di bawah ini dimasukkan ke kolom <b className="text-white">Authorized JavaScript origins</b> di Google Console.
+                   </p>
+                   <div className="flex items-center gap-2 bg-black/50 p-3 rounded-xl border border-slate-700">
+                      <code className="text-[10px] font-black text-emerald-400 flex-1 truncate">{currentOrigin}</code>
+                      <button onClick={() => { navigator.clipboard.writeText(currentOrigin); alert("URL disalin!"); }} className="p-2 hover:bg-slate-800 rounded-lg text-white">
+                         <Copy size={14} />
+                      </button>
+                   </div>
+                   <p className="text-[9px] text-red-400 font-bold uppercase italic flex items-center gap-2">
+                     <X size={12}/> Jangan masukkan ke "Redirect URIs"
+                   </p>
                 </div>
              </div>
            )}
@@ -270,8 +255,8 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
           </div>
 
           {!isLoginView && (
-            <>
-              <div className="space-y-1 animate-in fade-in slide-in-from-top-2">
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+              <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Lengkap</label>
                 <div className="relative">
                   <span className="absolute left-4 top-4 text-slate-400"><User size={18} /></span>
@@ -281,13 +266,13 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
                     value={formData.fullName}
                     onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                     className="w-full pl-12 pr-5 py-4 bg-slate-50 border border-transparent rounded-2xl focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all text-sm font-bold"
-                    placeholder="Nama Sesuai KTP/SK"
+                    placeholder="Nama Lengkap"
                   />
                 </div>
               </div>
 
-              <div className="space-y-1 animate-in fade-in slide-in-from-top-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nomor Telepon (WhatsApp)</label>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nomor WA</label>
                 <div className="relative">
                   <span className="absolute left-4 top-4 text-slate-400"><Phone size={18} /></span>
                   <input
@@ -301,13 +286,13 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
                 </div>
               </div>
 
-              <div className="space-y-1 animate-in fade-in slide-in-from-top-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jabatan / Peran Petugas</label>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jabatan</label>
                 <div className="relative">
                   <span className="absolute left-4 top-4 text-slate-400"><Briefcase size={18} /></span>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole, classes: [] })}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                     className="w-full pl-12 pr-10 py-4 border border-transparent bg-slate-50 rounded-2xl outline-none font-bold text-sm appearance-none focus:bg-white transition-all"
                   >
                     {Object.values(UserRole).map((role) => (
@@ -316,34 +301,7 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
                   </select>
                 </div>
               </div>
-
-              {formData.role === UserRole.MUSYRIF && (
-                <div className="space-y-3 animate-in slide-in-from-left-4 duration-500 mt-4 p-6 bg-emerald-50 rounded-[2rem] border border-emerald-100 shadow-inner">
-                  <label className="text-[10px] font-black text-emerald-800 uppercase tracking-widest flex items-center gap-2">
-                     <CheckSquare size={14}/> Pilih Kelas Binaan (Dapat Lebih Dari Satu)
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                     {availableClasses.length > 0 ? availableClasses.map(cls => (
-                       <button
-                         key={cls}
-                         type="button"
-                         onClick={() => toggleClass(cls)}
-                         className={`px-3 py-3 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-2 border-2 ${
-                           formData.classes.includes(cls) 
-                           ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' 
-                           : 'bg-white border-slate-100 text-slate-400 hover:border-emerald-200'
-                         }`}
-                       >
-                         {formData.classes.includes(cls) ? <CheckSquare size={12}/> : <Square size={12}/>}
-                         {cls}
-                       </button>
-                     )) : (
-                       <p className="col-span-3 text-[9px] text-slate-400 italic text-center py-4">Sila upload data santri terlebih dahulu untuk memunculkan daftar kelas.</p>
-                     )}
-                  </div>
-                </div>
-              )}
-            </>
+            </div>
           )}
 
           <button
@@ -357,12 +315,12 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
 
         <div className="mt-8 text-center pt-6 border-t border-slate-100">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            {isLoginView ? 'Petugas baru di Mahasina?' : 'Sudah terdaftar sebelumnya?'}
+            {isLoginView ? 'Belum punya akun?' : 'Sudah punya akun?'}
             <button 
               onClick={() => { setIsLoginView(!isLoginView); setError(''); }}
               className="ml-2 text-emerald-600 font-black hover:underline"
             >
-              {isLoginView ? 'KLIK REGISTRASI' : 'KLIK LOGIN'}
+              {isLoginView ? 'KLIK DAFTAR' : 'KLIK LOGIN'}
             </button>
           </p>
         </div>
