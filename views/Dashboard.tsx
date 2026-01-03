@@ -1,47 +1,76 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, Legend
-} from 'recharts';
-import { 
-  Activity, Clock, UserX, Users, Calendar, CheckCircle, Award, ShieldAlert, 
-  TrendingUp, Filter, UserCheck, Search, ChevronRight, AlertCircle, BookmarkCheck,
-  Download, Trophy, School, ListOrdered, GraduationCap, User, FileText, LayoutGrid, ChevronDown, ListChecks, Printer,
-  Eye, ShieldCheck, HelpCircle, ClipboardCheck, AlertTriangle, Layers, Trash2, Edit2, Check, X, BarChart3, Medal
+  Activity, Clock, CheckCircle, ShieldAlert, Trophy, 
+  Download, Filter, ChevronRight, Award, AlertTriangle, 
+  PieChart as PieIcon, BarChart3, UserCheck, Calendar, Search, FileText
 } from 'lucide-react';
 import { 
   UserRole, AttendanceRecord, ReportItem, AttendanceStatus, Student, 
-  UserProfile, TeacherAttendance, Schedule, TemplateItem, SessionType, ViolationCategory
+  UserProfile, TeacherAttendance, Schedule, AcademicConfig, SessionType, ViolationCategory
 } from '../types';
-import { CLASSES } from '../constants';
+import { 
+  PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend 
+} from 'recharts';
 import { downloadCSV } from '../utils/csvExport';
 
-// Fix: Define Period type to resolve "Cannot find name 'Period'" error
-type Period = 'Tanggal' | 'Hari Ini' | 'Minggu Ini' | 'Bulan Ini' | 'Semester' | 'Tahun Ajaran';
+const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b'];
 
-const StatCard = ({ label, value, color, icon: Icon, subLabel }: { label: string, value: number | string, color: string, icon: any, subLabel?: string }) => {
-  const colors: Record<string, string> = {
-    amber: 'bg-amber-50 text-amber-600',
-    blue: 'bg-blue-50 text-blue-600',
-    orange: 'bg-orange-50 text-orange-600',
-    red: 'bg-red-50 text-red-600',
-    slate: 'bg-slate-50 text-slate-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-  };
-  return (
-    <div className="bg-white p-8 rounded-[3rem] border shadow-sm flex items-center gap-6 group hover:shadow-xl transition-all duration-500">
-      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${colors[color] || 'bg-slate-50 text-slate-400'} shadow-inner group-hover:scale-110 transition-transform`}>
-        <Icon size={28} />
-      </div>
-      <div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-        <h4 className="text-3xl font-black text-slate-800 tracking-tighter">{value}</h4>
-        {subLabel && <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{subLabel}</p>}
-      </div>
-    </div>
-  );
+// Helper for filtering by time range
+const isWithinRange = (dateStr: string, range: string, customDate?: string) => {
+  const [d, m, y] = dateStr.split('/').map(Number);
+  const date = new Date(y, m - 1, d);
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  
+  switch (range) {
+    case 'Hari Ini':
+      return date.getTime() === now.getTime();
+    case 'Minggu Ini': {
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      return date >= startOfWeek;
+    }
+    case 'Bulan Ini':
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    case 'Semester': {
+      // Last 6 months simplified
+      const sixMonthsAgo = new Date(now);
+      sixMonthsAgo.setMonth(now.getMonth() - 6);
+      return date >= sixMonthsAgo;
+    }
+    case 'Pilih Tanggal':
+      if (!customDate) return true;
+      const [cy, cm, cd] = customDate.split('-').map(Number);
+      const target = new Date(cy, cm - 1, cd);
+      return date.getTime() === target.getTime();
+    default:
+      return true;
+  }
 };
+
+const RankingCard = ({ title, data, type, color = "amber" }: { title: string, data: any[], type: string, color?: string }) => (
+  <div className="bg-white p-6 rounded-[2.5rem] border border-slate-50 shadow-sm space-y-4">
+    <div className="flex items-center gap-3">
+       <div className={`w-8 h-8 bg-${color}-50 text-${color}-600 rounded-xl flex items-center justify-center`}><Award size={16}/></div>
+       <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{title}</h3>
+    </div>
+    <div className="space-y-2">
+       {data.slice(0, 5).map((item, idx) => (
+         <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl hover:bg-white hover:shadow-md transition-all group border border-transparent hover:border-slate-100">
+            <div className="flex items-center gap-3 overflow-hidden">
+               <span className={`w-6 h-6 shrink-0 rounded-lg flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-amber-500 text-white shadow-lg' : 'bg-white border text-slate-400'}`}>
+                  {idx + 1}
+               </span>
+               <span className="text-[10px] font-black text-slate-700 uppercase truncate">{item.name}</span>
+            </div>
+            <span className={`shrink-0 text-[10px] font-black ${idx === 0 ? 'text-red-600 bg-red-50' : 'text-slate-600 bg-slate-100'} px-2 py-0.5 rounded`}>{item.count} {type}</span>
+         </div>
+       ))}
+       {data.length === 0 && <p className="text-[9px] text-slate-300 italic text-center py-6 font-bold uppercase tracking-widest">Belum Ada Data</p>}
+    </div>
+  </div>
+);
 
 interface DashboardProps {
   attendance: AttendanceRecord[];
@@ -50,303 +79,483 @@ interface DashboardProps {
   students: Student[];
   teacherAttendance: TeacherAttendance[];
   schedules: Schedule[];
-  violationTemplates: TemplateItem[];
-  achievementTemplates: TemplateItem[];
+  academicConfig: AcademicConfig;
   onDeleteReport?: (id: string) => void;
   onUpdateReport?: (report: ReportItem) => void;
-  onDeleteAttendance?: (id: string) => void;
-  onDeleteTeacherAttendance?: (id: string) => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ 
-  attendance, 
-  reports, 
-  profile, 
-  students, 
-  teacherAttendance, 
-  schedules,
-  violationTemplates,
-  achievementTemplates,
-  onDeleteReport,
-  onUpdateReport,
-  onDeleteAttendance,
-  onDeleteTeacherAttendance
+  attendance, reports, profile, students, teacherAttendance, schedules, academicConfig
 }) => {
-  const [activeTab, setActiveTab] = useState<'santri' | 'guru' | 'pelanggaran' | 'prestasi'>('santri');
-  const [showRawLogs, setShowRawLogs] = useState(false);
-  const [editingReport, setEditingReport] = useState<ReportItem | null>(null);
+  const [activeTab, setActiveTab] = useState<'Santri' | 'Guru' | 'Pelanggaran' | 'Prestasi'>('Santri');
+  const [timeRange, setTimeRange] = useState('Bulan Ini');
+  const [customDate, setCustomDate] = useState(new Date().toISOString().split('T')[0]);
   
-  // Local state for Ranking Category
-  const [activeRankCategory, setActiveRankCategory] = useState<AttendanceStatus>(AttendanceStatus.S);
-  
-  const [filters, setFilters] = useState({
-    class: 'Semua',
-    level: 'Semua',
-    gender: 'Semua',
-    session: 'Semua' as SessionType | 'Semua',
-    period: 'Bulan Ini' as Period,
-    customDate: new Date().toISOString().split('T')[0]
-  });
+  // Advanced Filters
+  const [filterSession, setFilterSession] = useState<SessionType | 'Semua'>('Semua');
+  const [filterLevel, setFilterLevel] = useState<'Semua' | 'MTs' | 'MA'>('Semua');
+  const [filterGender, setFilterGender] = useState<'Semua' | 'Putra' | 'Putri'>('Semua');
+  const [filterClass, setFilterClass] = useState('Semua');
 
-  const isSuperAdmin = profile.email.toLowerCase() === 'idarohmahasina@gmail.com';
-  const isManagement = profile.role === UserRole.IDAROH || profile.role === UserRole.PENGASUH;
-  const isSantriOfficer = profile.role === UserRole.SANTRI_OFFICER;
+  // Ranking View Toggles
+  const [santriRankStatus, setSantriRankStatus] = useState<AttendanceStatus>(AttendanceStatus.A);
 
-  const isWithinPeriod = (dateStr: string) => {
-    try {
-      const parts = dateStr.split('/');
-      const targetDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      targetDate.setHours(0, 0, 0, 0);
-      const diffDays = Math.ceil((now.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24));
+  const isAdmin = profile.role === UserRole.IDAROH || profile.role === UserRole.PENGASUH;
+  const isMusyrif = profile.role === UserRole.MUSYRIF;
+  const isGuru = profile.role === UserRole.GURU;
+  const isPetugasSantri = profile.role === UserRole.SANTRI_OFFICER;
 
-      switch (filters.period) {
-        case 'Tanggal': {
-          const selected = new Date(filters.customDate);
-          selected.setHours(0,0,0,0);
-          return targetDate.getTime() === selected.getTime();
-        }
-        case 'Hari Ini': return targetDate.getTime() === now.getTime();
-        case 'Minggu Ini': return diffDays >= 0 && diffDays < 7;
-        case 'Bulan Ini': return targetDate.getMonth() === now.getMonth() && targetDate.getFullYear() === now.getFullYear();
-        case 'Semester': return diffDays >= 0 && diffDays < 180;
-        case 'Tahun Ajaran': return true;
-        default: return true;
-      }
-    } catch { return true; }
+  // 1. Data Filter Logic (Santri)
+  const filteredAttendance = useMemo(() => {
+    let list = attendance.filter(a => isWithinRange(a.date, timeRange, customDate));
+    
+    // Role filter
+    if (isMusyrif) {
+      list = list.filter(a => {
+        const s = students.find(std => std.id === a.studentId);
+        return profile.classes?.includes(s?.formalClass || '');
+      });
+    }
+
+    if (filterSession !== 'Semua') list = list.filter(a => a.sessionType === filterSession);
+    if (filterClass !== 'Semua') list = list.filter(a => a.class === filterClass);
+
+    return list.filter(a => {
+      const s = students.find(std => std.id === a.studentId);
+      if (!s) return false;
+      const matchLvl = filterLevel === 'Semua' || s.level === filterLevel;
+      const matchGdr = filterGender === 'Semua' || s.gender === filterGender;
+      return matchLvl && matchGdr;
+    });
+  }, [attendance, timeRange, customDate, filterSession, filterClass, filterLevel, filterGender, isMusyrif, profile.classes, students]);
+
+  // 2. Data Filter Logic (Teacher)
+  const filteredTeachers = useMemo(() => {
+    let list = teacherAttendance.filter(a => isWithinRange(a.date, timeRange, customDate));
+    if (isGuru) list = list.filter(a => a.teacherName === profile.fullName);
+    if (filterClass !== 'Semua') list = list.filter(a => a.class === filterClass);
+    return list.filter(a => {
+      const matchLvl = filterLevel === 'Semua' || a.level === filterLevel;
+      const matchGdr = filterGender === 'Semua' || a.gender === filterGender;
+      return matchLvl && matchGdr;
+    });
+  }, [teacherAttendance, timeRange, customDate, isGuru, profile.fullName, filterClass, filterLevel, filterGender]);
+
+  // 3. Data Filter Logic (Reports)
+  const getFilteredReports = (type: 'Violation' | 'Achievement') => {
+    let list = reports.filter(r => r.type === type && isWithinRange(r.date, timeRange, customDate));
+    
+    if (isMusyrif) {
+      list = list.filter(r => {
+        const s = students.find(std => std.id === r.studentId);
+        return profile.classes?.includes(s?.formalClass || '');
+      });
+    }
+
+    if (filterClass !== 'Semua') list = list.filter(r => {
+      const s = students.find(std => std.id === r.studentId);
+      return s?.formalClass === filterClass;
+    });
+
+    return list.filter(r => {
+      const s = students.find(std => std.id === r.studentId);
+      if (!s) return false;
+      const matchLvl = filterLevel === 'Semua' || s.level === filterLevel;
+      const matchGdr = filterGender === 'Semua' || s.gender === filterGender;
+      return matchLvl && matchGdr;
+    });
   };
 
-  const filteredData = useMemo(() => {
-    const allowedStudents = students.filter(s => {
-      const isAllowed = isManagement || isSantriOfficer || 
-        (profile.role === UserRole.MUSYRIF && profile.classes?.includes(s.formalClass));
-      if (!isAllowed) return false;
-      return (filters.class === 'Semua' || s.formalClass === filters.class) &&
-             (filters.level === 'Semua' || s.level === filters.level) &&
-             (filters.gender === 'Semua' || s.gender === filters.gender);
-    });
-    const ids = new Set(allowedStudents.map(s => s.id));
-    return {
-      students: allowedStudents,
-      attendance: attendance.filter(a => ids.has(a.studentId) && isWithinPeriod(a.date) && (filters.session === 'Semua' || a.sessionType === filters.session)),
-      reports: reports.filter(r => ids.has(r.studentId) && isWithinPeriod(r.date))
-    };
-  }, [students, attendance, reports, filters, profile, isManagement, isSantriOfficer]);
+  // Stats Calculations
+  const stats = {
+    H: filteredAttendance.filter(a => a.status === AttendanceStatus.H).length,
+    S: filteredAttendance.filter(a => a.status === AttendanceStatus.S).length,
+    I: filteredAttendance.filter(a => a.status === AttendanceStatus.I).length,
+    T: filteredAttendance.filter(a => a.status === AttendanceStatus.T).length,
+    A: filteredAttendance.filter(a => a.status === AttendanceStatus.A).length,
+  };
 
-  const rankings = useMemo(() => {
-    const sMap = new Map<string, { name: string, class: string, s: number, i: number, t: number, a: number }>();
-    const cMap = new Map<string, { name: string, s: number, i: number, t: number, a: number }>();
+  const teacherStats = {
+    present: filteredTeachers.filter(a => a.status === 'Hadir').length,
+    late: filteredTeachers.filter(a => a.status === 'Terlambat').length,
+    sick: filteredTeachers.filter(a => a.status === 'Izin').length,
+    alpha: filteredTeachers.filter(a => a.status === 'Alpha').length,
+    totalSessions: filteredTeachers.length
+  };
 
-    filteredData.students.forEach(s => {
-      sMap.set(s.id, { name: s.name, class: s.formalClass, s: 0, i: 0, t: 0, a: 0 });
-      if (!cMap.has(s.formalClass)) cMap.set(s.formalClass, { name: s.formalClass, s: 0, i: 0, t: 0, a: 0 });
-    });
-
-    filteredData.attendance.forEach(att => {
-      const s = sMap.get(att.studentId);
-      const c = cMap.get(att.class);
-      if (s && c) {
-        if (att.status === AttendanceStatus.S) { s.s++; c.s++; }
-        else if (att.status === AttendanceStatus.I) { s.i++; c.i++; }
-        else if (att.status === AttendanceStatus.T) { s.t++; c.t++; }
-        else if (att.status === AttendanceStatus.A) { s.a++; c.a++; }
+  const getRankingSITA = (status: AttendanceStatus, target: 'name' | 'class') => {
+    const map: Record<string, number> = {};
+    filteredAttendance.filter(a => a.status === status).forEach(a => {
+      const s = students.find(std => std.id === a.studentId);
+      if (s) {
+        const key = target === 'name' ? s.name : s.formalClass;
+        map[key] = (map[key] || 0) + 1;
       }
     });
+    return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count);
+  };
 
-    const getTop = (map: Map<string, any>, key: 's'|'i'|'t'|'a') => 
-      Array.from(map.values()).filter(x => x[key] > 0).sort((a, b) => b[key] - a[key]).slice(0, 5);
+  const getReportRankings = (type: 'Violation' | 'Achievement', target: 'name' | 'class') => {
+    const list = getFilteredReports(type);
+    const map: Record<string, number> = {};
+    list.forEach(r => {
+      const s = students.find(std => std.id === r.studentId);
+      if (s) {
+        const key = target === 'name' ? s.name : s.formalClass;
+        map[key] = (map[key] || 0) + 1;
+      }
+    });
+    return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count);
+  };
 
-    return {
-      s: { s: getTop(sMap, 's'), i: getTop(sMap, 'i'), t: getTop(sMap, 't'), a: getTop(sMap, 'a') },
-      c: { s: getTop(cMap, 's'), i: getTop(cMap, 'i'), t: getTop(cMap, 't'), a: getTop(cMap, 'a') }
-    };
-  }, [filteredData]);
+  const violationStats = getFilteredReports('Violation');
+  const achievementStats = getFilteredReports('Achievement');
 
-  const currentRankInfo = useMemo(() => {
-    const key = activeRankCategory === AttendanceStatus.S ? 's' : 
-                activeRankCategory === AttendanceStatus.I ? 'i' : 
-                activeRankCategory === AttendanceStatus.T ? 't' : 'a';
-    const label = activeRankCategory === AttendanceStatus.S ? 'Sakit' : 
-                  activeRankCategory === AttendanceStatus.I ? 'Izin' : 
-                  activeRankCategory === AttendanceStatus.T ? 'Terlambat' : 'Alpha';
-    const color = activeRankCategory === AttendanceStatus.S ? 'text-amber-600' : 
-                  activeRankCategory === AttendanceStatus.I ? 'text-blue-600' : 
-                  activeRankCategory === AttendanceStatus.T ? 'text-orange-600' : 'text-red-600';
-    const unit = activeRankCategory === AttendanceStatus.T ? 'KALI' : 'HARI';
-    
-    return {
-      students: rankings.s[key],
-      classes: rankings.c[key],
-      label, color, unit, key
-    };
-  }, [rankings, activeRankCategory]);
-
-  const handlePrint = () => { window.print(); };
+  const reportCategoryChart = useMemo(() => {
+    const list = activeTab === 'Pelanggaran' ? violationStats : achievementStats;
+    const map: Record<string, number> = {};
+    list.forEach(r => {
+      map[r.category] = (map[r.category] || 0) + 1;
+    });
+    return Object.entries(map).map(([name, value]) => ({ name, value }));
+  }, [activeTab, violationStats, achievementStats]);
 
   return (
-    <div className="space-y-10 pb-20 animate-in fade-in duration-1000">
-      {/* Filters Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 bg-white p-10 rounded-[4rem] border shadow-sm print:hidden">
-        <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-3xl w-full md:w-fit shadow-inner">
-          {['santri', 'guru', 'pelanggaran', 'prestasi'].map((t) => (
-            <button key={t} onClick={() => setActiveTab(t as any)} className={`flex-1 md:flex-none px-10 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${activeTab === t ? 'bg-white text-emerald-800 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}>
-              {t === 'santri' ? 'ABSENSI' : t.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="relative flex-1 md:w-48">
-             <select value={filters.period} onChange={e => setFilters({...filters, period: e.target.value as Period})} className="w-full pl-6 pr-10 py-4 bg-slate-50 border-2 border-slate-100 rounded-3xl text-[10px] font-black uppercase outline-none appearance-none">
-                {['Tanggal', 'Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Semester', 'Tahun Ajaran'].map(p => <option key={p} value={p}>{p}</option>)}
-             </select>
-             <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
-          </div>
-          <button onClick={handlePrint} className="p-4 bg-emerald-600 text-white rounded-3xl shadow-xl hover:bg-emerald-700 transition-all"><Printer size={20}/></button>
-        </div>
+    <div className="space-y-8 animate-in fade-in duration-700 pb-20">
+      
+      {/* 1. Header & Navigation */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+         <div>
+            <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase leading-none">Dashboard</h2>
+            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mt-2 italic">Analitik & Laporan Mahasina</p>
+         </div>
+         <div className="flex bg-slate-100 p-1 rounded-2xl shadow-inner shrink-0 overflow-x-auto no-scrollbar max-w-full">
+            {['Santri', 'Guru', 'Pelanggaran', 'Prestasi'].map(t => {
+               if (t === 'Guru' && isPetugasSantri) return null;
+               if ((t === 'Pelanggaran' || t === 'Prestasi') && isGuru) return null;
+               return (
+                  <button 
+                    key={t} 
+                    onClick={() => setActiveTab(t as any)} 
+                    className={`px-5 sm:px-8 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === t ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    {t}
+                  </button>
+               )
+            })}
+         </div>
       </div>
 
-      {activeTab === 'santri' && (
-        <div className="space-y-12">
-          {/* Quick Recap Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard label="Sakit (S)" value={filteredData.attendance.filter(a => a.status === AttendanceStatus.S).length} color="amber" icon={Activity} />
-            <StatCard label="Izin (I)" value={filteredData.attendance.filter(a => a.status === AttendanceStatus.I).length} color="blue" icon={CheckCircle} />
-            <StatCard label="Telat (T)" value={filteredData.attendance.filter(a => a.status === AttendanceStatus.T).length} color="orange" icon={Clock} />
-            <StatCard label="Alpha (A)" value={filteredData.attendance.filter(a => a.status === AttendanceStatus.A).length} color="red" icon={UserX} />
-          </div>
-
-          {/* Unified Ranking Center */}
-          {(isManagement || isSantriOfficer) && (
-            <div className="bg-white p-10 md:p-14 rounded-[4rem] border shadow-sm relative overflow-hidden animate-in zoom-in-95 duration-700">
-               {/* Internal Ranking Filter Switcher */}
-               <div className="absolute top-0 right-0 p-8 flex gap-2 z-10 print:hidden">
-                  {[
-                    { st: AttendanceStatus.S, label: 'S', color: 'bg-amber-500', bg: 'bg-amber-50' },
-                    { st: AttendanceStatus.I, label: 'I', color: 'bg-blue-500', bg: 'bg-blue-50' },
-                    { st: AttendanceStatus.T, label: 'T', color: 'bg-orange-500', bg: 'bg-orange-50' },
-                    { st: AttendanceStatus.A, label: 'A', color: 'bg-red-500', bg: 'bg-red-50' }
-                  ].map(item => (
-                    <button
-                      key={item.st}
-                      onClick={() => setActiveRankCategory(item.st)}
-                      className={`w-12 h-12 rounded-2xl font-black text-xs transition-all shadow-sm flex items-center justify-center ${activeRankCategory === item.st ? `${item.color} text-white scale-110 shadow-lg` : `${item.bg} text-slate-400 hover:scale-105`}`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-               </div>
-
-               <div className="flex items-center gap-6 mb-12">
-                  <div className={`w-16 h-16 rounded-[2rem] flex items-center justify-center text-white shadow-xl ${currentRankInfo.color.replace('text', 'bg')}`}>
-                     <Medal size={32} />
-                  </div>
-                  <div>
-                     <h3 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Peringkat Ketidakhadiran</h3>
-                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Filter Kategori: <span className={`${currentRankInfo.color} font-black`}>{currentRankInfo.label.toUpperCase()}</span></p>
-                  </div>
-               </div>
-
-               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                  {/* Top 5 Santri */}
-                  <div className="space-y-6">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b pb-4">
-                      <User size={14}/> Top 5 Santri Terbanyak {currentRankInfo.label}
-                    </h4>
-                    <div className="space-y-3">
-                      {currentRankInfo.students.map((item: any, i: number) => (
-                        <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-3xl border-2 border-transparent hover:bg-white hover:border-slate-50 hover:shadow-xl transition-all duration-300 group">
-                           <div className="flex items-center gap-4">
-                              <span className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black ${i === 0 ? 'bg-amber-400 text-white shadow-lg' : 'bg-slate-200 text-slate-400'}`}>{i+1}</span>
-                              <div>
-                                <p className="text-sm font-black text-slate-800 group-hover:text-emerald-700 transition-colors">{item.name}</p>
-                                <p className="text-[9px] text-slate-400 font-black uppercase tracking-wider">KELAS {item.class}</p>
-                              </div>
-                           </div>
-                           <div className="text-right">
-                              <div className="px-5 py-2 rounded-2xl bg-white shadow-sm border border-slate-50 flex flex-col items-center min-w-[70px]">
-                                <span className={`text-xl font-black ${currentRankInfo.color}`}>{item[currentRankInfo.key]}</span>
-                                <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">{currentRankInfo.unit}</span>
-                              </div>
-                           </div>
-                        </div>
-                      ))}
-                      {currentRankInfo.students.length === 0 && <div className="py-12 text-center text-slate-300 italic text-xs">Belum ada data peringkat</div>}
-                    </div>
-                  </div>
-
-                  {/* Top 5 Class */}
-                  <div className="space-y-6">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b pb-4">
-                      <School size={14}/> Top 5 Kelas Terbanyak {currentRankInfo.label}
-                    </h4>
-                    <div className="space-y-3">
-                      {currentRankInfo.classes.map((item: any, i: number) => (
-                        <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-3xl border-2 border-transparent hover:bg-white hover:border-slate-50 hover:shadow-xl transition-all duration-300 group">
-                           <div className="flex items-center gap-4">
-                              <span className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black ${i === 0 ? 'bg-indigo-500 text-white shadow-lg' : 'bg-slate-200 text-slate-400'}`}>{i+1}</span>
-                              <p className="text-sm font-black text-slate-800 uppercase tracking-tight group-hover:text-emerald-700 transition-colors">KELAS {item.name}</p>
-                           </div>
-                           <div className="text-right">
-                              <div className="px-5 py-2 rounded-2xl bg-white shadow-sm border border-slate-50 flex flex-col items-center min-w-[70px]">
-                                <span className={`text-xl font-black ${currentRankInfo.color}`}>{item[currentRankInfo.key]}</span>
-                                <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">{currentRankInfo.unit}</span>
-                              </div>
-                           </div>
-                        </div>
-                      ))}
-                      {currentRankInfo.classes.length === 0 && <div className="py-12 text-center text-slate-300 italic text-xs">Belum ada data peringkat</div>}
-                    </div>
-                  </div>
-               </div>
+      {/* 2. Global Filter Bar */}
+      <div className="bg-white p-6 rounded-[3rem] border border-slate-50 shadow-sm space-y-6">
+         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="space-y-1">
+               <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Rentang Waktu</label>
+               <select value={timeRange} onChange={e => setTimeRange(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
+                  {['Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Semester', 'Pilih Tanggal'].map(r => <option key={r} value={r}>{r}</option>)}
+               </select>
             </div>
-          )}
+            <div className="space-y-1">
+               <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Sesi / Unit</label>
+               <select value={filterSession} onChange={e => setFilterSession(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
+                  <option value="Semua">SEMUA SESI</option>
+                  {Object.values(SessionType).map(s => <option key={s} value={s}>{s}</option>)}
+               </select>
+            </div>
+            <div className="space-y-1">
+               <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Tingkatan</label>
+               <select value={filterLevel} onChange={e => setFilterLevel(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
+                  <option value="Semua">SEMUA TINGKATAN (MA/MTs)</option>
+                  <option value="MTs">MTs SAHAJA</option>
+                  <option value="MA">MA SAHAJA</option>
+               </select>
+            </div>
+            <div className="space-y-1">
+               <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Gender</label>
+               <select value={filterGender} onChange={e => setFilterGender(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
+                  <option value="Semua">SEMUA GENDER (PUTRA & PUTRI)</option>
+                  <option value="Putra">PUTRA</option>
+                  <option value="Putri">PUTRI</option>
+               </select>
+            </div>
+            <div className="space-y-1">
+               <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Kelas Spesifik</label>
+               <select value={filterClass} onChange={e => setFilterClass(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
+                  <option value="Semua">SEMUA KELAS</option>
+                  {Array.from(new Set(students.map(s => s.formalClass))).sort().map(c => <option key={c} value={c}>{c}</option>)}
+               </select>
+            </div>
+         </div>
+         {timeRange === 'Pilih Tanggal' && (
+           <div className="pt-4 border-t border-slate-50 flex items-center gap-4">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Pilih Tanggal Spesifik:</label>
+              <input type="date" value={customDate} onChange={e => setCustomDate(e.target.value)} className="px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-black outline-none border border-slate-100" />
+           </div>
+         )}
+      </div>
 
-          {/* Raw Log Logs */}
-          <div className="bg-white rounded-[4rem] border shadow-sm overflow-hidden border-2 border-slate-50">
-             <div className="p-10 md:p-12 border-b bg-emerald-900 text-white flex flex-col md:flex-row justify-between items-center gap-6">
-                <div>
-                   <h3 className="text-2xl font-black uppercase tracking-tighter">Rekapitulasi Absensi Santri</h3>
-                   <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-[0.2em] mt-2 italic">Menampilkan Log Absensi Lengkap Sesuai Filter</p>
+      {/* 3. Main Statistic Content */}
+      {activeTab === 'Santri' && (
+        <div className="space-y-8 animate-in slide-in-from-bottom-4">
+           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { label: 'Sakit / Izin', val: stats.S + stats.I, color: 'blue', icon: Activity },
+                { label: 'Terlambat', val: stats.T, color: 'orange', icon: Clock },
+                { label: 'Alpha', val: stats.A, color: 'red', icon: AlertTriangle },
+                { label: 'Hadir', val: stats.H, color: 'emerald', icon: CheckCircle },
+              ].map(st => (
+                <div key={st.label} className="bg-white p-6 rounded-[2.5rem] border border-slate-50 shadow-sm flex items-center gap-6 hover:shadow-xl transition-all group">
+                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center bg-${st.color}-50 text-${st.color}-600 shadow-inner group-hover:scale-110 transition-transform`}>
+                      <st.icon size={28}/>
+                   </div>
+                   <div>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{st.label}</p>
+                      <h4 className="text-3xl font-black text-slate-800 leading-none">{st.val}</h4>
+                   </div>
                 </div>
-                <button onClick={() => downloadCSV(filteredData.attendance, 'Log_Absensi_Santri')} className="flex items-center gap-3 px-8 py-4 bg-white text-emerald-900 rounded-[1.5rem] text-[9px] font-black uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-xl">
-                  <Download size={18} /> EXPORT EXCEL
-                </button>
-             </div>
-             <div className="overflow-x-auto">
-               <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b text-center">
-                    <tr>
-                      <th className="px-10 py-7 text-left">Santri</th>
-                      <th className="px-10 py-7">Sesi</th>
-                      <th className="px-6 py-7">Status</th>
-                      <th className="px-10 py-7 text-right">Tanggal</th>
-                    </tr>
+              ))}
+           </div>
+
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-white p-8 rounded-[3rem] border border-slate-50 shadow-sm space-y-6">
+                 <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><PieIcon size={16} className="text-emerald-600"/> Komposisi Kehadiran</h3>
+                 <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                       <PieChart>
+                          <Pie 
+                            data={[
+                              { name: 'Sakit', val: stats.S },
+                              { name: 'Izin', val: stats.I },
+                              { name: 'Terlambat', val: stats.T },
+                              { name: 'Alpha', val: stats.A },
+                              { name: 'Hadir', val: stats.H }
+                            ].filter(d => d.val > 0)} 
+                            cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="val"
+                          >
+                             {[0,1,2,3,4].map(idx => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
+                          </Pie>
+                          <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', fontSize: '10px'}} />
+                          <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                       </PieChart>
+                    </ResponsiveContainer>
+                 </div>
+              </div>
+
+              <div className="space-y-6">
+                 <div className="bg-white p-6 rounded-[2.5rem] border border-slate-50 shadow-sm space-y-4">
+                    <div className="flex justify-between items-center">
+                       <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Ranking Ketidakhadiran</h3>
+                       <div className="flex gap-1 bg-slate-50 p-1 rounded-lg">
+                          {[AttendanceStatus.A, AttendanceStatus.T, AttendanceStatus.I, AttendanceStatus.S].map(st => (
+                             <button key={st} onClick={() => setSantriRankStatus(st)} className={`w-8 h-8 rounded-md text-[10px] font-black transition-all ${santriRankStatus === st ? 'bg-emerald-800 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>{st[0]}</button>
+                          ))}
+                       </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-6">
+                       <RankingCard title={`Ranking Siswa (${santriRankStatus})`} data={getRankingSITA(santriRankStatus, 'name')} type="KALI" />
+                       <RankingCard title={`Ranking Kelas (${santriRankStatus})`} data={getRankingSITA(santriRankStatus, 'class')} type="KALI" color="blue" />
+                    </div>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {activeTab === 'Guru' && !isPetugasSantri && (
+        <div className="space-y-8 animate-in slide-in-from-bottom-4">
+           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              {[
+                { label: 'Sesi Diajar', val: teacherStats.totalSessions, color: 'slate', icon: FileText },
+                { label: 'Hadir', val: teacherStats.present, color: 'emerald', icon: CheckCircle },
+                { label: 'Terlambat', val: teacherStats.late, color: 'orange', icon: Clock },
+                { label: 'Izin / Sakit', val: teacherStats.sick, color: 'blue', icon: Activity },
+                { label: 'Alpha', val: teacherStats.alpha, color: 'red', icon: AlertTriangle },
+              ].map(st => (
+                <div key={st.label} className="bg-white p-6 rounded-[2rem] border border-slate-50 shadow-sm text-center">
+                   <div className={`w-10 h-10 rounded-xl mx-auto mb-3 flex items-center justify-center bg-${st.color}-50 text-${st.color}-600`}>
+                      <st.icon size={20}/>
+                   </div>
+                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{st.label}</p>
+                   <h4 className="text-xl font-black text-slate-800 mt-1">{st.val}</h4>
+                </div>
+              ))}
+           </div>
+        </div>
+      )}
+
+      {(activeTab === 'Pelanggaran' || activeTab === 'Prestasi') && !isGuru && (
+        <div className="space-y-8 animate-in slide-in-from-bottom-4">
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { label: `Total ${activeTab}`, val: activeTab === 'Pelanggaran' ? violationStats.length : achievementStats.length, color: activeTab === 'Pelanggaran' ? 'red' : 'emerald', icon: activeTab === 'Pelanggaran' ? ShieldAlert : Trophy },
+                { label: 'Sudah Ditindak', val: (activeTab === 'Pelanggaran' ? violationStats : achievementStats).filter(r => r.status === 'Ditindak').length, color: 'blue', icon: CheckCircle },
+                { label: 'Belum Ditindak', val: (activeTab === 'Pelanggaran' ? violationStats : achievementStats).filter(r => r.status === 'Belum Ditindak').length, color: 'amber', icon: Clock },
+              ].map(st => (
+                <div key={st.label} className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm flex items-center gap-6">
+                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center bg-${st.color}-50 text-${st.color}-600 shadow-inner`}>
+                      <st.icon size={28}/>
+                   </div>
+                   <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{st.label}</p>
+                      <h4 className="text-3xl font-black text-slate-800">{st.val}</h4>
+                   </div>
+                </div>
+              ))}
+           </div>
+
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-white p-8 rounded-[3rem] border border-slate-50 shadow-sm space-y-6">
+                 <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><BarChart3 size={16} className="text-indigo-600"/> Tren Kategori {activeTab}</h3>
+                 <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                       <BarChart data={reportCategoryChart}>
+                          <XAxis dataKey="name" fontSize={8} fontWeight="bold" />
+                          <YAxis fontSize={8} />
+                          <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', fontSize: '10px'}} />
+                          <Bar dataKey="value" fill={activeTab === 'Pelanggaran' ? '#ef4444' : '#10b981'} radius={[6, 6, 0, 0]} />
+                       </BarChart>
+                    </ResponsiveContainer>
+                 </div>
+              </div>
+              <div className="grid grid-cols-1 gap-6">
+                 <RankingCard title={`Ranking Siswa Ter-aktif (${activeTab})`} data={getReportRankings(activeTab === 'Pelanggaran' ? 'Violation' : 'Achievement', 'name')} type="DATA" />
+                 <RankingCard title={`Ranking Kelas Ter-aktif (${activeTab})`} data={getReportRankings(activeTab === 'Pelanggaran' ? 'Violation' : 'Achievement', 'class')} type="DATA" color="blue" />
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* 4. DETAIL DATA TABLE (AT THE VERY BOTTOM) */}
+      <div className="bg-white p-10 rounded-[3.5rem] border border-slate-50 shadow-xl overflow-hidden mt-12">
+         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+            <div>
+               <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-3"><FileText size={20} className="text-emerald-700"/> Rekap Detail {activeTab}</h3>
+               <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Tampilkan data berdasarkan filter yang aktif</p>
+            </div>
+            <button 
+              onClick={() => {
+                let dataToExport = [];
+                if (activeTab === 'Santri') dataToExport = filteredAttendance;
+                else if (activeTab === 'Guru') dataToExport = filteredTeachers;
+                else if (activeTab === 'Pelanggaran') dataToExport = violationStats;
+                else dataToExport = achievementStats;
+                downloadCSV(dataToExport, `Rekap_${activeTab}_Mahasina`);
+              }}
+              className="p-3.5 bg-emerald-900 text-white rounded-2xl shadow-lg flex items-center gap-3 text-[9px] font-black uppercase tracking-widest hover:bg-emerald-800 transition-all active:scale-95 whitespace-nowrap"
+            >
+               <Download size={16}/> Unduh Laporan (CSV)
+            </button>
+         </div>
+
+         <div className="overflow-x-auto no-scrollbar">
+            {activeTab === 'Santri' ? (
+               <table className="w-full text-left">
+                  <thead>
+                     <tr className="border-b-2 border-slate-50">
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Siswa / Kelas</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Sesi / Tanggal</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Catatan</th>
+                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-center">
-                     {filteredData.attendance.map(a => (
-                       <tr key={a.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-10 py-7 text-left">
-                            <p className="font-black text-slate-800">{students.find(s => s.id === a.studentId)?.name}</p>
-                            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">KELAS {a.class}</p>
-                          </td>
-                          <td className="px-10 py-7 text-xs font-black text-emerald-600 uppercase tracking-widest">{a.sessionType}</td>
-                          <td className="px-6 py-7">
-                            <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                              a.status === AttendanceStatus.H ? 'bg-emerald-100 text-emerald-700' :
-                              a.status === AttendanceStatus.A ? 'bg-red-100 text-red-700' :
-                              'bg-amber-100 text-amber-700'
-                            }`}>{a.status}</span>
-                          </td>
-                          <td className="px-10 py-7 text-right text-[10px] font-black text-slate-400 uppercase">{a.date}</td>
-                       </tr>
+                  <tbody className="divide-y divide-slate-50">
+                     {filteredAttendance.map(a => (
+                        <tr key={a.id} className="group hover:bg-slate-50 transition-all">
+                           <td className="py-5 pr-4">
+                              <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{students.find(s=>s.id===a.studentId)?.name || 'Siswa Dihapus'}</p>
+                              <p className="text-[8px] font-bold text-slate-400 mt-1.5 uppercase tracking-tighter">Unit: {a.class}</p>
+                           </td>
+                           <td className="py-5 pr-4">
+                              <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest ${
+                                a.status === AttendanceStatus.H ? 'bg-emerald-100 text-emerald-800' : 
+                                a.status === AttendanceStatus.A ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                              }`}>{a.status}</span>
+                           </td>
+                           <td className="py-5 pr-4">
+                              <p className="text-[9px] font-bold text-slate-600">{a.sessionType}</p>
+                              <p className="text-[8px] font-black text-slate-400 mt-1 uppercase">{a.date}</p>
+                           </td>
+                           <td className="py-5 pr-4 text-[10px] font-medium text-slate-500 italic">{a.note || '-'}</td>
+                        </tr>
                      ))}
                   </tbody>
                </table>
-             </div>
-          </div>
-        </div>
-      )}
+            ) : activeTab === 'Guru' ? (
+               <table className="w-full text-left">
+                  <thead>
+                     <tr className="border-b-2 border-slate-50">
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Nama Guru</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Mapel / Kelas</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Jam Absen</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                     {filteredTeachers.map(a => (
+                        <tr key={a.id} className="group hover:bg-slate-50 transition-all">
+                           <td className="py-5 pr-4 text-[11px] font-black text-slate-800 uppercase">{a.teacherName}</td>
+                           <td className="py-5 pr-4">
+                              <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest ${
+                                a.status === 'Hadir' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                              }`}>{a.status}</span>
+                           </td>
+                           <td className="py-5 pr-4">
+                              <p className="text-[10px] font-bold text-slate-600">{a.subject}</p>
+                              <p className="text-[8px] font-black text-slate-400 mt-1 uppercase">{a.class} • {a.level}</p>
+                           </td>
+                           <td className="py-5 pr-4">
+                              <p className="text-[9px] font-black text-slate-800">{a.checkInTime} - {a.checkOutTime || '...'}</p>
+                              <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">{a.date}</p>
+                           </td>
+                        </tr>
+                     ))}
+                  </tbody>
+               </table>
+            ) : (
+               <table className="w-full text-left">
+                  <thead>
+                     <tr className="border-b-2 border-slate-50">
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Siswa / Kelas</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Deskripsi Laporan</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Kat / Poin</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status Tindak</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                     {(activeTab === 'Pelanggaran' ? violationStats : achievementStats).map(r => (
+                        <tr key={r.id} className="group hover:bg-slate-50 transition-all">
+                           <td className="py-5 pr-4">
+                              <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{students.find(s=>s.id===r.studentId)?.name || 'Siswa Dihapus'}</p>
+                              <p className="text-[8px] font-bold text-slate-400 mt-1.5 uppercase tracking-tighter">{r.date}</p>
+                           </td>
+                           <td className="py-5 pr-4">
+                              <p className="text-[10px] font-bold text-slate-700 leading-tight">{r.description}</p>
+                              <p className="text-[8px] font-black text-slate-400 mt-1 uppercase tracking-widest">Oleh: {r.reporter}</p>
+                           </td>
+                           <td className="py-5 pr-4">
+                              <p className="text-[9px] font-black text-indigo-700 uppercase leading-none">{r.category}</p>
+                              <p className="text-[10px] font-black text-slate-800 mt-1.5">{r.points} PT</p>
+                           </td>
+                           <td className="py-5 pr-4">
+                              <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest ${
+                                r.status === 'Ditindak' ? 'bg-emerald-700 text-white shadow-md' : 'bg-amber-100 text-amber-800'
+                              }`}>{r.status}</span>
+                           </td>
+                        </tr>
+                     ))}
+                  </tbody>
+               </table>
+            )}
+            {((activeTab === 'Santri' && filteredAttendance.length === 0) || 
+               (activeTab === 'Guru' && filteredTeachers.length === 0) || 
+               (activeTab === 'Pelanggaran' && violationStats.length === 0) ||
+               (activeTab === 'Prestasi' && achievementStats.length === 0)) && (
+               <div className="py-32 text-center">
+                  <p className="text-[12px] font-black text-slate-300 uppercase italic tracking-[0.3em]">Data Tidak Ditemukan Untuk Filter Ini</p>
+               </div>
+            )}
+         </div>
+      </div>
     </div>
   );
 };

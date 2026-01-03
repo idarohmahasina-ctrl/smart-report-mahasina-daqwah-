@@ -1,21 +1,18 @@
 
 import { 
-  UserProfile, 
-  AttendanceRecord, 
-  ReportItem, 
-  TeacherAttendance,
-  Student,
-  Teacher,
-  Schedule,
-  OrganizationMember,
-  UserRole,
-  TemplateItem,
-  AcademicConfig
+  UserProfile, AttendanceRecord, ReportItem, TeacherAttendance, Student,
+  Teacher, Schedule, OrganizationMember, UserRole, TemplateItem, AcademicConfig
 } from '../types';
+// Fixed typo in PREDEFINED_ACHIEVEMENTS import
+import { 
+  MOCK_STUDENTS, MOCK_TEACHERS, MOCK_SCHEDULE, MOCK_REPORTS, 
+  MOCK_ATTENDANCE, MOCK_TEACHER_ATTENDANCE, PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS 
+} from '../constants';
 
 const STORAGE_KEY = 'mahasina_report_v2';
 const USERS_KEY = 'mahasina_users_db_v2';
 const SYNC_KEY = 'mahasina_sync_meta';
+const SESSION_KEY = 'mahasina_active_session';
 
 export interface AppData {
   profile: UserProfile | null;
@@ -35,20 +32,22 @@ export interface AppData {
 
 const initialData: AppData = {
   profile: null,
-  attendance: [],
-  teacherAttendance: [],
-  reports: [],
-  students: [],
-  teachers: [],
-  schedules: [],
+  attendance: MOCK_ATTENDANCE,
+  teacherAttendance: MOCK_TEACHER_ATTENDANCE,
+  reports: MOCK_REPORTS,
+  students: MOCK_STUDENTS,
+  teachers: MOCK_TEACHERS,
+  schedules: MOCK_SCHEDULE,
   orsam: [],
   orklas: [],
-  violationTemplates: [],
-  achievementTemplates: [],
+  violationTemplates: PREDEFINED_VIOLATIONS,
+  achievementTemplates: PREDEFINED_ACHIEVEMENTS,
   academicConfig: {
     schoolYear: '2025/2026',
     semester: 'II (Genap)',
-    isHoliday: false
+    isHoliday: false,
+    // Add missing required property from AcademicConfig interface
+    sessionHolidays: {}
   }
 };
 
@@ -56,8 +55,8 @@ export const getAppData = (): AppData => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) return initialData;
   const parsed = JSON.parse(data);
-  if (!parsed.academicConfig) parsed.academicConfig = initialData.academicConfig;
-  return parsed;
+  // Merge missing keys with initial data to prevent crashes
+  return { ...initialData, ...parsed };
 };
 
 export const saveAppData = (data: Partial<AppData>) => {
@@ -65,7 +64,6 @@ export const saveAppData = (data: Partial<AppData>) => {
   const newData = { ...current, ...data };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
   
-  // Mark as dirty so background sync knows it needs to run
   const status = getSyncStatus();
   localStorage.setItem(SYNC_KEY, JSON.stringify({ 
     ...status,
@@ -88,17 +86,13 @@ export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
   try {
     const data = getAppData();
     const fileName = 'mahasina_backup.json';
-    
     const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and trashed=false`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
-    
     if (!searchRes.ok) throw new Error('Failed to search GDrive');
     const searchData = await searchRes.json();
-    
     const fileContent = JSON.stringify(data);
     const metadata = { name: fileName, mimeType: 'application/json' };
-    
     if (searchData.files && searchData.files.length > 0) {
       const fileId = searchData.files[0].id;
       await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
@@ -110,42 +104,17 @@ export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
       const form = new FormData();
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       form.append('file', new Blob([fileContent], { type: 'application/json' }));
-
       await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}` },
         body: form
       });
     }
-    
     saveSyncStatus({ pending: false, timestamp: new Date().toISOString(), isNewLocal: false, autoSync: true });
     return true;
   } catch (error) {
     console.error('GDrive Sync Error:', error);
     return false;
-  }
-};
-
-export const downloadFromGDrive = async (accessToken: string): Promise<AppData | null> => {
-  try {
-    const fileName = 'mahasina_backup.json';
-    const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and trashed=false`, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    const searchData = await searchRes.json();
-
-    if (searchData.files && searchData.files.length > 0) {
-      const fileId = searchData.files[0].id;
-      const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      const data = await fileRes.json();
-      return data;
-    }
-    return null;
-  } catch (error) {
-    console.error('GDrive Download Error:', error);
-    return null;
   }
 };
 
@@ -156,8 +125,9 @@ export const getUsers = (): UserProfile[] => {
 
 export const registerUser = (user: UserProfile) => {
   const users = getUsers();
-  if (users.find(u => u.email.toLowerCase() === user.email.toLowerCase())) {
-    throw new Error('Email sudah terdaftar.');
+  const emailLower = user.email.toLowerCase().trim();
+  if (users.find(u => u.email.toLowerCase().trim() === emailLower)) {
+    throw new Error('Email sudah terdaftar. Silakan gunakan menu Login.');
   }
   const updatedUsers = [...users, user];
   localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
@@ -178,6 +148,18 @@ export const deleteUser = (userId: string) => {
   localStorage.setItem(USERS_KEY, JSON.stringify(filtered));
 };
 
+export const getActiveSession = (): UserProfile | null => {
+  const session = sessionStorage.getItem(SESSION_KEY);
+  return session ? JSON.parse(session) : null;
+};
+
+export const setActiveSession = (user: UserProfile | null) => {
+  if (user) sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  else sessionStorage.removeItem(SESSION_KEY);
+};
+
 export const clearAppData = () => {
-  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem('mahasina_cloud_token');
+  localStorage.removeItem('mahasina_cloud_connected');
 };

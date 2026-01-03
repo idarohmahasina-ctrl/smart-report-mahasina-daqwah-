@@ -26,16 +26,19 @@ export enum ViolationCategory {
 
 export enum SessionType {
   QURAN = 'Al-Quran',
-  SEKOLAH = 'Sekolah (Formal)',
+  MADRASAH = 'Madrasah',
   HADIS = 'Hadis',
   KITAB = 'Kitab Kuning',
-  PENJURUSAN = 'Penjurusan (XI & XII)'
+  PEMINATAN = 'Peminatan',
+  MAJLIS = 'Majlis Malam',
+  TAMBAHAN = 'Tambahan/Sesi Lain'
 }
 
 export interface AcademicConfig {
   schoolYear: string;
   semester: 'I (Ganjil)' | 'II (Genap)';
-  isHoliday: boolean; // Menentukan apakah sistem sedang libur atau tidak
+  isHoliday: boolean;
+  sessionHolidays: Partial<Record<SessionType, boolean>>;
 }
 
 export interface TemplateItem {
@@ -105,6 +108,7 @@ export interface AttendanceRecord {
   recordedBy: string;
   class: string;
   sessionType: SessionType;
+  subject: string;
 }
 
 export interface TeacherAttendance {
@@ -120,6 +124,7 @@ export interface TeacherAttendance {
   status: 'Hadir' | 'Terlambat' | 'Izin' | 'Alpha';
   note?: string;
   sessionType: SessionType;
+  timeScheduled: string;
 }
 
 export interface ReportItem {
@@ -130,8 +135,8 @@ export interface ReportItem {
   description: string;
   points: number;
   date: string;
+  timestamp: string; // Waktu presisi (HH:mm)
   reporter: string;
-  status: 'Pending' | 'Processed';
-  actionTaken?: string;
+  status: 'Belum Ditindak' | 'Ditindak';
   actionNote?: string;
 }

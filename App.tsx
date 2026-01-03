@@ -9,7 +9,6 @@ import Information from './views/Information.tsx';
 import Settings from './views/Settings.tsx';
 import { 
   UserProfile, 
-  UserRole, 
   AttendanceRecord, 
   ReportItem,
   Student,
@@ -20,8 +19,28 @@ import {
   TemplateItem,
   AcademicConfig
 } from './types.ts';
-import { getAppData, saveAppData, clearAppData, AppData, getSyncStatus, saveSyncStatus, getUsers, syncWithGDrive } from './services/dataService.ts';
-import { ICONS, APP_LOGO, MOCK_STUDENTS, MOCK_TEACHERS, MOCK_SCHEDULE, MOCK_ORSAM, MOCK_ORKLAS, PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS, CLASSES as DEFAULT_CLASSES } from './constants.tsx';
+import { 
+  getAppData, 
+  saveAppData, 
+  clearAppData, 
+  AppData, 
+  getSyncStatus, 
+  getUsers, 
+  syncWithGDrive,
+  getActiveSession,
+  setActiveSession
+} from './services/dataService.ts';
+import { 
+  APP_LOGO, 
+  MOCK_STUDENTS, 
+  MOCK_TEACHERS, 
+  MOCK_SCHEDULE, 
+  MOCK_ORSAM, 
+  MOCK_ORKLAS, 
+  PREDEFINED_VIOLATIONS, 
+  PREDEFINED_ACHIEVEMENTS, 
+  CLASSES as DEFAULT_CLASSES 
+} from './constants.tsx';
 import { RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -47,39 +66,30 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
 
-  // DYNAMIC CLASS LIST: Derived from actual student data uploaded in Information view
   const availableClasses = useMemo(() => {
-    // If we have actual students uploaded, extract unique formal classes
     if (students && students.length > 0) {
-      // Fix: Explicitly type the Set as string to avoid 'unknown' inference in Array.from (Fixes errors on line 55 and 56)
       const uniqueClasses = Array.from(new Set<string>(students.map(s => s.formalClass)))
         .filter(cls => cls && cls.trim() !== '')
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-      
-      // Only use dynamic list if we found valid classes, otherwise fallback to default
       return uniqueClasses.length > 0 ? uniqueClasses : DEFAULT_CLASSES;
     }
     return DEFAULT_CLASSES;
   }, [students]);
 
   useEffect(() => {
+    const activeUser = getActiveSession();
     const data = getAppData();
-    const allUsers = getUsers();
     
-    let currentProfile = data.profile;
-    if (currentProfile) {
-      const latestUserData = allUsers.find(u => u.email.toLowerCase() === currentProfile?.email.toLowerCase());
-      if (latestUserData) {
-        currentProfile = latestUserData;
-      }
+    if (activeUser) {
+      const allUsers = getUsers();
+      const latestUser = allUsers.find(u => u.email.toLowerCase() === activeUser.email.toLowerCase()) || activeUser;
+      setProfile(latestUser);
     }
 
-    setProfile(currentProfile);
     setAttendance(data.attendance || []);
     setReports(data.reports || []);
     setTeacherAttendance(data.teacherAttendance || []);
     
-    // Use saved students if available, otherwise mock data for initial preview
     setStudents(data.students.length > 0 ? data.students : MOCK_STUDENTS);
     setTeachers(data.teachers.length > 0 ? data.teachers : MOCK_TEACHERS);
     setSchedules(data.schedules.length > 0 ? data.schedules : MOCK_SCHEDULE);
@@ -117,13 +127,13 @@ const App: React.FC = () => {
 
   const handleRegistrationComplete = (newProfile: UserProfile) => {
     setProfile(newProfile);
-    saveAppData({ profile: newProfile });
     triggerAutoSync();
   };
 
   const handleLogout = () => {
-    if (confirm("Keluar dari sistem?")) {
+    if (confirm("Keluar dari sistem? Anda wajib login ulang dengan email nanti.")) {
       clearAppData();
+      setProfile(null);
       window.location.reload();
     }
   };
@@ -210,9 +220,9 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-emerald-900 text-white p-6 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-emerald-950 text-white p-6 text-center">
         <img src={APP_LOGO} className="w-24 h-24 animate-pulse mb-6 bg-white p-2 rounded-full shadow-2xl" alt="Loading" />
-        <p className="text-xl font-black tracking-tight uppercase">Smart Report</p>
+        <p className="text-xl font-black tracking-tighter uppercase leading-none">Smart Report<br/>Mahasina</p>
       </div>
     );
   }
@@ -232,12 +242,9 @@ const App: React.FC = () => {
             students={students} 
             teacherAttendance={teacherAttendance}
             schedules={schedules}
-            violationTemplates={violationTemplates}
-            achievementTemplates={achievementTemplates}
+            academicConfig={academicConfig} // Ditambahkan
             onDeleteReport={handleDeleteReport}
             onUpdateReport={handleSaveReport}
-            onDeleteAttendance={handleDeleteAttendance}
-            onDeleteTeacherAttendance={handleDeleteTeacherAttendance}
           />
         );
       case 'absen-guru':
@@ -330,16 +337,16 @@ const App: React.FC = () => {
   return (
     <>
       {syncState !== 'idle' && (
-        <div className={`fixed bottom-10 right-10 z-[2000] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-4 transition-colors duration-500 ${
-          syncState === 'syncing' ? 'bg-indigo-600' : 
-          syncState === 'success' ? 'bg-emerald-600' : 'bg-red-600'
-        } text-white`}>
-          {syncState === 'syncing' && <RefreshCw size={16} className="animate-spin" />}
-          {syncState === 'success' && <CheckCircle size={16} />}
-          {syncState === 'error' && <AlertCircle size={16} />}
-          <span className="text-[10px] font-black uppercase tracking-widest">
-            {syncState === 'syncing' ? 'Sinkronisasi Cloud...' : 
-             syncState === 'success' ? 'Sinkronisasi Berhasil' : 'Sinkronisasi Gagal'}
+        <div className={`fixed bottom-8 left-8 lg:left-80 z-[2000] px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-6 transition-all duration-500 border-2 ${
+          syncState === 'syncing' ? 'bg-white border-emerald-500 text-emerald-800' : 
+          syncState === 'success' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-red-600 border-red-500 text-white'
+        }`}>
+          {syncState === 'syncing' && <RefreshCw size={18} className="animate-spin" />}
+          {syncState === 'success' && <CheckCircle size={18} />}
+          {syncState === 'error' && <AlertCircle size={18} />}
+          <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+            {syncState === 'syncing' ? 'Sinkronisasi Data...' : 
+             syncState === 'success' ? 'Update Berhasil' : 'Koneksi Terputus'}
           </span>
         </div>
       )}
