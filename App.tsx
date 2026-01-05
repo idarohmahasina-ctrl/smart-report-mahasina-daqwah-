@@ -57,10 +57,13 @@ const App: React.FC = () => {
   const [orklas, setOrklas] = useState<OrganizationMember[]>([]);
   const [violationTemplates, setViolationTemplates] = useState<TemplateItem[]>([]);
   const [achievementTemplates, setAchievementTemplates] = useState<TemplateItem[]>([]);
+  
+  // Fix: Add missing required sessionHolidays property to AcademicConfig
   const [academicConfig, setAcademicConfig] = useState<AcademicConfig>({
     schoolYear: '2025/2026',
     semester: 'II (Genap)',
-    isHoliday: false
+    isHoliday: false,
+    sessionHolidays: {}
   });
 
   const [loading, setLoading] = useState(true);
@@ -242,7 +245,7 @@ const App: React.FC = () => {
             students={students} 
             teacherAttendance={teacherAttendance}
             schedules={schedules}
-            academicConfig={academicConfig} // Ditambahkan
+            academicConfig={academicConfig}
             onDeleteReport={handleDeleteReport}
             onUpdateReport={handleSaveReport}
           />
