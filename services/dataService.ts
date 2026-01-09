@@ -6,13 +6,21 @@ import {
 } from '../types';
 import { 
   MOCK_STUDENTS, MOCK_TEACHERS, MOCK_SCHEDULE, MOCK_REPORTS, 
-  MOCK_ATTENDANCE, MOCK_TEACHER_ATTENDANCE, PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS 
+  MOCK_ATTENDANCE, MOCK_TEACHER_ATTENDANCE, PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS,
+  MOCK_ORSAM, MOCK_ORKLAS
 } from '../constants';
 
 const STORAGE_KEY = 'mahasina_report_v2';
 const USERS_KEY = 'mahasina_users_db_v2';
 const SYNC_KEY = 'mahasina_sync_meta';
 const SESSION_KEY = 'mahasina_active_session';
+
+export interface ExtraDataList {
+  id: string;
+  title: string;
+  data: any[];
+  uploadedAt: string;
+}
 
 export interface AppData {
   profile: UserProfile | null;
@@ -25,6 +33,7 @@ export interface AppData {
   schedules: Schedule[];
   orsam: OrganizationMember[];
   orklas: OrganizationMember[];
+  extraDataLists: ExtraDataList[];
   violationTemplates: TemplateItem[];
   achievementTemplates: TemplateItem[];
   announcements: Announcement[];
@@ -41,8 +50,9 @@ const initialData: AppData = {
   students: MOCK_STUDENTS,
   teachers: MOCK_TEACHERS,
   schedules: MOCK_SCHEDULE,
-  orsam: [],
-  orklas: [],
+  orsam: MOCK_ORSAM,
+  orklas: MOCK_ORKLAS,
+  extraDataLists: [],
   violationTemplates: PREDEFINED_VIOLATIONS,
   achievementTemplates: PREDEFINED_ACHIEVEMENTS,
   announcements: [
@@ -67,7 +77,6 @@ export const getAppData = (): AppData => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) return initialData;
   const parsed = JSON.parse(data);
-  // Ensure new keys exist in old localstorage data
   return { ...initialData, ...parsed };
 };
 

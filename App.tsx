@@ -32,7 +32,8 @@ import {
   getUsers, 
   syncWithGDrive,
   getActiveSession,
-  setActiveSession
+  setActiveSession,
+  ExtraDataList
 } from './services/dataService.ts';
 import { 
   APP_LOGO, 
@@ -60,6 +61,7 @@ const App: React.FC = () => {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [orsam, setOrsam] = useState<OrganizationMember[]>([]);
   const [orklas, setOrklas] = useState<OrganizationMember[]>([]);
+  const [extraDataLists, setExtraDataLists] = useState<ExtraDataList[]>([]);
   const [violationTemplates, setViolationTemplates] = useState<TemplateItem[]>([]);
   const [achievementTemplates, setAchievementTemplates] = useState<TemplateItem[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -104,6 +106,7 @@ const App: React.FC = () => {
     setSchedules(data.schedules.length > 0 ? data.schedules : MOCK_SCHEDULE);
     setOrsam(data.orsam.length > 0 ? data.orsam : MOCK_ORSAM);
     setOrklas(data.orklas.length > 0 ? data.orklas : MOCK_ORKLAS);
+    setExtraDataLists(data.extraDataLists || []);
     setViolationTemplates(data.violationTemplates?.length > 0 ? data.violationTemplates : PREDEFINED_VIOLATIONS);
     setAchievementTemplates(data.achievementTemplates?.length > 0 ? data.achievementTemplates : PREDEFINED_ACHIEVEMENTS);
     setAnnouncements(data.announcements || []);
@@ -187,6 +190,7 @@ const App: React.FC = () => {
     if (type === 'Jadwal') { setSchedules(data); update.schedules = data; }
     if (type === 'ORSAM') { setOrsam(data); update.orsam = data; }
     if (type === 'ORKLAS') { setOrklas(data); update.orklas = data; }
+    if (type === 'ExtraDataLists') { setExtraDataLists(data); update.extraDataLists = data; }
     if (type === 'Violations') { setViolationTemplates(data); update.violationTemplates = data; }
     if (type === 'Achievements') { setAchievementTemplates(data); update.achievementTemplates = data; }
     if (type === 'Announcements') { setAnnouncements(data); update.announcements = data; }
@@ -384,6 +388,7 @@ const App: React.FC = () => {
               schedules, 
               orsam, 
               orklas, 
+              extraDataLists,
               violationTemplates, 
               achievementTemplates,
               announcements
