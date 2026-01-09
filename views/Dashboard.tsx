@@ -251,14 +251,11 @@ const Dashboard: React.FC<DashboardProps> = ({
          <div className="flex bg-slate-100 p-1 rounded-2xl shadow-inner shrink-0 overflow-x-auto no-scrollbar max-w-full">
             {['Santri', 'Guru', 'Pelanggaran', 'Prestasi'].map(t => {
                if (t === 'Guru' && isPetugasSantri) return null;
-               if ((t === 'Pelanggaran' || t === 'Prestasi') && isGuru && !isSuperAdmin) {
-                  // Guru can see these if they input them, so we keep it enabled
-               }
                return (
                   <button 
                     key={t} 
                     onClick={() => setActiveTab(t as any)} 
-                    className={`px-5 sm:px-8 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === t ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`px-5 sm:px-8 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === t ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     {t}
                   </button>
@@ -422,6 +419,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               ))}
            </div>
+
+           {/* Ranking Restored Section */}
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <RankingCard 
+                title={`Top Santri (${activeTab})`} 
+                data={getReportRankings(activeTab === 'Pelanggaran' ? 'Violation' : 'Achievement', 'name')} 
+                type="KALI" 
+                color={activeTab === 'Pelanggaran' ? "red" : "emerald"}
+              />
+              <RankingCard 
+                title={`Ranking Unit Kelas (${activeTab})`} 
+                data={getReportRankings(activeTab === 'Pelanggaran' ? 'Violation' : 'Achievement', 'class')} 
+                type="KALI" 
+                color="blue" 
+              />
+           </div>
         </div>
       )}
 
@@ -510,6 +523,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Siswa / Kelas</th>
                         <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Keterangan</th>
                         <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Poin / Status</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Tindakan</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -527,6 +541,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                               <span className={`mt-2 inline-block px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest ${
                                 r.status === 'Ditindak' ? 'bg-emerald-700 text-white shadow-md' : 'bg-amber-100 text-amber-800'
                               }`}>{r.status}</span>
+                           </td>
+                           <td className="py-5 pr-4">
+                              <p className={`text-[10px] font-bold ${r.actionNote ? 'text-emerald-700' : 'text-slate-300 italic'}`}>
+                                 {r.actionNote || 'Belum ada tindakan'}
+                              </p>
                            </td>
                         </tr>
                      ))}
