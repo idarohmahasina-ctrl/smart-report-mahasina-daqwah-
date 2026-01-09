@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Memastikan variabel lingkungan dari Vercel bisa dibaca oleh aplikasi
+    // Memberitahukan Vite untuk menyertakan API_KEY saat proses kompilasi
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
   },
   build: {
