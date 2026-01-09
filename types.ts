@@ -60,9 +60,19 @@ export interface AcademicConfig {
 }
 
 export interface TemplateItem {
+  id?: string;
   label: string;
   points: number;
   category: ViolationCategory;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+  author: string;
+  priority: 'Normal' | 'Penting';
 }
 
 export interface UserProfile {

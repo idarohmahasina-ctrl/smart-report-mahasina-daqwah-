@@ -2,7 +2,7 @@
 import { 
   UserProfile, AttendanceRecord, ReportItem, TeacherAttendance, Student,
   Teacher, Schedule, OrganizationMember, UserRole, TemplateItem, AcademicConfig,
-  PrayerRecord
+  PrayerRecord, Announcement
 } from '../types';
 import { 
   MOCK_STUDENTS, MOCK_TEACHERS, MOCK_SCHEDULE, MOCK_REPORTS, 
@@ -27,6 +27,7 @@ export interface AppData {
   orklas: OrganizationMember[];
   violationTemplates: TemplateItem[];
   achievementTemplates: TemplateItem[];
+  announcements: Announcement[];
   academicConfig: AcademicConfig;
   lastSynced?: string;
 }
@@ -44,6 +45,16 @@ const initialData: AppData = {
   orklas: [],
   violationTemplates: PREDEFINED_VIOLATIONS,
   achievementTemplates: PREDEFINED_ACHIEVEMENTS,
+  announcements: [
+    {
+      id: 'ann-1',
+      title: 'Selamat Datang di Smart Report Mahasina',
+      content: 'Gunakan aplikasi ini untuk memantau absensi dan pelaporan santri secara real-time. Mohon admin Idaroh memastikan data master sudah terupdate.',
+      date: new Date().toLocaleDateString('id-ID'),
+      author: 'Idaroh Pusat',
+      priority: 'Normal'
+    }
+  ],
   academicConfig: {
     schoolYear: '2025/2026',
     semester: 'II (Genap)',
@@ -56,6 +67,7 @@ export const getAppData = (): AppData => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) return initialData;
   const parsed = JSON.parse(data);
+  // Ensure new keys exist in old localstorage data
   return { ...initialData, ...parsed };
 };
 

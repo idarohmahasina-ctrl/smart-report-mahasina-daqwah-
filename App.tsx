@@ -20,7 +20,8 @@ import {
   TeacherAttendance,
   TemplateItem,
   AcademicConfig,
-  PrayerRecord
+  PrayerRecord,
+  Announcement
 } from './types.ts';
 import { 
   getAppData, 
@@ -61,6 +62,7 @@ const App: React.FC = () => {
   const [orklas, setOrklas] = useState<OrganizationMember[]>([]);
   const [violationTemplates, setViolationTemplates] = useState<TemplateItem[]>([]);
   const [achievementTemplates, setAchievementTemplates] = useState<TemplateItem[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   
   const [academicConfig, setAcademicConfig] = useState<AcademicConfig>({
     schoolYear: '2025/2026',
@@ -104,6 +106,7 @@ const App: React.FC = () => {
     setOrklas(data.orklas.length > 0 ? data.orklas : MOCK_ORKLAS);
     setViolationTemplates(data.violationTemplates?.length > 0 ? data.violationTemplates : PREDEFINED_VIOLATIONS);
     setAchievementTemplates(data.achievementTemplates?.length > 0 ? data.achievementTemplates : PREDEFINED_ACHIEVEMENTS);
+    setAnnouncements(data.announcements || []);
     setAcademicConfig(data.academicConfig);
     
     setLoading(false);
@@ -186,6 +189,7 @@ const App: React.FC = () => {
     if (type === 'ORKLAS') { setOrklas(data); update.orklas = data; }
     if (type === 'Violations') { setViolationTemplates(data); update.violationTemplates = data; }
     if (type === 'Achievements') { setAchievementTemplates(data); update.achievementTemplates = data; }
+    if (type === 'Announcements') { setAnnouncements(data); update.announcements = data; }
     saveAppData(update);
     triggerAutoSync();
   };
@@ -366,6 +370,7 @@ const App: React.FC = () => {
                deleteReport: handleDeleteReport,
                updateReport: handleSaveReport
             }}
+            userEmail={profile.email}
           />
         );
       case 'informasi':
@@ -380,7 +385,8 @@ const App: React.FC = () => {
               orsam, 
               orklas, 
               violationTemplates, 
-              achievementTemplates 
+              achievementTemplates,
+              announcements
             }}
             onUpdateData={updateMasterData}
           />

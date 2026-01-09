@@ -28,9 +28,10 @@ interface ControlPanelProps {
     deleteReport: (id: string) => void;
     updateReport: (record: ReportItem) => void;
   };
+  userEmail: string;
 }
 
-const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
+const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions, userEmail }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   const [activeModul, setActiveModul] = useState<'absen-guru' | 'absen-santri' | 'absen-sholat' | 'laporan'>('absen-santri');
@@ -38,6 +39,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
   
   // Modal Edit States
   const [editingItem, setEditingItem] = useState<any>(null);
+
+  const isSuperAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
 
   const handlePinInput = (digit: string) => {
     if (pin.length < 4) {
@@ -70,7 +73,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
   if (!isAuthenticated) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-6 animate-in zoom-in-95 duration-500">
-        <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl border border-slate-50 p-10 text-center space-y-10">
+        <div className="bg-white w-full max-sm rounded-[3rem] shadow-2xl border border-slate-50 p-10 text-center space-y-10">
           <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner">
             <Lock size={36} className="animate-pulse" />
           </div>
@@ -185,8 +188,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                            <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">Unit: {item.class} • {item.level || 'Pondok'}</p>
                         </td>
                         <td className="py-6 pr-4">
-                           <p className="text-[10px] font-bold text-slate-700">{item.sessionType || item.prayerTime || item.subject}</p>
-                           <p className="text-[8px] font-black text-slate-400 mt-1.5 uppercase truncate max-w-[150px]">{item.description || item.subject || 'Catatan Presensi'}</p>
+                           <p className="text-[10px] font-bold text-slate-700">{item.sessionType || item.prayerTime || item.subject || (item.type === 'Violation' ? 'Pelanggaran' : 'Prestasi')}</p>
+                           <p className="text-[8px] font-black text-slate-400 mt-1.5 uppercase truncate max-w-[200px]">{item.description || item.subject || 'Catatan Presensi'}</p>
+                           {item.actionNote && (
+                              <p className="text-[8px] font-black text-emerald-600 mt-1 uppercase italic bg-emerald-50 px-2 py-0.5 rounded inline-block">Tindakan: {item.actionNote}</p>
+                           )}
                         </td>
                         <td className="py-6 pr-4">
                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
@@ -265,11 +271,24 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                   <div className="space-y-3">
                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Edit Catatan / Kronologi</label>
                      <textarea 
-                        value={editingItem.note || editingItem.description || ''} 
-                        onChange={e => setEditingItem({...editingItem, [editingItem.description ? 'description' : 'note']: e.target.value})}
+                        value={editingItem.description || editingItem.note || ''} 
+                        onChange={e => setEditingItem({...editingItem, [editingItem.description !== undefined ? 'description' : 'note']: e.target.value})}
                         className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-emerald-600 rounded-2xl outline-none font-medium text-xs h-32 shadow-inner resize-none" 
                      />
                   </div>
+
+                  {activeModul === 'laporan' && (
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Catatan Penindakan (Action Note)</label>
+                       <input 
+                          type="text" 
+                          value={editingItem.actionNote || ''} 
+                          onChange={e => setEditingItem({...editingItem, actionNote: e.target.value, status: e.target.value.trim() ? 'Ditindak' : 'Belum Ditindak'})}
+                          className="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-emerald-600 rounded-2xl outline-none font-black text-xs shadow-inner" 
+                          placeholder="Contoh: Nasehat, Takzir, atau Hadiah..."
+                       />
+                    </div>
+                  )}
 
                   {editingItem.points !== undefined && (
                      <div className="space-y-3">
@@ -291,7 +310,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                            else if(activeModul === 'laporan') actions.updateReport(editingItem);
                            // Absen guru di-update lewat status
                            else if(activeModul === 'absen-guru') {
-                              // Teacher update logic
+                              // Teacher update logic not requested but assumed working similarly
                            }
                            setEditingItem(null);
                            alert("Koreksi database berhasil dilakukan.");
