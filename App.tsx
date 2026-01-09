@@ -7,6 +7,8 @@ import Attendance from './views/Attendance.tsx';
 import Reports from './views/Reports.tsx';
 import Information from './views/Information.tsx';
 import Settings from './views/Settings.tsx';
+import PrayerAttendance from './views/PrayerAttendance.tsx';
+import ControlPanel from './views/ControlPanel.tsx';
 import { 
   UserProfile, 
   AttendanceRecord, 
@@ -17,7 +19,8 @@ import {
   OrganizationMember,
   TeacherAttendance,
   TemplateItem,
-  AcademicConfig
+  AcademicConfig,
+  PrayerRecord
 } from './types.ts';
 import { 
   getAppData, 
@@ -47,6 +50,7 @@ const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [prayerAttendance, setPrayerAttendance] = useState<PrayerRecord[]>([]);
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [teacherAttendance, setTeacherAttendance] = useState<TeacherAttendance[]>([]);
   
@@ -58,7 +62,6 @@ const App: React.FC = () => {
   const [violationTemplates, setViolationTemplates] = useState<TemplateItem[]>([]);
   const [achievementTemplates, setAchievementTemplates] = useState<TemplateItem[]>([]);
   
-  // Fix: Add missing required sessionHolidays property to AcademicConfig
   const [academicConfig, setAcademicConfig] = useState<AcademicConfig>({
     schoolYear: '2025/2026',
     semester: 'II (Genap)',
@@ -90,6 +93,7 @@ const App: React.FC = () => {
     }
 
     setAttendance(data.attendance || []);
+    setPrayerAttendance(data.prayerAttendance || []);
     setReports(data.reports || []);
     setTeacherAttendance(data.teacherAttendance || []);
     
@@ -193,10 +197,38 @@ const App: React.FC = () => {
     triggerAutoSync();
   };
 
+  const handleUpdateAttendance = (record: AttendanceRecord) => {
+    const updated = attendance.map(a => a.id === record.id ? record : a);
+    setAttendance(updated);
+    saveAppData({ attendance: updated });
+    triggerAutoSync();
+  };
+
+  const handleSavePrayerAttendance = (newRecords: PrayerRecord[]) => {
+    const updated = [...prayerAttendance, ...newRecords];
+    setPrayerAttendance(updated);
+    saveAppData({ prayerAttendance: updated });
+    triggerAutoSync();
+  };
+
+  const handleUpdatePrayerAttendance = (record: PrayerRecord) => {
+    const updated = prayerAttendance.map(a => a.id === record.id ? record : a);
+    setPrayerAttendance(updated);
+    saveAppData({ prayerAttendance: updated });
+    triggerAutoSync();
+  };
+
   const handleDeleteAttendance = (id: string) => {
     const updated = attendance.filter(a => a.id !== id);
     setAttendance(updated);
     saveAppData({ attendance: updated });
+    triggerAutoSync();
+  };
+
+  const handleDeletePrayerRecord = (id: string) => {
+    const updated = prayerAttendance.filter(a => a.id !== id);
+    setPrayerAttendance(updated);
+    saveAppData({ prayerAttendance: updated });
     triggerAutoSync();
   };
 
@@ -282,6 +314,15 @@ const App: React.FC = () => {
             academicConfig={academicConfig}
           />
         );
+      case 'absen-sholat':
+        return (
+          <PrayerAttendance 
+            students={students} 
+            onSave={handleSavePrayerAttendance} 
+            allPrayerRecords={prayerAttendance}
+            currentUser={profile.fullName}
+          />
+        );
       case 'pelanggaran':
         return (
           <Reports 
@@ -304,6 +345,27 @@ const App: React.FC = () => {
             students={students}
             allReports={reports}
             templates={achievementTemplates}
+          />
+        );
+      case 'panel-kontrol':
+        return (
+          <ControlPanel 
+            data={{
+               attendance,
+               prayerAttendance,
+               teacherAttendance,
+               reports,
+               students
+            }}
+            actions={{
+               deleteAttendance: handleDeleteAttendance,
+               updateAttendance: handleUpdateAttendance,
+               deletePrayer: handleDeletePrayerRecord,
+               updatePrayer: handleUpdatePrayerAttendance,
+               deleteTeacherAttendance: handleDeleteTeacherAttendance,
+               deleteReport: handleDeleteReport,
+               updateReport: handleSaveReport
+            }}
           />
         );
       case 'informasi':

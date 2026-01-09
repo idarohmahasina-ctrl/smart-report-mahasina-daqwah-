@@ -15,6 +15,24 @@ export enum AttendanceStatus {
   A = 'Alpha'
 }
 
+export enum PrayerStatus {
+  JAMAAH = 'Berjama\'ah',
+  UDZUR = 'Udzur',
+  SAKIT = 'Sakit',
+  IZIN = 'Izin',
+  TERLAMBAT = 'Terlambat',
+  ALPHA = 'Alpha'
+}
+
+export enum PrayerTime {
+  SUBUH = 'Subuh',
+  DHUHA = 'Dhuha',
+  DZUHUR = 'Dzuhur',
+  ASHAR = 'Ashar',
+  MAGHRIB = 'Maghrib',
+  ISYA = 'Isya'
+}
+
 export enum ViolationCategory {
   AKADEMIK = 'Akademik',
   IBADAH = 'Ibadah',
@@ -102,6 +120,7 @@ export interface OrganizationMember {
 export interface AttendanceRecord {
   id: string;
   date: string;
+  recordedTime: string; // HH:mm
   studentId: string;
   status: AttendanceStatus;
   note?: string;
@@ -109,6 +128,18 @@ export interface AttendanceRecord {
   class: string;
   sessionType: SessionType;
   subject: string;
+}
+
+export interface PrayerRecord {
+  id: string;
+  date: string;
+  recordedTime: string; // HH:mm
+  studentId: string;
+  status: PrayerStatus;
+  note?: string;
+  recordedBy: string;
+  class: string;
+  prayerTime: PrayerTime;
 }
 
 export interface TeacherAttendance {
@@ -135,7 +166,7 @@ export interface ReportItem {
   description: string;
   points: number;
   date: string;
-  timestamp: string; // Waktu presisi (HH:mm)
+  timestamp: string; // HH:mm
   reporter: string;
   status: 'Belum Ditindak' | 'Ditindak';
   actionNote?: string;

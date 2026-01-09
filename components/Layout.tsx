@@ -5,7 +5,7 @@ import { UserRole, AcademicConfig } from '../types.ts';
 import { 
   Settings as SettingsIcon, Home, UserCheck, 
   ShieldAlert, Trophy, Info, LogOut, Menu, X, User, ChevronRight,
-  Cloud, CloudOff, RefreshCw
+  Cloud, CloudOff, RefreshCw, Zap, LayoutDashboard
 } from 'lucide-react';
 import { getSyncStatus } from '../services/dataService.ts';
 
@@ -26,6 +26,8 @@ const Layout: React.FC<LayoutProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [cloudStatus, setCloudStatus] = useState({ connected: false, pending: false });
 
+  const isSuperAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
+
   useEffect(() => {
     const checkStatus = () => {
       const connected = localStorage.getItem('mahasina_cloud_connected') === 'true';
@@ -41,11 +43,14 @@ const Layout: React.FC<LayoutProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: <Home size={20} /> },
     { id: 'absen-guru', label: 'Absen Guru', icon: <UserCheck size={20} /> },
     { id: 'absen-santri', label: 'Absen Santri', icon: <UserCheck size={20} /> },
+    { id: 'absen-sholat', label: 'Absen Sholat Santri', icon: <Zap size={20} /> },
     { id: 'pelanggaran', label: 'Input Pelanggaran', icon: <ShieldAlert size={20} /> },
     { id: 'prestasi', label: 'Input Prestasi', icon: <Trophy size={20} /> },
     { id: 'informasi', label: 'Informasi Data', icon: <Info size={20} /> },
     { id: 'pengaturan', label: 'Pengaturan', icon: <SettingsIcon size={20} /> },
+    { id: 'panel-kontrol', label: 'Panel Kontrol', icon: <LayoutDashboard size={20} />, superOnly: true },
   ].filter(item => {
+    if (item.superOnly && !isSuperAdmin) return false;
     if (item.id === 'absen-guru') return role !== UserRole.SANTRI_OFFICER;
     return true;
   });
@@ -119,10 +124,9 @@ const Layout: React.FC<LayoutProps> = ({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
         
-        {/* Top Status Bar (Integrated, No Header Bar Background) */}
+        {/* Top Status Bar */}
         <div className="w-full flex items-start justify-between px-4 py-4 md:px-10 lg:px-12 z-30 shrink-0">
           
-          {/* Top Left: Hamburger + User Info + Sync */}
           <div className="flex items-start gap-2 md:gap-4">
             <button 
               onClick={() => setIsSidebarOpen(true)}
@@ -149,7 +153,6 @@ const Layout: React.FC<LayoutProps> = ({
             </div>
           </div>
 
-          {/* Top Right: Semester + Institution + Logo */}
           <div className="flex items-center gap-3 md:gap-6 text-right">
             <div className="flex flex-col gap-0 mt-0.5">
               <h3 className="text-[9px] md:text-xs font-black text-slate-800 uppercase leading-none tracking-tight">Ponpes Mahasina</h3>

@@ -1,9 +1,9 @@
 
 import { 
   UserProfile, AttendanceRecord, ReportItem, TeacherAttendance, Student,
-  Teacher, Schedule, OrganizationMember, UserRole, TemplateItem, AcademicConfig
+  Teacher, Schedule, OrganizationMember, UserRole, TemplateItem, AcademicConfig,
+  PrayerRecord
 } from '../types';
-// Fixed typo in PREDEFINED_ACHIEVEMENTS import
 import { 
   MOCK_STUDENTS, MOCK_TEACHERS, MOCK_SCHEDULE, MOCK_REPORTS, 
   MOCK_ATTENDANCE, MOCK_TEACHER_ATTENDANCE, PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS 
@@ -17,6 +17,7 @@ const SESSION_KEY = 'mahasina_active_session';
 export interface AppData {
   profile: UserProfile | null;
   attendance: AttendanceRecord[];
+  prayerAttendance: PrayerRecord[];
   teacherAttendance: TeacherAttendance[];
   reports: ReportItem[];
   students: Student[];
@@ -33,6 +34,7 @@ export interface AppData {
 const initialData: AppData = {
   profile: null,
   attendance: MOCK_ATTENDANCE,
+  prayerAttendance: [],
   teacherAttendance: MOCK_TEACHER_ATTENDANCE,
   reports: MOCK_REPORTS,
   students: MOCK_STUDENTS,
@@ -46,7 +48,6 @@ const initialData: AppData = {
     schoolYear: '2025/2026',
     semester: 'II (Genap)',
     isHoliday: false,
-    // Add missing required property from AcademicConfig interface
     sessionHolidays: {}
   }
 };
@@ -55,7 +56,6 @@ export const getAppData = (): AppData => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) return initialData;
   const parsed = JSON.parse(data);
-  // Merge missing keys with initial data to prevent crashes
   return { ...initialData, ...parsed };
 };
 
