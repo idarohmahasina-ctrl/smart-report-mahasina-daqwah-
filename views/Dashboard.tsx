@@ -110,7 +110,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const filteredAttendance = useMemo(() => {
     let list = attendance.filter(a => isWithinRange(a.date, timeRange, customDate));
     
-    // PEMBATASAN AKSES: Musyrif hanya melihat santri di kelas binaannya
     if (isMusyrif && !isSuperAdmin) {
       list = list.filter(a => {
         const s = students.find(std => std.id === a.studentId);
@@ -118,7 +117,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       });
     }
 
-    // PEMBATASAN AKSES: Guru hanya melihat absen yang ia buat sendiri (kecuali admin)
     if (isGuru && !isSuperAdmin) {
       list = list.filter(a => a.recordedBy.toLowerCase().trim() === profile.fullName.toLowerCase().trim());
     }
@@ -139,7 +137,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const filteredTeachers = useMemo(() => {
     let list = teacherAttendance.filter(a => isWithinRange(a.date, timeRange, customDate));
     
-    // PEMBATASAN AKSES: Guru hanya melihat statistiknya sendiri
     if (isGuru && !isSuperAdmin) {
       list = list.filter(a => a.teacherName.toLowerCase().trim() === profile.fullName.toLowerCase().trim());
     }
@@ -156,7 +153,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const getFilteredReports = (type: 'Violation' | 'Achievement') => {
     let list = reports.filter(r => r.type === type && isWithinRange(r.date, timeRange, customDate));
     
-    // PEMBATASAN AKSES: Musyrif hanya melihat laporan santri binaannya
     if (isMusyrif && !isSuperAdmin) {
       list = list.filter(r => {
         const s = students.find(std => std.id === r.studentId);
@@ -164,7 +160,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       });
     }
 
-    // PEMBATASAN AKSES: Guru hanya melihat laporan yang ia input sendiri
     if (isGuru && !isSuperAdmin) {
       list = list.filter(r => r.reporter.toLowerCase().trim() === profile.fullName.toLowerCase().trim());
     }
@@ -183,7 +178,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
   };
 
-  // Stats Calculations
+  const violationStats = getFilteredReports('Violation');
+  const achievementStats = getFilteredReports('Achievement');
+
   const stats = {
     H: filteredAttendance.filter(a => a.status === AttendanceStatus.H).length,
     S: filteredAttendance.filter(a => a.status === AttendanceStatus.S).length,
@@ -224,18 +221,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
     return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count);
   };
-
-  const violationStats = getFilteredReports('Violation');
-  const achievementStats = getFilteredReports('Achievement');
-
-  const reportCategoryChart = useMemo(() => {
-    const list = activeTab === 'Pelanggaran' ? violationStats : achievementStats;
-    const map: Record<string, number> = {};
-    list.forEach(r => {
-      map[r.category] = (map[r.category] || 0) + 1;
-    });
-    return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [activeTab, violationStats, achievementStats]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
@@ -467,7 +452,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                      <tr className="border-b-2 border-slate-50">
                         <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Siswa / Kelas</th>
                         <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Sesi / Tanggal</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Waktu Input</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -475,7 +460,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <tr key={a.id} className="group hover:bg-slate-50 transition-all">
                            <td className="py-5 pr-4">
                               <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{students.find(s=>s.id===a.studentId)?.name || 'Siswa Dihapus'}</p>
-                              <p className="text-[8px] font-bold text-slate-400 mt-1.5 uppercase tracking-tighter">KELAS: {a.class}</p>
+                              <p className="text-[8px] font-bold text-slate-400 mt-1.5 uppercase tracking-tighter">KELAS: {a.class} • {a.sessionType}</p>
                            </td>
                            <td className="py-5 pr-4">
                               <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest ${
@@ -483,8 +468,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                               }`}>{a.status}</span>
                            </td>
                            <td className="py-5 pr-4">
-                              <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">{a.sessionType}</p>
-                              <p className="text-[8px] font-black text-slate-400 mt-1 uppercase">{a.date}</p>
+                              <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">{a.date}</p>
+                              <p className="text-[8px] font-black text-slate-400 mt-1 uppercase">{a.recordedTime}</p>
                            </td>
                         </tr>
                      ))}
@@ -496,21 +481,24 @@ const Dashboard: React.FC<DashboardProps> = ({
                      <tr className="border-b-2 border-slate-50">
                         <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Nama Guru</th>
                         <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Mapel / Kelas</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Waktu Input</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                      {filteredTeachers.map(a => (
                         <tr key={a.id} className="group hover:bg-slate-50 transition-all">
-                           <td className="py-5 pr-4 text-[11px] font-black text-slate-800 uppercase">{a.teacherName}</td>
+                           <td className="py-5 pr-4">
+                              <p className="text-[11px] font-black text-slate-800 uppercase">{a.teacherName}</p>
+                              <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{a.subject} ({a.class})</p>
+                           </td>
                            <td className="py-5 pr-4">
                               <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest ${
                                 a.status === 'Hadir' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                               }`}>{a.status}</span>
                            </td>
                            <td className="py-5 pr-4">
-                              <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{a.subject}</p>
-                              <p className="text-[8px] font-black text-slate-400 mt-1 uppercase">{a.class} • {a.date}</p>
+                              <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">{a.date}</p>
+                              <p className="text-[8px] font-black text-slate-400 mt-1 uppercase">{a.checkInTime}</p>
                            </td>
                         </tr>
                      ))}
@@ -521,9 +509,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <thead>
                      <tr className="border-b-2 border-slate-50">
                         <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Siswa / Kelas</th>
-                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Keterangan</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Waktu Input</th>
                         <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Poin / Status</th>
-                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Tindakan</th>
+                        <th className="pb-5 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Catatan Tindakan</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -531,10 +519,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <tr key={r.id} className="group hover:bg-slate-50 transition-all">
                            <td className="py-5 pr-4">
                               <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{students.find(s=>s.id===r.studentId)?.name || 'Siswa Dihapus'}</p>
-                              <p className="text-[8px] font-bold text-slate-400 mt-1.5 uppercase tracking-tighter">{r.date}</p>
+                              <p className="text-[8px] font-bold text-slate-400 mt-1.5 uppercase tracking-tighter">{r.description}</p>
                            </td>
                            <td className="py-5 pr-4">
-                              <p className="text-[10px] font-bold text-slate-700 leading-tight">{r.description}</p>
+                              <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">{r.date}</p>
+                              <p className="text-[8px] font-black text-slate-400 mt-1 uppercase">{r.timestamp}</p>
                            </td>
                            <td className="py-5 pr-4">
                               <p className="text-[9px] font-black text-indigo-700 uppercase leading-none">{r.points} PT</p>

@@ -4,8 +4,8 @@ import {
   ReportItem, TeacherAttendance, AttendanceRecord, Teacher, OrganizationMember
 } from './types';
 
-// Updated Logo URL from User Request (Thumbnail format for Direct Display)
-export const APP_LOGO = "https://drive.google.com/thumbnail?id=1mBlXA-qfITD8umkcEWiqbVGG5R4Rh46v&sz=w200";
+// Updated Logo URL from User Request
+export const APP_LOGO = "https://drive.google.com/thumbnail?id=1jn1DUtOIreMiNEvVvBkWTP_71mXZbPdm&sz=w200";
 
 export const CLASSES = ['7A', '7B', '8A', '8B', '9A', '9B', '10 IPA', '10 IPS', '11 IPA', '11 IPS', '12 IPA', '12 IPS'];
 
@@ -82,7 +82,6 @@ export const MOCK_SCHEDULE: Schedule[] = [
 ];
 
 export const MOCK_ATTENDANCE: AttendanceRecord[] = [
-  // Fix: Add missing 'recordedTime' property for each record in MOCK_ATTENDANCE
   { id: 'a1', date: t(0), recordedTime: '07:45', studentId: '1', status: AttendanceStatus.S, note: 'Sakit Demam', recordedBy: 'Ustadzah Fatmawati', class: '11 IPA', sessionType: SessionType.MADRASAH, subject: 'Fisika Terapan' },
   { id: 'a2', date: t(0), recordedTime: '13:10', studentId: '2', status: AttendanceStatus.T, note: 'Telat 10 Menit', recordedBy: 'Ustadz Ahmad Rifa\'i', class: '7A', sessionType: SessionType.MADRASAH, subject: 'Fiqih Wadlih' },
   { id: 'a3', date: t(1), recordedTime: '07:50', studentId: '5', status: AttendanceStatus.A, note: 'Alpha', recordedBy: 'Ustadz Zulkifli', class: '8B', sessionType: SessionType.MADRASAH, subject: 'Nahwu Jurumiyah' },

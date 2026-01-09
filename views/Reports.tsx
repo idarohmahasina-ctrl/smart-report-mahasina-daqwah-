@@ -50,7 +50,6 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
     const finalPoints = isCustom ? points : (templates.find(t => t.label === selectedRule)?.points || 0);
     const now = new Date();
     
-    // Logic: Status is "Belum Ditindak" if actionNote is empty
     const reportStatus = actionNote.trim() ? 'Ditindak' : 'Belum Ditindak';
 
     onSave({
@@ -87,7 +86,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
   return (
     <div className="max-w-5xl mx-auto pb-24 relative overflow-hidden">
       
-      {/* Sticky Sub-Navigation (Switch between Input and History) */}
+      {/* Sticky Sub-Navigation */}
       <div className="flex bg-slate-100 p-1.5 rounded-[2rem] w-fit mx-auto shadow-inner border border-slate-200 mb-10 sticky top-4 z-40 backdrop-blur-lg">
          <button 
            onClick={() => setViewMode('input')} 
@@ -122,8 +121,6 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
 
             <div className="bg-white p-10 md:p-14 rounded-[4rem] border border-slate-100 shadow-sm space-y-12">
                <form onSubmit={handleSubmit} className="space-y-12">
-                  
-                  {/* 1. Student Selection Section */}
                   <div className="space-y-4">
                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><User size={14}/> 1. Cari & Pilih Santri</label>
                      <div className="relative">
@@ -149,7 +146,6 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                                 <ChevronRight size={20} className="text-slate-200 group-hover:text-emerald-600 group-hover:translate-x-2 transition-all"/>
                               </button>
                             ))}
-                            {filteredStudents.length === 0 && <div className="p-10 text-center font-black text-slate-300 text-[10px] uppercase tracking-widest">Santri Tidak Ditemukan</div>}
                           </div>
                         )}
                      </div>
@@ -167,7 +163,6 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                      )}
                   </div>
 
-                  {/* 2. Main Form Fields - Always Visible */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-8 border-t border-slate-100">
                      <div className="space-y-3">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><Filter size={14}/> 2. Kategori {isViolation ? 'Pelanggaran' : 'Prestasi'}</label>
@@ -191,10 +186,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
                      <div className="space-y-3">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><Award size={14}/> 4. Poin</label>
-                        <div className="relative">
-                          <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-emerald-800 text-xs">P:</span>
-                          <input type="number" value={points} onChange={e => setPoints(Number(e.target.value))} className="w-full pl-12 pr-6 py-5 bg-slate-50 border-2 border-transparent focus:border-emerald-600 rounded-2xl outline-none font-black text-sm shadow-inner" />
-                        </div>
+                        <input type="number" value={points} onChange={e => setPoints(Number(e.target.value))} className="w-full px-6 py-5 bg-slate-50 border-2 border-transparent focus:border-emerald-600 rounded-2xl outline-none font-black text-sm shadow-inner" />
                      </div>
                      <div className="md:col-span-3 space-y-3">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><Edit size={14}/> 5. Keterangan Rinci</label>
@@ -211,17 +203,11 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                        placeholder="Contoh: Nasehat, Takzir lari, Hadiah Kitab, dll..." 
                        className="w-full px-8 py-5 bg-slate-50 border-2 border-transparent focus:border-emerald-600 rounded-2xl outline-none font-black text-xs shadow-inner" 
                      />
-                     <div className="flex justify-between items-center px-2">
-                        <p className={`text-[8px] font-black uppercase tracking-widest ${actionNote.trim() ? 'text-emerald-600' : 'text-amber-600'}`}>
-                           Status Laporan: {actionNote.trim() ? "DITINDAK" : "BELUM DITINDAK"}
-                        </p>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest italic leading-none">* Kosongkan jika belum ada tindakan</p>
-                     </div>
                   </div>
 
                   <div className="pt-6 border-t border-slate-50">
                     <button type="submit" className={`w-full py-7 rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-[12px] shadow-2xl flex items-center justify-center gap-5 active:scale-95 transition-all ${isViolation ? 'bg-red-900 text-white hover:bg-red-800' : 'bg-emerald-900 text-white hover:bg-emerald-800'}`}>
-                      <Send size={24}/> Kirim Laporan sebagai {currentUser}
+                      <Send size={24}/> Kirim Laporan
                     </button>
                     <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-6">Waktu Input Terarsip: {nowTimeStr} • {new Date().toLocaleDateString('id-ID')}</p>
                   </div>
@@ -236,7 +222,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
               <div className="flex justify-between items-end border-b border-slate-100 pb-8">
                  <div>
                     <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Riwayat Input Anda</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Daftar laporan {type === 'Violation' ? 'pelanggaran' : 'prestasi'} yang anda ajukan</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Daftar laporan personal anda</p>
                  </div>
                  <div className="text-right">
                     <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-100 uppercase tracking-widest">
@@ -255,8 +241,13 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                          <div className="flex-1 min-w-0">
                             <p className="text-sm font-black text-slate-800 uppercase leading-none truncate">{students.find(s=>s.id===r.studentId)?.name || 'Siswa Dihapus'}</p>
                             <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase truncate max-w-[320px]">{r.description}</p>
-                            <div className="flex items-center gap-4 text-[8px] font-black text-slate-400 uppercase tracking-widest mt-3">
-                               <ClockIcon size={12}/> {r.timestamp} • {r.date}
+                            <div className="flex flex-col gap-1 mt-3">
+                               <div className="flex items-center gap-4 text-[8px] font-black text-emerald-700 uppercase tracking-widest">
+                                  <ClockIcon size={12}/> {r.date} • {r.timestamp} (Input Rinci)
+                               </div>
+                               {r.actionNote && (
+                                  <p className="text-[9px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 inline-block self-start mt-1">TINDAKAN: {r.actionNote}</p>
+                               )}
                             </div>
                          </div>
                       </div>
@@ -268,12 +259,6 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                       </div>
                    </div>
                  ))}
-                 {allReports.filter(r => r.reporter === currentUser && r.type === type).length === 0 && (
-                    <div className="py-32 text-center border-4 border-dashed border-slate-50 rounded-[3rem]">
-                       <History size={64} className="mx-auto text-slate-100 mb-6"/>
-                       <p className="text-[14px] font-black text-slate-200 uppercase tracking-[0.3em] italic">Belum Ada Riwayat Laporan Terarsip</p>
-                    </div>
-                 )}
               </div>
            </div>
         </div>
