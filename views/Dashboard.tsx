@@ -106,6 +106,16 @@ const Dashboard: React.FC<DashboardProps> = ({
   const isGuru = profile.role === UserRole.GURU;
   const isPetugasSantri = profile.role === UserRole.SANTRI_OFFICER;
 
+  // CASCADING CLASS LOGIC: Filter list kelas berdasarkan tingkatan yang dipilih
+  const availableClassesForLevel = useMemo(() => {
+    let baseList = students;
+    if (filterLevel !== 'Semua') {
+      baseList = students.filter(s => s.level === filterLevel);
+    }
+    // Fix: Explicitly cast unknown items to string for localeCompare in sort
+    return Array.from(new Set(baseList.map(s => s.formalClass))).sort((a: any, b: any) => String(a).localeCompare(String(b), undefined, {numeric: true}));
+  }, [students, filterLevel]);
+
   // 1. Data Filter Logic (Santri)
   const filteredAttendance = useMemo(() => {
     let list = attendance.filter(a => isWithinRange(a.date, timeRange, customDate));
@@ -122,7 +132,11 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
 
     if (filterSession !== 'Semua') list = list.filter(a => a.sessionType === filterSession);
-    if (filterClass !== 'Semua') list = list.filter(a => a.class === filterClass);
+    
+    // Logic filter kelas yang sudah cerdas: Jika kelas terpilih tidak ada di jenjang, reset ke semua
+    if (filterClass !== 'Semua') {
+      list = list.filter(a => a.class === filterClass);
+    }
 
     return list.filter(a => {
       const s = students.find(std => std.id === a.studentId);
@@ -257,6 +271,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                <select value={timeRange} onChange={e => setTimeRange(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
                   {['Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Semester', 'Pilih Tanggal'].map(r => <option key={r} value={r}>{r}</option>)}
                </select>
+               {timeRange === 'Pilih Tanggal' && (
+                 <input 
+                   type="date" 
+                   value={customDate} 
+                   onChange={e => setCustomDate(e.target.value)}
+                   className="mt-2 w-full p-2 bg-emerald-50 rounded-lg text-[10px] font-bold outline-none border border-emerald-100"
+                 />
+               )}
             </div>
             <div className="space-y-1">
                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Sesi / Unit</label>
@@ -267,7 +289,14 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div className="space-y-1">
                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Tingkatan</label>
-               <select value={filterLevel} onChange={e => setFilterLevel(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
+               <select 
+                 value={filterLevel} 
+                 onChange={e => {
+                    setFilterLevel(e.target.value as any);
+                    setFilterClass('Semua'); // Auto-reset kelas saat jenjang berubah
+                 }} 
+                 className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none"
+               >
                   <option value="Semua">SEMUA TINGKATAN</option>
                   <option value="MTs">MTs</option>
                   <option value="MA">MA</option>
@@ -285,7 +314,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Kelas Spesifik</label>
                <select value={filterClass} onChange={e => setFilterClass(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
                   <option value="Semua">SEMUA KELAS</option>
-                  {Array.from(new Set(students.map(s => s.formalClass))).sort().map(c => <option key={c} value={c}>{c}</option>)}
+                  {availableClassesForLevel.map(c => <option key={c} value={c}>{c}</option>)}
                </select>
             </div>
          </div>
@@ -358,7 +387,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {activeTab === 'Guru' && !isPetugasSantri && (
-        <div className="space-y-8 animate-in slide-in-from-bottom-4">
+        <div className="space-y-8 animate-in fade-in duration-700 pb-20">
            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               {[
                 { label: 'Sesi Diajar', val: teacherStats.totalSessions, color: 'slate', icon: FileText },

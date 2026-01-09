@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { PrayerTime, PrayerStatus, Student, PrayerRecord } from '../types';
+import { PrayerTime, PrayerStatus, Student, PrayerRecord, SessionType } from '../types';
 import { 
   PlusCircle, History, Zap, Search, Users, ChevronRight, Save, Clock, Filter,
   Activity, CheckCircle, FileText, Download, Award, AlertTriangle
@@ -12,12 +12,37 @@ import { downloadCSV } from '../utils/csvExport';
 
 const COLORS = ['#10b981', '#3b82f6', '#6366f1', '#f59e0b', '#f97316', '#ef4444'];
 
-interface PrayerAttendanceProps {
-  students: Student[];
-  onSave: (records: PrayerRecord[]) => void;
-  allPrayerRecords: PrayerRecord[];
-  currentUser: string;
-}
+// Helper for filtering by time range (Enhanced with custom date)
+const isWithinRange = (dateStr: string, range: string, customDate?: string) => {
+  const [d, m, y] = dateStr.split('/').map(Number);
+  const date = new Date(y, m - 1, d);
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  
+  switch (range) {
+    case 'Hari Ini':
+      return date.getTime() === now.getTime();
+    case 'Minggu Ini': {
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      return date >= startOfWeek;
+    }
+    case 'Bulan Ini':
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    case 'Semester': {
+      const sixMonthsAgo = new Date(now);
+      sixMonthsAgo.setMonth(now.getMonth() - 6);
+      return date >= sixMonthsAgo;
+    }
+    case 'Pilih Tanggal':
+      if (!customDate) return true;
+      const [cy, cm, cd] = customDate.split('-').map(Number);
+      const target = new Date(cy, cm - 1, cd);
+      return date.getTime() === target.getTime();
+    default:
+      return true;
+  }
+};
 
 const RankingCard = ({ title, data, type, color = "amber" }: { title: string, data: any[], type: string, color?: string }) => (
   <div className="bg-white p-6 rounded-[2.5rem] border border-slate-50 shadow-sm space-y-4">
@@ -42,6 +67,13 @@ const RankingCard = ({ title, data, type, color = "amber" }: { title: string, da
   </div>
 );
 
+interface PrayerAttendanceProps {
+  students: Student[];
+  onSave: (records: PrayerRecord[]) => void;
+  allPrayerRecords: PrayerRecord[];
+  currentUser: string;
+}
+
 const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, allPrayerRecords, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'input' | 'report'>('input');
   
@@ -53,51 +85,50 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
 
   // State Report
   const [reportRange, setReportRange] = useState('Bulan Ini');
+  const [reportCustomDate, setReportCustomDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportPrayer, setReportPrayer] = useState<PrayerTime | 'Semua'>('Semua');
   const [reportClass, setReportClass] = useState('Semua');
+  const [reportLevel, setReportLevel] = useState<'Semua' | 'MTs' | 'MA'>('Semua');
+  const [reportGender, setReportGender] = useState<'Semua' | 'Putra' | 'Putri'>('Semua');
   const [reportRankStatus, setReportRankStatus] = useState<PrayerStatus>(PrayerStatus.ALPHA);
 
-  const availableClasses = useMemo(() => 
-    Array.from(new Set(students.map(s => s.formalClass))).sort()
+  const availableClassesForInput = useMemo(() => 
+    // Fix: Explicitly cast unknown items to string for localeCompare in sort
+    Array.from(new Set(students.map(s => s.formalClass))).sort((a: any, b: any) => String(a).localeCompare(String(b), undefined, {numeric: true}))
   , [students]);
 
-  const filteredStudents = useMemo(() => {
+  // CASCADING CLASS OPTIONS: Filter kelas berdasarkan jenjang pada laporan
+  const availableClassesForReport = useMemo(() => {
+    let baseList = students;
+    if (reportLevel !== 'Semua') {
+      baseList = students.filter(s => s.level === reportLevel);
+    }
+    // Fix: Explicitly cast unknown items to string for localeCompare in sort
+    return Array.from(new Set(baseList.map(s => s.formalClass))).sort((a: any, b: any) => String(a).localeCompare(String(b), undefined, {numeric: true}));
+  }, [students, reportLevel]);
+
+  const filteredStudentsForInput = useMemo(() => {
     if (!selectedClass) return [];
     return students
       .filter(s => s.formalClass === selectedClass)
       .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [students, selectedClass, searchTerm]);
 
-  // Handle Save Input
-  const handleSave = () => {
-    if (!selectedClass) { alert("Pilih kelas terlebih dahulu."); return; }
-    if (filteredStudents.length === 0) { alert("Tidak ada santri di kelas ini."); return; }
-    
-    const now = new Date();
-    const records: PrayerRecord[] = filteredStudents.map(s => ({
-      id: Math.random().toString(36).substr(2, 9),
-      date: now.toLocaleDateString('id-ID'),
-      recordedTime: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-      studentId: s.id,
-      status: tempRecords[s.id]?.status || PrayerStatus.JAMAAH,
-      note: tempRecords[s.id]?.note || '',
-      recordedBy: currentUser,
-      class: selectedClass,
-      prayerTime: selectedPrayer
-    }));
-
-    onSave(records);
-    alert(`Absen ${selectedPrayer} kelas ${selectedClass} berhasil disimpan.`);
-    setTempRecords({});
-  };
-
   // Logic Reports
   const filteredRecords = useMemo(() => {
-    let list = allPrayerRecords;
+    let list = allPrayerRecords.filter(r => isWithinRange(r.date, reportRange, reportCustomDate));
+    
     if (reportPrayer !== 'Semua') list = list.filter(r => r.prayerTime === reportPrayer);
     if (reportClass !== 'Semua') list = list.filter(r => r.class === reportClass);
-    return list;
-  }, [allPrayerRecords, reportPrayer, reportClass]);
+    
+    return list.filter(r => {
+      const s = students.find(std => std.id === r.studentId);
+      if (!s) return false;
+      const matchLvl = reportLevel === 'Semua' || s.level === reportLevel;
+      const matchGdr = reportGender === 'Semua' || s.gender === reportGender;
+      return matchLvl && matchGdr;
+    });
+  }, [allPrayerRecords, reportRange, reportCustomDate, reportPrayer, reportClass, reportLevel, reportGender, students]);
 
   const stats = {
     JAMAAH: filteredRecords.filter(r => r.status === PrayerStatus.JAMAAH).length,
@@ -118,6 +149,28 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
       }
     });
     return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count);
+  };
+
+  const handleSave = () => {
+    if (!selectedClass) { alert("Pilih kelas terlebih dahulu."); return; }
+    if (filteredStudentsForInput.length === 0) { alert("Tidak ada santri di kelas ini."); return; }
+    
+    const now = new Date();
+    const records: PrayerRecord[] = filteredStudentsForInput.map(s => ({
+      id: Math.random().toString(36).substr(2, 9),
+      date: now.toLocaleDateString('id-ID'),
+      recordedTime: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      studentId: s.id,
+      status: tempRecords[s.id]?.status || PrayerStatus.JAMAAH,
+      note: tempRecords[s.id]?.note || '',
+      recordedBy: currentUser,
+      class: selectedClass,
+      prayerTime: selectedPrayer
+    }));
+
+    onSave(records);
+    alert(`Absen ${selectedPrayer} kelas ${selectedClass} berhasil disimpan.`);
+    setTempRecords({});
   };
 
   return (
@@ -156,7 +209,6 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
 
       {activeSubTab === 'input' ? (
         <div className="space-y-8 animate-in slide-in-from-bottom-6">
-           {/* Selector Panel */}
            <div className="bg-white p-8 rounded-[3rem] border border-slate-50 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-3">
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Waktu Sholat</label>
@@ -176,12 +228,11 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Unit Kelas</label>
                  <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="w-full p-5 bg-slate-50 rounded-2xl outline-none font-black text-[11px] uppercase tracking-widest shadow-inner border-2 border-transparent focus:border-emerald-600 appearance-none cursor-pointer">
                     <option value="">-- PILIH KELAS UNTUK ABSEN --</option>
-                    {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                    {availableClassesForInput.map(c => <option key={c} value={c}>{c}</option>)}
                  </select>
               </div>
            </div>
 
-           {/* Student List - Optimized for space */}
            <div className="bg-white rounded-[3.5rem] border border-slate-50 shadow-xl overflow-hidden min-h-[500px]">
               {!selectedClass ? (
                  <div className="py-32 text-center space-y-6">
@@ -202,7 +253,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                        </div>
                     </div>
                     <div className="max-h-[800px] overflow-y-auto no-scrollbar">
-                       {filteredStudents.map(s => {
+                       {filteredStudentsForInput.map(s => {
                           const curr = tempRecords[s.id] || { status: PrayerStatus.JAMAAH, note: '' };
                           return (
                             <div key={s.id} className="flex flex-col md:flex-row items-center justify-between p-6 sm:p-8 hover:bg-slate-50/50 transition-all gap-6 group">
@@ -213,8 +264,6 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                                      <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 mt-1.5 uppercase tracking-widest">{s.nis} • {s.gender}</p>
                                   </div>
                                </div>
-                               
-                               {/* Compact Options Row */}
                                <div className="flex items-center gap-4 w-full md:w-auto">
                                   <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner shrink-0">
                                      {[
@@ -245,9 +294,6 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                             </div>
                           );
                        })}
-                       {filteredStudents.length === 0 && (
-                          <div className="py-24 text-center text-slate-200 font-black uppercase italic text-[11px] tracking-widest">Santri Tidak Ditemukan</div>
-                       )}
                     </div>
                  </div>
               )}
@@ -267,39 +313,64 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
         </div>
       ) : (
         <div className="space-y-10 animate-in slide-in-from-bottom-6">
-           {/* Report Filters */}
-           <div className="bg-white p-8 rounded-[3.5rem] border border-slate-50 shadow-sm grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div className="space-y-1">
-                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Rentang Waktu</label>
-                 <select value={reportRange} onChange={e => setReportRange(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
-                    {['Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Semester'].map(r => <option key={r} value={r}>{r}</option>)}
-                 </select>
-              </div>
-              <div className="space-y-1">
-                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Waktu Sholat</label>
-                 <select value={reportPrayer} onChange={e => setReportPrayer(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
-                    <option value="Semua">SEMUA WAKTU</option>
-                    {Object.values(PrayerTime).map(p => <option key={p} value={p}>{p}</option>)}
-                 </select>
-              </div>
-              <div className="space-y-1">
-                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Filter Unit</label>
-                 <select value={reportClass} onChange={e => setReportClass(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
-                    <option value="Semua">SEMUA KELAS</option>
-                    {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
-                 </select>
-              </div>
-              <div className="flex items-end">
-                 <button 
-                   onClick={() => downloadCSV(filteredRecords, `Laporan_Sholat_Mahasina`)}
-                   className="w-full p-3.5 bg-emerald-900 text-white rounded-xl shadow-lg flex items-center justify-center gap-3 text-[9px] font-black uppercase tracking-widest hover:bg-emerald-800 transition-all active:scale-95"
-                 >
-                    <Download size={14}/> Download Detail
-                 </button>
+           {/* Enhanced Report Filters */}
+           <div className="bg-white p-6 rounded-[3rem] border border-slate-50 shadow-sm space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                 <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Rentang Waktu</label>
+                    <select value={reportRange} onChange={e => setReportRange(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
+                       {['Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Semester', 'Pilih Tanggal'].map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    {reportRange === 'Pilih Tanggal' && (
+                      <input 
+                        type="date" 
+                        value={reportCustomDate} 
+                        onChange={e => setReportCustomDate(e.target.value)}
+                        className="mt-2 w-full p-2 bg-emerald-50 rounded-lg text-[10px] font-bold outline-none border border-emerald-100"
+                      />
+                    )}
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Waktu Sholat</label>
+                    <select value={reportPrayer} onChange={e => setReportPrayer(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
+                       <option value="Semua">SEMUA WAKTU</option>
+                       {Object.values(PrayerTime).map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Tingkatan</label>
+                    <select 
+                      value={reportLevel} 
+                      onChange={e => {
+                        setReportLevel(e.target.value as any);
+                        setReportClass('Semua'); // Auto reset saat jenjang ganti
+                      }} 
+                      className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none"
+                    >
+                       <option value="Semua">SEMUA TINGKATAN</option>
+                       <option value="MTs">MTs</option>
+                       <option value="MA">MA</option>
+                    </select>
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Gender</label>
+                    <select value={reportGender} onChange={e => setReportGender(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
+                       <option value="Semua">SEMUA GENDER</option>
+                       <option value="Putra">PUTRA</option>
+                       <option value="Putri">PUTRI</option>
+                    </select>
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Kelas Spesifik</label>
+                    <select value={reportClass} onChange={e => setReportClass(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
+                       <option value="Semua">SEMUA KELAS</option>
+                       {availableClassesForReport.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                 </div>
               </div>
            </div>
 
-           {/* Stats Summary - Expanded for Terlambat */}
+           {/* Stats Summary */}
            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {[
                 { label: 'Berjamaah', val: stats.JAMAAH, color: 'emerald', icon: CheckCircle },
@@ -319,7 +390,6 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
               ))}
            </div>
 
-           {/* Ranking Sections */}
            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
               <div className="bg-white p-8 rounded-[3.5rem] border border-slate-50 shadow-xl space-y-8">
                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -361,22 +431,29 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                        </PieChart>
                     </ResponsiveContainer>
                  </div>
-                 <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
-                    <p className="text-[9px] font-medium text-slate-500 italic leading-relaxed text-center">Data di atas mencerminkan akumulasi kehadiran sholat berjama'ah santri sesuai filter yang dipilih.</p>
-                 </div>
               </div>
            </div>
 
-           {/* Detail List Table */}
            <div className="bg-white p-10 rounded-[3.5rem] border border-slate-50 shadow-xl overflow-hidden">
-              <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest mb-10 flex items-center gap-3"><FileText size={20} className="text-emerald-700"/> Detail Histori Absensi</h3>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+                 <div>
+                    <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-3"><FileText size={20} className="text-emerald-700"/> Detail Histori Absensi</h3>
+                    <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Data akumulasi berdasarkan filter aktif</p>
+                 </div>
+                 <button 
+                   onClick={() => downloadCSV(filteredRecords, `Laporan_Sholat_Mahasina`)}
+                   className="p-3.5 bg-emerald-900 text-white rounded-2xl shadow-lg flex items-center gap-3 text-[9px] font-black uppercase tracking-widest hover:bg-emerald-800 transition-all active:scale-95 whitespace-nowrap"
+                 >
+                    <Download size={16}/> Unduh (.CSV)
+                 </button>
+              </div>
               <div className="overflow-x-auto no-scrollbar">
                  <table className="w-full text-left">
                     <thead>
                        <tr className="border-b-2 border-slate-50">
                           <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Santri / Unit</th>
                           <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Status Sholat</th>
-                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Waktu / Tanggal</th>
+                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Waktu Input</th>
                           <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Catatan</th>
                        </tr>
                     </thead>
@@ -404,7 +481,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                     </tbody>
                  </table>
                  {filteredRecords.length === 0 && (
-                    <div className="py-32 text-center text-slate-300 font-black uppercase italic tracking-[0.3em]">Belum Ada Histori Sholat Terarsip</div>
+                    <div className="py-32 text-center text-slate-200 font-black uppercase italic tracking-[0.3em]">Belum Ada Histori Sholat Terarsip</div>
                  )}
               </div>
            </div>
