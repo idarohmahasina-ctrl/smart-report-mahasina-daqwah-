@@ -5,12 +5,19 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Memberitahukan Vite untuk menyertakan API_KEY saat proses kompilasi
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
   },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'lucide-react', 'recharts'],
+          ai: ['@google/genai']
+        }
+      }
+    }
   },
   server: {
     port: 3000,
