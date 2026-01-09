@@ -206,7 +206,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                   </div>
 
                   <div className="pt-6 border-t border-slate-50">
-                    <button type="submit" className={`w-full py-7 rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-[12px] shadow-2xl flex items-center justify-center gap-5 active:scale-95 transition-all ${isViolation ? 'bg-red-900 text-white hover:bg-red-800' : 'bg-emerald-900 text-white hover:bg-emerald-800'}`}>
+                    <button type="submit" className={`w-full py-7 rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-[12px] shadow-2xl flex items-center justify-center gap-5 active:scale-95 transition-all ${isViolation ? 'bg-red-950 text-white hover:bg-red-800' : 'bg-emerald-950 text-white hover:bg-emerald-800'}`}>
                       <Send size={24}/> Kirim Laporan
                     </button>
                     <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-6">Waktu Input Terarsip: {nowTimeStr} • {new Date().toLocaleDateString('id-ID')}</p>

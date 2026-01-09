@@ -405,7 +405,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               ))}
            </div>
 
-           {/* Ranking Restored Section */}
+           {/* Ranking Sections */}
            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <RankingCard 
                 title={`Top Santri (${activeTab})`} 

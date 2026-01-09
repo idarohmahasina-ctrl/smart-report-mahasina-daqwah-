@@ -4,7 +4,7 @@ import {
   ReportItem, TeacherAttendance, AttendanceRecord, Teacher, OrganizationMember
 } from './types';
 
-// Updated Logo URL from User Request
+// Updated Logo URL from User Request (Thumbnail format for better loading)
 export const APP_LOGO = "https://drive.google.com/thumbnail?id=1jn1DUtOIreMiNEvVvBkWTP_71mXZbPdm&sz=w200";
 
 export const CLASSES = ['7A', '7B', '8A', '8B', '9A', '9B', '10 IPA', '10 IPS', '11 IPA', '11 IPS', '12 IPA', '12 IPS'];
