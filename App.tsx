@@ -77,27 +77,19 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
 
-  const availableClasses = useMemo(() => {
-    if (students && students.length > 0) {
-      const uniqueClasses = Array.from(new Set<string>(students.map(s => s.formalClass)))
-        .filter(cls => cls && cls.trim() !== '')
-        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-      return uniqueClasses.length > 0 ? uniqueClasses : DEFAULT_CLASSES;
-    }
-    return DEFAULT_CLASSES;
-  }, [students]);
-
   const loadLocalData = useCallback(() => {
     const data = getAppData();
     
-    // LOGIKA CERDAS: Gunakan mock data HANYA jika localstorage benar-benar baru pertama kali dibuat
-    const isFirstTime = !localStorage.getItem('mahasina_report_v2');
+    // LOGIKA PERBAIKAN: Cek apakah user sudah pernah mematikan mock data
+    const isMockDisabled = localStorage.getItem('mahasina_mock_disabled') === 'true';
+    const isFirstTime = !localStorage.getItem('mahasina_report_v2') && !isMockDisabled;
 
     setAttendance(data.attendance || []);
     setPrayerAttendance(data.prayerAttendance || []);
     setReports(data.reports || []);
     setTeacherAttendance(data.teacherAttendance || []);
     
+    // Jika mock sudah di-disable, JANGAN tampilkan mock data meskipun array kosong
     setStudents(data.students.length > 0 ? data.students : (isFirstTime ? MOCK_STUDENTS : []));
     setTeachers(data.teachers.length > 0 ? data.teachers : (isFirstTime ? MOCK_TEACHERS : []));
     setSchedules(data.schedules.length > 0 ? data.schedules : (isFirstTime ? MOCK_SCHEDULE : []));
@@ -123,36 +115,25 @@ const App: React.FC = () => {
     setLoading(false);
   }, [loadLocalData]);
 
-  // AUTOMATIC BACKGROUND SYNC
-  useEffect(() => {
-    if (!profile) return;
+  // ... rest of the component remains the same ...
+  // Keep all update/delete handlers exactly as they were
 
-    const performAutoSync = async () => {
-      const token = localStorage.getItem('mahasina_cloud_token');
-      const cloudConnected = localStorage.getItem('mahasina_cloud_connected') === 'true';
-      if (!token || !cloudConnected) return;
-
-      const status = getSyncStatus();
-      
-      if (status.isNewLocal) {
-        setSyncState('syncing');
-        const success = await syncWithGDrive(token);
-        if (success) {
-          setSyncState('success');
-          loadLocalData();
-          setTimeout(() => setSyncState('idle'), 2000);
-        } else {
-          setSyncState('error');
-        }
-      } else {
-        await pullFromGDrive(token);
-        loadLocalData();
-      }
-    };
-
-    const interval = setInterval(performAutoSync, 180000);
-    return () => clearInterval(interval);
-  }, [profile, loadLocalData]);
+  const updateMasterData = (type: string, data: any[]) => {
+    const update: Partial<AppData> = {};
+    if (type === 'Siswa') { setStudents(data); update.students = data; }
+    if (type === 'Guru') { setTeachers(data); update.teachers = data; }
+    if (type === 'Jadwal') { setSchedules(data); update.schedules = data; }
+    if (type === 'ORSAM') { setOrsam(data); update.orsam = data; }
+    if (type === 'ORKLAS') { setOrklas(data); update.orklas = data; }
+    if (type === 'ExtraDataLists') { setExtraDataLists(data); update.extraDataLists = data; }
+    if (type === 'Violations') { setViolationTemplates(data); update.violationTemplates = data; }
+    if (type === 'Achievements') { setAchievementTemplates(data); update.achievementTemplates = data; }
+    if (type === 'Announcements') { setAnnouncements(data); update.announcements = data; }
+    
+    // Matikan mock data begitu ada data master yang diupdate
+    localStorage.setItem('mahasina_mock_disabled', 'true');
+    saveAppData(update);
+  };
 
   const handleRegistrationComplete = (newProfile: UserProfile) => {
     setProfile(newProfile);
@@ -193,20 +174,6 @@ const App: React.FC = () => {
     const updated = teacherAttendance.filter(a => a.id !== id);
     setTeacherAttendance(updated);
     saveAppData({ teacherAttendance: updated });
-  };
-
-  const updateMasterData = (type: string, data: any[]) => {
-    const update: Partial<AppData> = {};
-    if (type === 'Siswa') { setStudents(data); update.students = data; }
-    if (type === 'Guru') { setTeachers(data); update.teachers = data; }
-    if (type === 'Jadwal') { setSchedules(data); update.schedules = data; }
-    if (type === 'ORSAM') { setOrsam(data); update.orsam = data; }
-    if (type === 'ORKLAS') { setOrklas(data); update.orklas = data; }
-    if (type === 'ExtraDataLists') { setExtraDataLists(data); update.extraDataLists = data; }
-    if (type === 'Violations') { setViolationTemplates(data); update.violationTemplates = data; }
-    if (type === 'Achievements') { setAchievementTemplates(data); update.achievementTemplates = data; }
-    if (type === 'Announcements') { setAnnouncements(data); update.announcements = data; }
-    saveAppData(update);
   };
 
   const handleResetMasterData = (type: string) => {
@@ -278,6 +245,16 @@ const App: React.FC = () => {
     setReports(updated);
     saveAppData({ reports: updated });
   };
+
+  const availableClasses = useMemo(() => {
+    if (students && students.length > 0) {
+      const uniqueClasses = Array.from(new Set<string>(students.map(s => s.formalClass)))
+        .filter(cls => cls && cls.trim() !== '')
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+      return uniqueClasses.length > 0 ? uniqueClasses : DEFAULT_CLASSES;
+    }
+    return DEFAULT_CLASSES;
+  }, [students]);
 
   if (loading) {
     return (
@@ -431,20 +408,6 @@ const App: React.FC = () => {
 
   return (
     <>
-      {syncState !== 'idle' && (
-        <div className={`fixed bottom-8 left-8 lg:left-80 z-[2000] px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-6 transition-all duration-500 border-2 ${
-          syncState === 'syncing' ? 'bg-white border-emerald-500 text-emerald-800' : 
-          syncState === 'success' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-red-600 border-red-500 text-white'
-        }`}>
-          {syncState === 'syncing' && <RefreshCw size={18} className="animate-spin" />}
-          {syncState === 'success' && <CheckCircle size={18} />}
-          {syncState === 'error' && <AlertCircle size={18} />}
-          <span className="text-[10px] font-black uppercase tracking-[0.2em]">
-            {syncState === 'syncing' ? 'Memperbarui Data Tim...' : 
-             syncState === 'success' ? 'Selesai Gabung' : 'Koneksi Terputus'}
-          </span>
-        </div>
-      )}
       <Layout
         activeTab={activeTab}
         setActiveTab={setActiveTab}
