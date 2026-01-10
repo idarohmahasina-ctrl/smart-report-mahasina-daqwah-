@@ -75,13 +75,14 @@ export const getAppData = (): AppData => {
   }
 };
 
-export const linkTeacherEmail = (teacherId: string, email: string) => {
-  const current = getAppData();
-  const updatedTeachers = current.teachers.map(t => 
-    t.id === teacherId ? { ...t, email: email.toLowerCase().trim() } : t
-  );
-  saveAppData({ teachers: updatedTeachers });
-};
+// Deteksi otomatis ID Database dari URL jika ada
+const urlParams = new URLSearchParams(window.location.search);
+const joinId = urlParams.get('join');
+if (joinId) {
+  localStorage.setItem(TEAM_DB_ID_KEY, joinId);
+  // Bersihkan URL agar tidak mengganggu navigasi
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
 
 export const setTeamDatabaseId = (id: string) => {
   localStorage.setItem(TEAM_DB_ID_KEY, id);
@@ -94,23 +95,22 @@ export const getTeamDatabaseId = () => {
 const mergeData = (local: AppData, cloud: AppData): AppData => {
   const combine = (arr1: any[], arr2: any[]) => {
     const map = new Map();
-    [...(arr2 || []), ...(arr1 || [])].forEach(item => {
+    // Prioritaskan cloud data jika ada konflik ID, tapi simpan yang terbaru
+    [...(arr1 || []), ...(arr2 || [])].forEach(item => {
       if (item && item.id) {
-        const existing = map.get(item.id);
-        if (!existing || (item.updatedAt && item.updatedAt > (existing.updatedAt || 0))) {
-          map.set(item.id, item);
-        }
+        map.set(item.id, item);
       }
     });
     return Array.from(map.values());
   };
 
   return {
-    ...cloud,
+    ...cloud, // Metadata (Config, Students, Teachers) ambil dari cloud
     attendance: combine(local.attendance, cloud.attendance),
     prayerAttendance: combine(local.prayerAttendance, cloud.prayerAttendance),
     teacherAttendance: combine(local.teacherAttendance, cloud.teacherAttendance),
     reports: combine(local.reports, cloud.reports),
+    // Data master selalu ikuti Cloud jika cloud memiliki data
     students: (cloud.students && cloud.students.length > 0) ? cloud.students : local.students,
     teachers: (cloud.teachers && cloud.teachers.length > 0) ? cloud.teachers : local.teachers,
     schedules: (cloud.schedules && cloud.schedules.length > 0) ? cloud.schedules : local.schedules,
@@ -137,6 +137,7 @@ export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
     const localData = getAppData();
     let fileId = getTeamDatabaseId();
     
+    // Jika belum punya ID, cari file dengan nama universal di Drive user
     if (!fileId) {
       const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${GLOBAL_DB_NAME}' and trashed=false`, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -223,19 +224,12 @@ export const registerUser = (user: UserProfile) => {
   localStorage.setItem(USERS_KEY, JSON.stringify([...users, user]));
 };
 
-export const updateUser = (user: UserProfile) => {
-  const users = getUsers();
-  const index = users.findIndex(u => u.id === user.id);
-  if (index === -1) return;
-  const updatedUsers = [...users];
-  updatedUsers[index] = user;
-  localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
-};
-
-export const deleteUser = (userId: string) => {
-  const users = getUsers();
-  const updatedUsers = users.filter(u => u.id !== userId);
-  localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
+export const linkTeacherEmail = (teacherId: string, email: string) => {
+  const current = getAppData();
+  const updatedTeachers = current.teachers.map(t => 
+    t.id === teacherId ? { ...t, email: email.toLowerCase().trim() } : t
+  );
+  saveAppData({ teachers: updatedTeachers });
 };
 
 export const getActiveSession = (): UserProfile | null => {
@@ -256,4 +250,5 @@ export const getSyncStatus = () => {
 export const clearAppData = () => {
   sessionStorage.removeItem(SESSION_KEY);
   localStorage.removeItem('mahasina_cloud_token');
+  localStorage.removeItem('mahasina_cloud_connected');
 };

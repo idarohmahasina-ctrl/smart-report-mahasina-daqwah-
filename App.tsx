@@ -34,7 +34,8 @@ import {
   pullFromGDrive,
   getActiveSession,
   setActiveSession,
-  ExtraDataList
+  ExtraDataList,
+  getTeamDatabaseId
 } from './services/dataService.ts';
 import { 
   APP_LOGO, 
@@ -79,8 +80,6 @@ const App: React.FC = () => {
 
   const loadLocalData = useCallback(() => {
     const data = getAppData();
-    
-    // LOGIKA PERBAIKAN: Cek apakah user sudah pernah mematikan mock data
     const isMockDisabled = localStorage.getItem('mahasina_mock_disabled') === 'true';
     const isFirstTime = !localStorage.getItem('mahasina_report_v2') && !isMockDisabled;
 
@@ -89,7 +88,6 @@ const App: React.FC = () => {
     setReports(data.reports || []);
     setTeacherAttendance(data.teacherAttendance || []);
     
-    // Jika mock sudah di-disable, JANGAN tampilkan mock data meskipun array kosong
     setStudents(data.students.length > 0 ? data.students : (isFirstTime ? MOCK_STUDENTS : []));
     setTeachers(data.teachers.length > 0 ? data.teachers : (isFirstTime ? MOCK_TEACHERS : []));
     setSchedules(data.schedules.length > 0 ? data.schedules : (isFirstTime ? MOCK_SCHEDULE : []));
@@ -104,6 +102,20 @@ const App: React.FC = () => {
     setAcademicConfig(data.academicConfig);
   }, []);
 
+  // AUTO-SYNC EFFECT: Tarik data otomatis saat app terbuka
+  useEffect(() => {
+    const autoPull = async () => {
+      const token = localStorage.getItem('mahasina_cloud_token');
+      const dbId = getTeamDatabaseId();
+      if (token && dbId) {
+        console.log("Auto-sync: Menarik data terbaru tim...");
+        await pullFromGDrive(token);
+        loadLocalData();
+      }
+    };
+    autoPull();
+  }, [loadLocalData]);
+
   useEffect(() => {
     const activeUser = getActiveSession();
     if (activeUser) {
@@ -114,9 +126,6 @@ const App: React.FC = () => {
     loadLocalData();
     setLoading(false);
   }, [loadLocalData]);
-
-  // ... rest of the component remains the same ...
-  // Keep all update/delete handlers exactly as they were
 
   const updateMasterData = (type: string, data: any[]) => {
     const update: Partial<AppData> = {};
@@ -130,7 +139,6 @@ const App: React.FC = () => {
     if (type === 'Achievements') { setAchievementTemplates(data); update.achievementTemplates = data; }
     if (type === 'Announcements') { setAnnouncements(data); update.announcements = data; }
     
-    // Matikan mock data begitu ada data master yang diupdate
     localStorage.setItem('mahasina_mock_disabled', 'true');
     saveAppData(update);
   };
