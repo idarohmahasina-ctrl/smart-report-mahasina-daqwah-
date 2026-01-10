@@ -39,19 +39,19 @@ export interface AppData {
   violationTemplates: TemplateItem[];
   achievementTemplates: TemplateItem[];
   lastUpdate?: string;
-  databaseId?: string; // Menyimpan ID file unik tim
+  databaseId?: string;
 }
 
 const initialData: AppData = {
-  attendance: MOCK_ATTENDANCE,
+  attendance: [],
   prayerAttendance: [],
-  teacherAttendance: MOCK_TEACHER_ATTENDANCE,
-  reports: MOCK_REPORTS,
-  students: MOCK_STUDENTS,
-  teachers: MOCK_TEACHERS,
-  schedules: MOCK_SCHEDULE,
-  orsam: MOCK_ORSAM,
-  orklas: MOCK_ORKLAS,
+  teacherAttendance: [],
+  reports: [],
+  students: [],
+  teachers: [],
+  schedules: [],
+  orsam: [],
+  orklas: [],
   announcements: [],
   academicConfig: {
     schoolYear: '2025/2026',
@@ -68,7 +68,8 @@ export const getAppData = (): AppData => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) return initialData;
   try {
-    return { ...initialData, ...JSON.parse(data) };
+    const parsed = JSON.parse(data);
+    return { ...initialData, ...parsed };
   } catch (e) {
     return initialData;
   }
@@ -102,7 +103,9 @@ const mergeData = (local: AppData, cloud: AppData): AppData => {
     prayerAttendance: combine(local.prayerAttendance, cloud.prayerAttendance),
     teacherAttendance: combine(local.teacherAttendance, cloud.teacherAttendance),
     reports: combine(local.reports, cloud.reports),
-    students: cloud.students?.length > 0 ? cloud.students : local.students,
+    students: (cloud.students && cloud.students.length > 0) ? cloud.students : local.students,
+    teachers: (cloud.teachers && cloud.teachers.length > 0) ? cloud.teachers : local.teachers,
+    schedules: (cloud.schedules && cloud.schedules.length > 0) ? cloud.schedules : local.schedules,
     lastUpdate: new Date().toISOString()
   };
 };
@@ -126,7 +129,6 @@ export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
     const localData = getAppData();
     let fileId = getTeamDatabaseId();
     
-    // Jika belum punya ID, cari berdasarkan nama
     if (!fileId) {
       const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${GLOBAL_DB_NAME}' and trashed=false`, {
         headers: { Authorization: `Bearer ${accessToken}` }
