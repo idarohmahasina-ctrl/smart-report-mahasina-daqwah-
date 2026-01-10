@@ -58,8 +58,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     const reader = new FileReader();
     reader.onload = (event) => {
       let text = event.target?.result as string;
-      
-      // Hapus BOM (Byte Order Mark) yang sering muncul dari Excel
       text = text.replace(/^\uFEFF/, '');
       
       const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
@@ -70,27 +68,19 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
 
       const firstLine = lines[0];
       const delimiter = firstLine.includes(';') ? ';' : ',';
-      
-      // Bersihkan header dari spasi dan karakter aneh
       const rawHeaders = firstLine.split(delimiter).map(h => h.replace(/["\r\n]/g, '').trim());
       const headersMap: Record<string, number> = {};
-      rawHeaders.forEach((h, i) => {
-        // Normalisasi header: Hapus spasi, jadikan huruf besar
-        const cleanKey = h.toUpperCase().replace(/\s+/g, '');
-        headersMap[cleanKey] = i;
-      });
+      rawHeaders.forEach((h, i) => headersMap[h.toUpperCase().replace(/\s+/g, '')] = i);
 
       const getVal = (rowArr: string[], possibleNames: string[]) => {
         for (const name of possibleNames) {
-          const cleanKey = name.toUpperCase().replace(/\s+/g, '');
-          const idx = headersMap[cleanKey];
+          const idx = headersMap[name.toUpperCase().replace(/\s+/g, '')];
           if (idx !== undefined) return rowArr[idx]?.replace(/["\r\n]/g, '').trim() || '';
         }
         return '';
       };
 
       const newData = lines.slice(1).map((line, idx) => {
-        // Handle CSV split yang lebih cerdas untuk data yang mengandung koma di dalam tanda kutip
         const values = line.split(delimiter).map(v => v.replace(/^"|"$/g, '').trim());
         
         if (type === 'Siswa') {
@@ -103,7 +93,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
               if (val) sessionClasses[sessionName] = val;
             }
           });
-
           return {
             id: `std-${Date.now()}-${idx}`,
             nis: getVal(values, ['NIS', 'NISN', 'NOMORINDUK']),
@@ -111,30 +100,54 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             gender: getVal(values, ['GENDER', 'JENISKELAMIN', 'JK']) || 'Putra',
             level: getVal(values, ['TINGKAT', 'JENJANG', 'UNIT']) || 'MTs',
             formalClass: getVal(values, ['KELASMADRASAH(FORMAL)', 'KELASFORMAL', 'KELASMADRASAH', 'KELAS']),
-            sessionClasses: sessionClasses
+            sessionClasses
           };
         }
         
-        // Pemetaan untuk Jadwal dan Guru serupa...
+        if (type === 'Guru') {
+           return {
+             id: `t-${Date.now()}-${idx}`,
+             name: getVal(values, ['NAMA', 'NAMAGURU']),
+             subject: getVal(values, ['MAPEL', 'MATAPELAJARAN']),
+             phone: getVal(values, ['NOHP', 'WHATSAPP']),
+             email: getVal(values, ['EMAIL']),
+             gender: getVal(values, ['GENDER', 'JK']) || 'Putra',
+             isWaliKelas: getVal(values, ['WALIKELAS', 'WALI']).toLowerCase() === 'ya',
+             waliKelasFor: getVal(values, ['WALIKELASDI', 'WALIUNIT']),
+             teachingClasses: (getVal(values, ['MENGAJARDIKELAS', 'KELAS']) || '').split(';').map(s => s.trim())
+           };
+        }
+
+        if (type === 'Jadwal') {
+          return {
+            id: `sch-${Date.now()}-${idx}`,
+            day: getVal(values, ['HARI']) || 'Senin',
+            time: getVal(values, ['WAKTU', 'JAM']),
+            subject: getVal(values, ['MAPEL', 'MATAPELAJARAN']),
+            teacherName: getVal(values, ['GURU', 'USTADZ', 'USTADZAH']),
+            class: getVal(values, ['UNIT', 'KELAS']),
+            sessionType: getVal(values, ['SESI', 'JENISKEGIATAN']) || 'Madrasah',
+            level: getVal(values, ['TINGKAT', 'JENJANG']) || 'MTs',
+            gender: getVal(values, ['GENDER', 'JK']) || 'Putra'
+          };
+        }
+
         return values;
       }).filter(item => {
         if (typeof item === 'object' && 'name' in item) return !!item.name;
+        if (typeof item === 'object' && 'subject' in item && 'teacherName' in item) return !!item.subject;
         return true;
       });
 
       if (newData.length === 0) {
-        alert("Gagal membaca data. Pastikan judul kolom (Header) sudah benar.\nContoh: NIS, Nama, Gender, Kelas Madrasah (Formal)");
+        alert("Gagal membaca data. Pastikan judul kolom (Header) sudah benar.");
         return;
       }
 
-      const totalStudents = newData.length;
-      const detectedSessions = type === 'Siswa' ? Object.keys((newData[0] as Student).sessionClasses).length : 0;
-
-      if (confirm(`Data Terdeteksi:\n- Total: ${totalStudents} baris\n- Kolom Sesi: ${detectedSessions} sesi\n\nSimpan data ini dan hapus data lama?`)) {
-        // Tanda agar data sampel tidak muncul lagi selamanya
+      if (confirm(`Terdeteksi ${newData.length} baris data ${type}. Timpa data lama?`)) {
         localStorage.setItem('mahasina_mock_disabled', 'true');
         onUpdateData(type, newData);
-        alert("Sinkronisasi Berhasil! Data Anda sudah aktif.");
+        alert("Sinkronisasi Berhasil!");
         setTimeout(() => window.location.reload(), 300);
       }
     };
@@ -144,11 +157,10 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
   const downloadTemplate = (type: string) => {
     let content = "";
     let filename = `Template_${type}_Mahasina.csv`;
-    if (type === 'Siswa') {
-      content = "NIS,Nama,Gender,Tingkat,Kelas Madrasah (Formal),Kelas Al-Quran,Kelas Kitab Kuning,Kelas Sore\n2024001,Ahmad Santri,Putra,MTs,7A,Yanbu'a 3,Safinatun Najah,Kamar A";
-    } else {
-      content = "Header1,Header2\nData1,Data2";
-    }
+    if (type === 'Siswa') content = "NIS,Nama,Gender,Tingkat,Kelas Madrasah (Formal),Kelas Al-Quran,Kelas Kitab Kuning\n2024001,Ahmad Santri,Putra,MTs,7A,Yanbu'a 3,Safinatun Najah";
+    else if (type === 'Guru') content = "Nama,Mapel,No HP,Email,Gender,Wali Kelas,Wali Kelas Di,Mengajar Di Kelas\nUstadz Zulkifli,Nahwu,081234,zulkifli@gmail.com,Putra,Ya,7A,7A;7B;8A";
+    else if (type === 'Jadwal') content = "Hari,Waktu,Mapel,Guru,Unit,Sesi,Tingkat,Gender\nSenin,07:30 - 09:00,Nahwu,Ustadz Zulkifli,7A,Madrasah,MTs,Putra";
+    
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -192,7 +204,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                  <button onClick={() => {setSelectedCategory(null); setSearchTerm('');}} className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-50 hover:text-emerald-600 transition-all"><ArrowLeft size={24}/></button>
                  <div>
                     <h2 className="text-2xl font-black uppercase tracking-tight">{selectedCategory}</h2>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Gunakan CSV (Comma Delimited) dari Excel</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Gunakan format CSV Excel yang sesuai</p>
                  </div>
               </div>
               <div className="flex gap-3 w-full md:w-auto">
@@ -256,13 +268,82 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                               </tr>
                             );
                          })}
-                         {filteredStudents.length === 0 && <tr><td colSpan={3} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest text-[10px]">Data Santri Masih Kosong</td></tr>}
                       </tbody>
                    </table>
                 </div>
              </div>
            )}
-           {/* Rendering kategori lain (Guru, Jadwal) disesuaikan... */}
+
+           {selectedCategory === 'Guru' && (
+             <div className="bg-white p-10 rounded-[4rem] border shadow-sm overflow-x-auto no-scrollbar">
+                <table className="w-full text-left">
+                   <thead>
+                      <tr className="border-b-2 border-slate-50">
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Nama Guru</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Email (Login)</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Mapel</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-50">
+                      {data.teachers.map(t => (
+                        <tr key={t.id}>
+                           <td className="py-6 font-black uppercase text-xs">{t.name}</td>
+                           <td className="py-6 font-bold text-slate-500 text-[10px]">{t.email || '-'}</td>
+                           <td className="py-6 font-black text-indigo-600 text-[10px] uppercase">{t.subject}</td>
+                        </tr>
+                      ))}
+                   </tbody>
+                </table>
+             </div>
+           )}
+
+           {selectedCategory === 'Jadwal' && (
+             <div className="bg-white p-10 rounded-[4rem] border shadow-sm overflow-x-auto no-scrollbar">
+                <table className="w-full text-left">
+                   <thead>
+                      <tr className="border-b-2 border-slate-50">
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Waktu</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Guru</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Mapel</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Unit</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-50">
+                      {data.schedules.map(sch => (
+                        <tr key={sch.id}>
+                           <td className="py-6 font-black uppercase text-[10px]">{sch.day} {sch.time}</td>
+                           <td className="py-6 font-black text-emerald-800 text-[10px] uppercase">{sch.teacherName}</td>
+                           <td className="py-6 font-black text-slate-800 text-[10px] uppercase">{sch.subject}</td>
+                           <td className="py-6 font-black text-slate-400 text-[10px] uppercase">{sch.class}</td>
+                        </tr>
+                      ))}
+                   </tbody>
+                </table>
+             </div>
+           )}
+
+           {selectedCategory === 'Peraturan' && (
+             <div className="bg-white p-10 rounded-[4rem] border shadow-sm overflow-x-auto no-scrollbar">
+                <table className="w-full text-left">
+                   <thead>
+                      <tr className="border-b-2 border-slate-50">
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Kategori</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Peraturan</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Poin</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-50">
+                      {[...data.violationTemplates, ...data.achievementTemplates].map((p, idx) => (
+                        <tr key={idx}>
+                           <td className="py-6"><span className="px-3 py-1 bg-slate-100 text-[9px] font-black uppercase rounded-lg">{p.category}</span></td>
+                           <td className="py-6 font-black uppercase text-[10px]">{p.label}</td>
+                           <td className="py-6 font-black text-red-600">{p.points}</td>
+                        </tr>
+                      ))}
+                   </tbody>
+                </table>
+             </div>
+           )}
         </div>
       )}
     </div>
