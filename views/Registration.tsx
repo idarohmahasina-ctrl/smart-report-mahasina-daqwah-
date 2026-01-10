@@ -13,7 +13,7 @@ import {
   linkTeacherEmail
 } from '../services/dataService';
 import { 
-  LogIn, Mail, User, AlertCircle, Search, ChevronRight, Link2, CheckCircle2, ShieldCheck, UserCheck2, ArrowLeft
+  LogIn, Mail, User, AlertCircle, Search, ChevronRight, Link2, CheckCircle2, ShieldCheck, UserCheck2, ArrowLeft, RefreshCw
 } from 'lucide-react';
 
 declare const google: any;
@@ -44,8 +44,15 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
 
   const startDiscovery = (profile: UserProfile) => {
     setActiveSession(profile);
-    setDiscoveryStatus('Mencari Database Tim Mahasina...');
+    setDiscoveryStatus('Memverifikasi Izin Akses Google Drive...');
     setView('discovery');
+
+    // Pastikan library Google Client sudah siap
+    if (typeof google === 'undefined') {
+      alert("Gagal memuat sistem Google. Mohon refresh halaman.");
+      setView('login');
+      return;
+    }
 
     const client = google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
@@ -54,13 +61,24 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
         if (response.access_token) {
           localStorage.setItem('mahasina_cloud_token', response.access_token);
           localStorage.setItem('mahasina_cloud_connected', 'true');
-          setDiscoveryStatus('Sinkronisasi Data Tim...');
-          await pullFromGDrive(response.access_token);
-          onComplete(profile);
+          setDiscoveryStatus('Menarik Data Master Tim Mahasina...');
+          
+          const success = await pullFromGDrive(response.access_token);
+          if (success) {
+            setDiscoveryStatus('Berhasil Terhubung! Menyiapkan Dashboard...');
+            setTimeout(() => onComplete(profile), 1000);
+          } else {
+            // Jika pull gagal tapi punya ID, coba sinkronisasi ulang
+            onComplete(profile);
+          }
         } else {
           onComplete(profile);
         }
       },
+      error_callback: (err: any) => {
+        console.error("Auth error:", err);
+        onComplete(profile);
+      }
     });
     client.requestAccessToken();
   };
@@ -69,14 +87,15 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
     e.preventDefault();
     const emailLower = formData.email.toLowerCase().trim();
     
+    // Bypass IDAROH
     if (emailLower === 'idarohmahasina@gmail.com') {
       const admin = { id: 'admin', fullName: 'Idaroh Pusat', email: emailLower, phone: '-', role: UserRole.IDAROH, classes: [] };
       startDiscovery(admin);
       return;
     }
 
+    // Cek di Guru Master
     const masterTeacher = appData.teachers.find(t => t.email?.toLowerCase().trim() === emailLower);
-    
     if (masterTeacher) {
       const teacherProfile: UserProfile = {
         id: masterTeacher.id,
@@ -90,16 +109,18 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
       return;
     }
 
+    // Cek di user yang sudah daftar lokal
     const users = getUsers();
     const user = users.find(u => u.email.toLowerCase().trim() === emailLower);
     if (user) {
       startDiscovery(user);
     } else {
-      // JIKA EMAIL BELUM ADA DI DATABASE:
+      // Jika benar-benar baru, arahkan untuk pilih nama guru
       if (appData.teachers.length > 0) {
         setView('claim_profile');
       } else {
-        setError('Database guru masih kosong. Hubungi Idaroh untuk upload data guru terlebih dahulu.');
+        // Fallback: Jika database masih kosong, izinkan admin masuk dulu untuk upload
+        setError('Data pengajar belum tersedia. Hubungi Admin Idaroh.');
       }
     }
   };
@@ -107,7 +128,6 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
   const handleClaimProfile = (teacher: Teacher) => {
     if (confirm(`Apakah benar Anda adalah ${teacher.name}? Email ini akan ditautkan secara permanen.`)) {
       linkTeacherEmail(teacher.id, formData.email);
-      
       const teacherProfile: UserProfile = {
         id: teacher.id,
         fullName: teacher.name,
@@ -163,7 +183,7 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
                 <button onClick={() => setView('login')} className="p-3 bg-slate-100 rounded-xl text-slate-400"><ArrowLeft size={18}/></button>
                 <div>
                   <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Siapa Nama Anda?</h2>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Email Anda belum tertaut ke Nama Guru.</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Pilih nama Anda dari daftar database.</p>
                 </div>
              </div>
 
@@ -185,17 +205,6 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
                      <UserCheck2 size={18} className="text-slate-200 group-hover:text-emerald-600 transition-all"/>
                   </button>
                 ))}
-                {filteredTeachers.length === 0 && (
-                  <div className="p-10 text-center space-y-3">
-                     <AlertCircle size={32} className="mx-auto text-slate-200" />
-                     <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Nama Tidak Ditemukan</p>
-                  </div>
-                )}
-             </div>
-
-             <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-4">
-                <ShieldCheck size={20} className="text-amber-600 shrink-0" />
-                <p className="text-[8px] font-bold text-amber-800 leading-relaxed uppercase">Hanya pilih nama Anda sendiri. Sekali dipilih, email ini akan mengunci profil guru tersebut.</p>
              </div>
           </div>
         )}
@@ -205,12 +214,12 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
              <div className="relative w-24 h-24 mx-auto">
                 <div className="absolute inset-0 bg-emerald-100 rounded-full animate-ping opacity-25"></div>
                 <div className="relative bg-white w-24 h-24 rounded-full flex items-center justify-center shadow-xl border-4 border-emerald-500">
-                   <Search size={40} className="text-emerald-600 animate-pulse" />
+                   <RefreshCw size={40} className="text-emerald-600 animate-spin" />
                 </div>
              </div>
              <div>
                 <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">{discoveryStatus}</h2>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Menyiapkan Jadwal & Data Kelas Anda...</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Sinkronisasi Server Mahasina...</p>
              </div>
           </div>
         )}

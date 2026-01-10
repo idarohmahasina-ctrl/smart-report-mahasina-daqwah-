@@ -79,9 +79,17 @@ export const getAppData = (): AppData => {
 const urlParams = new URLSearchParams(window.location.search);
 const joinId = urlParams.get('join');
 if (joinId) {
-  localStorage.setItem(TEAM_DB_ID_KEY, joinId);
-  // Bersihkan URL agar tidak mengganggu navigasi
-  window.history.replaceState({}, document.title, window.location.pathname);
+  const currentId = localStorage.getItem(TEAM_DB_ID_KEY);
+  if (currentId !== joinId) {
+    // Jika ID berbeda, bersihkan data lokal agar tidak campur aduk
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem('mahasina_cloud_connected');
+    localStorage.removeItem('mahasina_cloud_token');
+    localStorage.setItem(TEAM_DB_ID_KEY, joinId);
+    localStorage.setItem('mahasina_mock_disabled', 'true');
+    // Force refresh agar App.tsx menangkap state bersih
+    window.location.href = window.location.pathname; 
+  }
 }
 
 export const setTeamDatabaseId = (id: string) => {
@@ -95,7 +103,6 @@ export const getTeamDatabaseId = () => {
 const mergeData = (local: AppData, cloud: AppData): AppData => {
   const combine = (arr1: any[], arr2: any[]) => {
     const map = new Map();
-    // Prioritaskan cloud data jika ada konflik ID, tapi simpan yang terbaru
     [...(arr1 || []), ...(arr2 || [])].forEach(item => {
       if (item && item.id) {
         map.set(item.id, item);
@@ -105,12 +112,12 @@ const mergeData = (local: AppData, cloud: AppData): AppData => {
   };
 
   return {
-    ...cloud, // Metadata (Config, Students, Teachers) ambil dari cloud
+    ...cloud, 
     attendance: combine(local.attendance, cloud.attendance),
     prayerAttendance: combine(local.prayerAttendance, cloud.prayerAttendance),
     teacherAttendance: combine(local.teacherAttendance, cloud.teacherAttendance),
     reports: combine(local.reports, cloud.reports),
-    // Data master selalu ikuti Cloud jika cloud memiliki data
+    // Data Master selalu utamakan Cloud jika Cloud ada isinya
     students: (cloud.students && cloud.students.length > 0) ? cloud.students : local.students,
     teachers: (cloud.teachers && cloud.teachers.length > 0) ? cloud.teachers : local.teachers,
     schedules: (cloud.schedules && cloud.schedules.length > 0) ? cloud.schedules : local.schedules,
@@ -137,7 +144,6 @@ export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
     const localData = getAppData();
     let fileId = getTeamDatabaseId();
     
-    // Jika belum punya ID, cari file dengan nama universal di Drive user
     if (!fileId) {
       const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${GLOBAL_DB_NAME}' and trashed=false`, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -205,10 +211,12 @@ export const pullFromGDrive = async (accessToken: string): Promise<boolean> => {
       const localData = getAppData();
       const merged = mergeData(localData, cloudData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      localStorage.setItem('mahasina_mock_disabled', 'true');
       return true;
     }
     return false;
   } catch (error) {
+    console.error("Pull failed:", error);
     return false;
   }
 };
