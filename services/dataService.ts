@@ -69,8 +69,9 @@ export const getAppData = (): AppData => {
 
 export const findDatabaseInDrive = async (token: string): Promise<string | null> => {
   try {
+    // Cari file dengan nama spesifik dan bukan di sampah
     const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name='mahasina_db.json' and trashed=false&fields=files(id)`,
+      `https://www.googleapis.com/drive/v3/files?q=name='mahasina_db.json' and trashed=false&fields=files(id, name, modifiedTime)&orderBy=modifiedTime desc`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     const data = await response.json();
@@ -81,6 +82,7 @@ export const findDatabaseInDrive = async (token: string): Promise<string | null>
     }
     return null;
   } catch (e) {
+    console.error("Discovery error:", e);
     return null;
   }
 };
@@ -144,7 +146,9 @@ export const pushToGDrive = async (token: string): Promise<boolean> => {
 
 const merge = (local: any[], remote: any[]) => {
   const map = new Map();
+  // Data remote dianggap benar untuk Master Data
   (remote || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
+  // Data local ditambahkan jika tidak ada di remote
   (local || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
   return Array.from(map.values());
 };
@@ -167,8 +171,9 @@ export const pullFromGDrive = async (token: string): Promise<boolean> => {
     const remoteData: AppData = await response.json();
     const localData = getAppData();
 
+    // SINKRONISASI KRUSIAL: Ambil semua data master dari Cloud
     const mergedData: AppData = {
-      ...remoteData,
+      ...remoteData, // Prioritas Data Cloud (Santri, Guru, Jadwal)
       attendance: merge(localData.attendance, remoteData.attendance),
       prayerAttendance: merge(localData.prayerAttendance, remoteData.prayerAttendance),
       teacherAttendance: merge(localData.teacherAttendance, remoteData.teacherAttendance),
@@ -180,6 +185,7 @@ export const pullFromGDrive = async (token: string): Promise<boolean> => {
     localStorage.setItem(SYNC_KEY, JSON.stringify({ isNewLocal: false, timestamp: new Date().toISOString() }));
     return true;
   } catch (e) {
+    console.error("Pull error:", e);
     return false;
   }
 };
@@ -216,18 +222,14 @@ export const clearAppData = () => {
   sessionStorage.clear();
 };
 
-/**
- * Robust Normalization: Menghapus gelar-gelar umum di Mahasina 
- * agar pencocokan nama lebih akurat.
- */
 export const normalizeName = (name: string): string => {
   if (!name) return '';
   return name
     .toLowerCase()
-    .replace(/(ustadz|ustadzah|ust|usth|kyai|nyai|ibu|bapak|pak|bu|dr|h\.|hj\.)/g, '') // Hapus gelar
-    .replace(/[.,]/g, '') // Hapus titik koma
+    .replace(/(ustadz|ustadzah|ust|usth|kyai|nyai|ibu|bapak|pak|bu|dr|h\.|hj\.)/g, '')
+    .replace(/[.,]/g, '')
     .trim()
-    .replace(/\s+/g, ' '); // Sederhanakan spasi
+    .replace(/\s+/g, ' ');
 };
 
 export const getTeachersFromSchedules = (schedules: Schedule[]): string[] => {
