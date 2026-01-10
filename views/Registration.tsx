@@ -9,7 +9,7 @@ import {
   pullFromGDrive,
   normalizeName 
 } from '../services/dataService';
-import { Mail, User, ChevronRight, Search, ShieldCheck, UserCheck2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Mail, User, ChevronRight, UserCheck2, RefreshCw, AlertCircle } from 'lucide-react';
 
 declare const google: any;
 
@@ -26,25 +26,17 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
   const appData = getAppData();
   const knownTeachers = useMemo(() => getTeachersFromSchedules(appData.schedules || []), [appData.schedules]);
 
-  // Cari kecocokan nama secara cerdas
   const detectedTeacher = useMemo(() => {
     if (fullName.length < 3) return null;
     const cleanInput = normalizeName(fullName);
     return knownTeachers.find(name => normalizeName(name) === cleanInput) || null;
   }, [fullName, knownTeachers]);
 
-  const handleAuth = (e: React.FormEvent) => {
-    e.preventDefault();
-    setStep('identity');
-  };
-
   const finalizeRegistration = async () => {
     setIsLoading(true);
     setStep('sync');
 
-    // Gunakan detectedTeacher jika ada, jika tidak gunakan input asli
     const finalName = detectedTeacher || fullName.trim();
-    
     let role = UserRole.SANTRI_OFFICER;
     if (email.toLowerCase() === 'idarohmahasina@gmail.com') role = UserRole.IDAROH;
     else if (detectedTeacher) role = UserRole.GURU;
@@ -54,20 +46,24 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
       fullName: finalName,
       email: email.toLowerCase().trim(),
       phone: '-',
-      role: role,
-      classes: detectedTeacher ? appData.schedules.filter(s => s.teacherName === detectedTeacher).map(s => s.class) : []
+      role: role
     };
 
     if (typeof google !== 'undefined') {
       const client = google.accounts.oauth2.initTokenClient({
         client_id: '769350037876-j7u6mul9fb3be11984h4jre7i9afsktd.apps.googleusercontent.com',
-        scope: 'https://www.googleapis.com/auth/drive.file',
+        scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.resource',
         callback: async (res: any) => {
           if (res.access_token) {
             localStorage.setItem('mahasina_cloud_token', res.access_token);
             localStorage.setItem('mahasina_cloud_connected', 'true');
             await pullFromGDrive(res.access_token);
           }
+          setActiveSession(profile);
+          onComplete(profile);
+        },
+        error_callback: (err: any) => {
+          console.error("GSI Error:", err);
           setActiveSession(profile);
           onComplete(profile);
         }
@@ -89,7 +85,7 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
         </div>
 
         {step === 'auth' && (
-          <form onSubmit={handleAuth} className="space-y-6">
+          <form onSubmit={(e) => { e.preventDefault(); setStep('identity'); }} className="space-y-6">
              <div className="space-y-2">
                 <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Email Google Anda</label>
                 <div className="relative">
@@ -106,12 +102,11 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
         {step === 'identity' && (
           <div className="space-y-8 animate-in slide-in-from-right-10">
              <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Ketik Nama Anda (Cukup Nama Panggilan)</label>
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nama Anda</label>
                 <div className="relative">
                    <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
                    <input required type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full pl-14 pr-6 py-5 bg-slate-50 rounded-2xl outline-none font-black text-sm border-2 border-transparent focus:border-emerald-600 transition-all" placeholder="Misal: Ahmad" />
                 </div>
-                <p className="text-[8px] text-slate-400 font-medium mt-2 italic px-1">Sistem akan otomatis membersihkan gelar & mencocokkan dengan database jadwal.</p>
              </div>
 
              <div className="space-y-3">
@@ -121,9 +116,9 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
                         {detectedTeacher ? <UserCheck2 size={20}/> : <AlertCircle size={20}/>}
                      </div>
                      <div>
-                        <p className="text-[10px] font-black text-slate-800 uppercase leading-none">Status Deteksi:</p>
+                        <p className="text-[10px] font-black text-slate-800 uppercase leading-none">Status:</p>
                         <p className={`text-[11px] font-black uppercase mt-1 ${detectedTeacher ? 'text-emerald-700' : 'text-blue-700'}`}>
-                           {detectedTeacher ? `Terdeteksi Sebagai: ${detectedTeacher}` : 'Petugas Santri / Umum'}
+                           {detectedTeacher ? `Guru: ${detectedTeacher}` : 'Petugas Umum'}
                         </p>
                      </div>
                   </div>
@@ -139,7 +134,7 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
         {step === 'sync' && (
           <div className="text-center py-10 space-y-6 animate-in zoom-in-95">
              <RefreshCw className="w-12 h-12 text-emerald-600 animate-spin mx-auto" />
-             <h2 className="text-lg font-black text-slate-800 uppercase">Menghubungkan Database...</h2>
+             <h2 className="text-lg font-black text-slate-800 uppercase">Menghubungkan...</h2>
              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Sinkronisasi Cloud Aktif</p>
           </div>
         )}

@@ -5,13 +5,9 @@ import {
   Search, Download, Upload, FileText, Info as InfoIcon, Users, 
   Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark
 } from 'lucide-react';
+import { ExtraDataList } from '../services/dataService';
 
-interface ExtraDataList {
-  id: string;
-  title: string;
-  data: any[];
-  uploadedAt: string;
-}
+// Removed local interface definition for ExtraDataList as it is now centrally exported from dataService.ts
 
 interface InformationProps {
   role: UserRole;
