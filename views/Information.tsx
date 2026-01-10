@@ -4,7 +4,7 @@ import { UserRole, Student, Teacher, Schedule, OrganizationMember, TemplateItem,
 import { 
   Search, Download, Upload, FileText, Info as InfoIcon, Users, 
   Shield, Calendar, UserCheck, Table, Bell, Plus, X, Edit, Trash2, 
-  Database, ArrowLeft, UserCheck2, Mail, Phone, Filter, ChevronRight, FileSpreadsheet, Save
+  Database, ArrowLeft, UserCheck2, Mail, Phone, Filter, ChevronRight, FileSpreadsheet, Save, RotateCcw
 } from 'lucide-react';
 import { downloadCSV } from '../utils/csvExport';
 import * as XLSX from 'xlsx';
@@ -31,9 +31,10 @@ interface InformationProps {
     announcements: Announcement[];
   };
   onUpdateData: (type: string, newData: any[]) => void;
+  onResetData?: (type: string) => void;
 }
 
-const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpdateData }) => {
+const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpdateData, onResetData }) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeExtraId, setActiveExtraId] = useState<string | null>(null);
   const [dayFilter, setDayFilter] = useState<string>('Senin');
@@ -84,6 +85,14 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     });
   }, [data.schedules, dayFilter, searchTerm]);
 
+  const handleReset = () => {
+    if (!selectedCategory) return;
+    if (confirm(`Apakah Anda yakin ingin MENGHAPUS DATA ${selectedCategory} dan mengembalikannya ke data awal sistem? Tindakan ini tidak dapat dibatalkan.`)) {
+      if (onResetData) onResetData(selectedCategory);
+      alert("Data berhasil direset.");
+    }
+  };
+
   return (
     <div className="space-y-10 pb-20 animate-in fade-in duration-700 max-w-6xl mx-auto">
       {!selectedCategory ? (
@@ -120,6 +129,16 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                        {selectedCategory}
                     </h2>
                  </div>
+              </div>
+              <div className="flex flex-wrap gap-4">
+                 {isSuperAdmin && (
+                   <button onClick={handleReset} className="px-6 py-3 bg-red-50 text-red-600 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:bg-red-600 hover:text-white transition-all shadow-sm">
+                      <RotateCcw size={16}/> Reset Data
+                   </button>
+                 )}
+                 <button className="px-6 py-3 bg-emerald-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 shadow-lg hover:bg-emerald-800 transition-all">
+                    <Upload size={16}/> Unggah Baru
+                 </button>
               </div>
            </div>
 
@@ -164,6 +183,9 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                             ))}
                          </tbody>
                       </table>
+                      {filteredStudents.length === 0 && (
+                        <div className="py-32 text-center text-slate-200 font-black uppercase italic tracking-[0.3em]">Data Santri Kosong</div>
+                      )}
                    </div>
                 </div>
               )}

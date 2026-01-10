@@ -198,6 +198,22 @@ const App: React.FC = () => {
     triggerAutoSync();
   };
 
+  const handleResetMasterData = (type: string) => {
+    let mockData: any[] = [];
+    if (type === 'Siswa') mockData = MOCK_STUDENTS;
+    if (type === 'Guru') mockData = MOCK_TEACHERS;
+    if (type === 'Jadwal') mockData = MOCK_SCHEDULE;
+    if (type === 'ORSAM') mockData = MOCK_ORSAM;
+    if (type === 'ORKLAS') mockData = MOCK_ORKLAS;
+    if (type === 'Peraturan') {
+        updateMasterData('Violations', PREDEFINED_VIOLATIONS);
+        updateMasterData('Achievements', PREDEFINED_ACHIEVEMENTS);
+        return;
+    }
+    
+    updateMasterData(type, mockData);
+  };
+
   const handleSaveAttendance = (newRecords: AttendanceRecord[]) => {
     const updated = [...attendance, ...newRecords];
     setAttendance(updated);
@@ -394,6 +410,7 @@ const App: React.FC = () => {
               announcements
             }}
             onUpdateData={updateMasterData}
+            onResetData={handleResetMasterData}
           />
         );
       case 'pengaturan':
