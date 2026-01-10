@@ -42,21 +42,22 @@ export enum ViolationCategory {
   LAINNYA = 'Lain-lain'
 }
 
+// Fixed: Changed SessionType to enum so it can be used as a value in mock data and constants
 export enum SessionType {
-  QURAN = 'Al-Quran',
   MADRASAH = 'Madrasah',
+  MAJLIS = 'Majlis',
+  QURAN = 'Quran',
   HADIS = 'Hadis',
-  KITAB = 'Kitab Kuning',
-  PEMINATAN = 'Peminatan',
-  MAJLIS = 'Majlis Malam',
-  TAMBAHAN = 'Tambahan/Sesi Lain'
+  KITAB = 'Kitab',
+  TAMBAHAN = 'Tambahan',
+  PEMINATAN = 'Peminatan'
 }
 
 export interface AcademicConfig {
   schoolYear: string;
   semester: 'I (Ganjil)' | 'II (Genap)';
   isHoliday: boolean;
-  sessionHolidays: Partial<Record<SessionType, boolean>>;
+  sessionHolidays: Record<string, boolean>;
 }
 
 export interface TemplateItem {
@@ -89,7 +90,7 @@ export interface Student {
   nis: string;
   name: string;
   formalClass: string; 
-  sessionClasses: Partial<Record<SessionType, string>>;
+  sessionClasses: Record<string, string>; // Dinamis: Sesi -> Nama Kelas
   level: 'MTs' | 'MA';
   gender: 'Putra' | 'Putri';
 }
@@ -115,7 +116,7 @@ export interface Schedule {
   time: string;
   subject: string;
   teacherName: string;
-  sessionType: SessionType;
+  sessionType: string;
 }
 
 export interface OrganizationMember {
@@ -130,20 +131,20 @@ export interface OrganizationMember {
 export interface AttendanceRecord {
   id: string;
   date: string;
-  recordedTime: string; // HH:mm
+  recordedTime: string; 
   studentId: string;
   status: AttendanceStatus;
   note?: string;
   recordedBy: string;
   class: string;
-  sessionType: SessionType;
+  sessionType: string;
   subject: string;
 }
 
 export interface PrayerRecord {
   id: string;
   date: string;
-  recordedTime: string; // HH:mm
+  recordedTime: string; 
   studentId: string;
   status: PrayerStatus;
   note?: string;
@@ -164,7 +165,7 @@ export interface TeacherAttendance {
   checkOutTime?: string;
   status: 'Hadir' | 'Terlambat' | 'Izin' | 'Alpha';
   note?: string;
-  sessionType: SessionType;
+  sessionType: string;
   timeScheduled: string;
 }
 
@@ -176,7 +177,7 @@ export interface ReportItem {
   description: string;
   points: number;
   date: string;
-  timestamp: string; // HH:mm
+  timestamp: string; 
   reporter: string;
   status: 'Belum Ditindak' | 'Ditindak';
   actionNote?: string;
