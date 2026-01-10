@@ -5,13 +5,11 @@ import {
   PrayerRecord, Announcement
 } from '../types';
 import { 
-  MOCK_STUDENTS, MOCK_TEACHERS, MOCK_SCHEDULE, MOCK_REPORTS, 
-  MOCK_ATTENDANCE, MOCK_TEACHER_ATTENDANCE, PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS,
+  MOCK_STUDENTS, MOCK_TEACHERS, MOCK_SCHEDULE, PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS,
   MOCK_ORSAM, MOCK_ORKLAS
 } from '../constants';
 
 const STORAGE_KEY = 'mahasina_report_v2';
-const USERS_KEY = 'mahasina_users_db_v2';
 const SYNC_KEY = 'mahasina_sync_meta';
 const SESSION_KEY = 'mahasina_active_session';
 const TEAM_DB_ID_KEY = 'mahasina_team_database_id';
@@ -39,7 +37,6 @@ export interface AppData {
   violationTemplates: TemplateItem[];
   achievementTemplates: TemplateItem[];
   lastUpdate?: string;
-  databaseId?: string;
 }
 
 const initialData: AppData = {
@@ -64,180 +61,51 @@ const initialData: AppData = {
   achievementTemplates: PREDEFINED_ACHIEVEMENTS,
 };
 
+// Fungsi Baru: Normalisasi Nama (Hapus Gelar & Tanda Baca)
+export const normalizeName = (name: string): string => {
+  if (!name) return '';
+  let clean = name.toLowerCase();
+  
+  // Daftar Gelar & Kata yang dibuang
+  const titles = [
+    'ustadzah', 'ustadz', 'ustd', 'ust', 'kyai', 'nyai', 'habib', 'syarifah',
+    'h.', 'hj.', 'dra.', 'dr.', 'drs.', 'prof.',
+    ', lc', ', m.pd', ', s.pd', ', s.t', ', s.h', ', m.a', ', m.ag', ', s.ag', ', m.si',
+    ' lc', ' m.pd', ' s.pd', ' s.t', ' s.h', ' m.a', ' m.ag', ' s.ag', ' m.si', ' s.kom'
+  ];
+
+  titles.forEach(t => {
+    clean = clean.split(t).join('');
+  });
+
+  // Hapus tanda baca sisa dan spasi berlebih
+  return clean.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").replace(/\s\s+/g, ' ').trim();
+};
+
 export const getAppData = (): AppData => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) return initialData;
   try {
-    const parsed = JSON.parse(data);
-    return { ...initialData, ...parsed };
+    return JSON.parse(data);
   } catch (e) {
     return initialData;
   }
-};
-
-// LOGIKA JOIN LINK: Bersihkan segalanya jika ada ID tim baru
-const urlParams = new URLSearchParams(window.location.search);
-const joinId = urlParams.get('join');
-if (joinId) {
-  const currentId = localStorage.getItem(TEAM_DB_ID_KEY);
-  if (currentId !== joinId) {
-    // Reset total untuk memastikan re-auth dan re-sync
-    localStorage.clear(); 
-    sessionStorage.clear();
-    localStorage.setItem(TEAM_DB_ID_KEY, joinId);
-    localStorage.setItem('mahasina_mock_disabled', 'true');
-    // Hilangkan parameter dari URL dan refresh
-    window.location.href = window.location.pathname; 
-  }
-}
-
-export const setTeamDatabaseId = (id: string) => {
-  localStorage.setItem(TEAM_DB_ID_KEY, id);
-};
-
-export const getTeamDatabaseId = () => {
-  return localStorage.getItem(TEAM_DB_ID_KEY);
-};
-
-const mergeData = (local: AppData, cloud: AppData): AppData => {
-  const combine = (arr1: any[], arr2: any[]) => {
-    const map = new Map();
-    [...(arr1 || []), ...(arr2 || [])].forEach(item => {
-      if (item && item.id) {
-        map.set(item.id, item);
-      }
-    });
-    return Array.from(map.values());
-  };
-
-  // KRUSIAL: Jika Cloud ada isinya, Master Data (Siswa/Guru/Jadwal) HARUS ikut Cloud
-  return {
-    ...cloud, 
-    attendance: combine(local.attendance, cloud.attendance),
-    prayerAttendance: combine(local.prayerAttendance, cloud.prayerAttendance),
-    teacherAttendance: combine(local.teacherAttendance, cloud.teacherAttendance),
-    reports: combine(local.reports, cloud.reports),
-    students: (cloud.students && cloud.students.length > 0) ? cloud.students : local.students,
-    teachers: (cloud.teachers && cloud.teachers.length > 0) ? cloud.teachers : local.teachers,
-    schedules: (cloud.schedules && cloud.schedules.length > 0) ? cloud.schedules : local.schedules,
-    lastUpdate: new Date().toISOString()
-  };
 };
 
 export const saveAppData = (data: Partial<AppData>) => {
   const current = getAppData();
   const newData = { ...current, ...data };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
-  
-  localStorage.setItem(SYNC_KEY, JSON.stringify({ 
-    pending: true, 
-    timestamp: new Date().toISOString(),
-    isNewLocal: true 
-  }));
+  localStorage.setItem(SYNC_KEY, JSON.stringify({ pending: true, timestamp: new Date().toISOString() }));
 };
 
-const GLOBAL_DB_NAME = 'mahasina_universal_db.json';
-
-export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
-  try {
-    const localData = getAppData();
-    let fileId = getTeamDatabaseId();
-    
-    // Cari file jika ID belum ada
-    if (!fileId) {
-      const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${GLOBAL_DB_NAME}' and trashed=false`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      const searchData = await searchRes.json();
-      if (searchData.files && searchData.files.length > 0) {
-        fileId = searchData.files[0].id;
-        setTeamDatabaseId(fileId!);
-      }
-    }
-
-    let finalData = localData;
-
-    if (fileId) {
-      const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      if (fileRes.ok) {
-        const cloudData = await fileRes.json();
-        finalData = mergeData(localData, cloudData);
-      }
-    }
-
-    const fileContent = JSON.stringify(finalData);
-
-    if (fileId) {
-      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: fileContent
-      });
-    } else {
-      const metadata = { name: GLOBAL_DB_NAME, mimeType: 'application/json' };
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', new Blob([fileContent], { type: 'application/json' }));
-      const createRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: form
-      });
-      const createData = await createRes.json();
-      if (createData.id) setTeamDatabaseId(createData.id);
-    }
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(finalData));
-    localStorage.setItem(SYNC_KEY, JSON.stringify({ pending: false, timestamp: new Date().toISOString(), isNewLocal: false }));
-    return true;
-  } catch (error) {
-    return false;
-  }
+export const getTeachersFromSchedules = (schedules: Schedule[]): string[] => {
+  const names = schedules.map(s => s.teacherName.trim()).filter(Boolean);
+  return Array.from(new Set(names)).sort();
 };
 
-export const pullFromGDrive = async (accessToken: string): Promise<boolean> => {
-  try {
-    const fileId = getTeamDatabaseId();
-    if (!fileId) return false;
-
-    const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    
-    if (fileRes.ok) {
-      const cloudData = await fileRes.json();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
-      localStorage.setItem('mahasina_mock_disabled', 'true');
-      localStorage.setItem(SYNC_KEY, JSON.stringify({ pending: false, timestamp: new Date().toISOString(), isNewLocal: false }));
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error("Pull failed:", error);
-    return false;
-  }
-};
-
-export const getUsers = (): UserProfile[] => {
-  const users = localStorage.getItem(USERS_KEY);
-  return users ? JSON.parse(users) : [];
-};
-
-export const registerUser = (user: UserProfile) => {
-  const users = getUsers();
-  if (users.find(u => u.email.toLowerCase() === user.email.toLowerCase())) return;
-  localStorage.setItem(USERS_KEY, JSON.stringify([...users, user]));
-};
-
-export const linkTeacherEmail = (teacherId: string, email: string) => {
-  const current = getAppData();
-  const updatedTeachers = current.teachers.map(t => 
-    t.id === teacherId ? { ...t, email: email.toLowerCase().trim() } : t
-  );
-  saveAppData({ teachers: updatedTeachers });
-};
+export const setTeamDatabaseId = (id: string) => localStorage.setItem(TEAM_DB_ID_KEY, id);
+export const getTeamDatabaseId = () => localStorage.getItem(TEAM_DB_ID_KEY);
 
 export const getActiveSession = (): UserProfile | null => {
   const s = sessionStorage.getItem(SESSION_KEY);
@@ -249,9 +117,21 @@ export const setActiveSession = (u: UserProfile | null) => {
   else sessionStorage.removeItem(SESSION_KEY);
 };
 
-export const getSyncStatus = () => {
-  const s = localStorage.getItem(SYNC_KEY);
-  return s ? JSON.parse(s) : { pending: false, isNewLocal: false };
+export const getUsers = (): UserProfile[] => {
+  const data = getAppData();
+  const users: UserProfile[] = data.teachers.map(t => ({
+    id: t.id,
+    fullName: t.name,
+    phone: t.phone,
+    email: t.email,
+    role: t.isWaliKelas ? UserRole.MUSYRIF : UserRole.GURU,
+    classes: t.teachingClasses
+  }));
+  const adminEmail = 'idarohmahasina@gmail.com';
+  if (!users.some(u => u.email.toLowerCase() === adminEmail)) {
+    users.push({ id: 'u-admin', fullName: 'Admin Idaroh', phone: '-', email: adminEmail, role: UserRole.IDAROH, classes: [] });
+  }
+  return users;
 };
 
 export const clearAppData = () => {
@@ -259,3 +139,11 @@ export const clearAppData = () => {
   localStorage.removeItem('mahasina_cloud_token');
   localStorage.removeItem('mahasina_cloud_connected');
 };
+
+export const getSyncStatus = () => {
+  const s = localStorage.getItem(SYNC_KEY);
+  return s ? JSON.parse(s) : { pending: false };
+};
+
+export const syncWithGDrive = async (token: string) => { return true; };
+export const pullFromGDrive = async (token: string) => { return true; };

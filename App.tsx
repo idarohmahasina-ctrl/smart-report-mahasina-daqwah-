@@ -76,7 +76,6 @@ const App: React.FC = () => {
   });
 
   const [loading, setLoading] = useState(true);
-  const [isSyncingInitial, setIsSyncingInitial] = useState(false);
 
   const loadLocalData = useCallback(() => {
     const data = getAppData();
@@ -102,29 +101,21 @@ const App: React.FC = () => {
     setAcademicConfig(data.academicConfig);
   }, []);
 
-  // AUTO-SYNC EFFECT: Tarik data otomatis saat app terbuka
-  useEffect(() => {
-    const autoPull = async () => {
-      const token = localStorage.getItem('mahasina_cloud_token');
-      const dbId = getTeamDatabaseId();
-      if (token && dbId) {
-        setIsSyncingInitial(true);
-        const success = await pullFromGDrive(token);
-        if (success) {
-          loadLocalData();
-        }
-        setIsSyncingInitial(false);
-      }
-    };
-    autoPull();
-  }, [loadLocalData]);
-
   useEffect(() => {
     const activeUser = getActiveSession();
     if (activeUser) {
-      const allUsers = getUsers();
-      const latestUser = allUsers.find(u => u.email.toLowerCase() === activeUser.email.toLowerCase()) || activeUser;
-      setProfile(latestUser);
+      // Refresh profil dari data master guru (jika ada update di cloud)
+      const data = getAppData();
+      const masterTeacher = data.teachers.find(t => t.email?.toLowerCase().trim() === activeUser.email.toLowerCase().trim());
+      if (masterTeacher) {
+         setProfile({
+            ...activeUser,
+            fullName: masterTeacher.name,
+            classes: masterTeacher.teachingClasses
+         });
+      } else {
+         setProfile(activeUser);
+      }
     }
     loadLocalData();
     setLoading(false);
@@ -148,7 +139,7 @@ const App: React.FC = () => {
 
   const handleRegistrationComplete = (newProfile: UserProfile) => {
     setProfile(newProfile);
-    // Tidak perlu reload berat, biarkan effect autoPull bekerja
+    loadLocalData();
   };
 
   const handleLogout = () => {
@@ -267,7 +258,7 @@ const App: React.FC = () => {
     return DEFAULT_CLASSES;
   }, [students]);
 
-  if (loading || isSyncingInitial) {
+  if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-emerald-950 text-white p-6 text-center">
         <div className="relative mb-8">
@@ -275,9 +266,7 @@ const App: React.FC = () => {
            <div className="absolute inset-0 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
         </div>
         <h2 className="text-xl font-black tracking-widest uppercase mb-2">Smart Report Mahasina</h2>
-        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.3em] animate-bounce">
-          {isSyncingInitial ? 'Menarik Data Terbaru Tim...' : 'Menyiapkan Dashboard...'}
-        </p>
+        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.3em] animate-bounce">Menyiapkan Dashboard...</p>
       </div>
     );
   }
@@ -419,7 +408,7 @@ const App: React.FC = () => {
           />
         );
       default:
-        return <div>Tab not implemented yet</div>;
+        return <div>Tab tidak ditemukan</div>;
     }
   };
 
