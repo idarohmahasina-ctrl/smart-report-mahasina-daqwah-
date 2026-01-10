@@ -31,6 +31,7 @@ import {
   getSyncStatus, 
   getUsers, 
   syncWithGDrive,
+  pullFromGDrive,
   getActiveSession,
   setActiveSession,
   ExtraDataList
@@ -86,21 +87,12 @@ const App: React.FC = () => {
     return DEFAULT_CLASSES;
   }, [students]);
 
-  useEffect(() => {
-    const activeUser = getActiveSession();
+  const loadLocalData = useCallback(() => {
     const data = getAppData();
-    
-    if (activeUser) {
-      const allUsers = getUsers();
-      const latestUser = allUsers.find(u => u.email.toLowerCase() === activeUser.email.toLowerCase()) || activeUser;
-      setProfile(latestUser);
-    }
-
     setAttendance(data.attendance || []);
     setPrayerAttendance(data.prayerAttendance || []);
     setReports(data.reports || []);
     setTeacherAttendance(data.teacherAttendance || []);
-    
     setStudents(data.students.length > 0 ? data.students : MOCK_STUDENTS);
     setTeachers(data.teachers.length > 0 ? data.teachers : MOCK_TEACHERS);
     setSchedules(data.schedules.length > 0 ? data.schedules : MOCK_SCHEDULE);
@@ -111,36 +103,56 @@ const App: React.FC = () => {
     setAchievementTemplates(data.achievementTemplates?.length > 0 ? data.achievementTemplates : PREDEFINED_ACHIEVEMENTS);
     setAnnouncements(data.announcements || []);
     setAcademicConfig(data.academicConfig);
-    
-    setLoading(false);
   }, []);
 
-  const triggerAutoSync = useCallback(async () => {
-    const status = getSyncStatus();
-    const cloudConnected = localStorage.getItem('mahasina_cloud_connected') === 'true';
-    const token = localStorage.getItem('mahasina_cloud_token');
+  useEffect(() => {
+    const activeUser = getActiveSession();
+    if (activeUser) {
+      const allUsers = getUsers();
+      const latestUser = allUsers.find(u => u.email.toLowerCase() === activeUser.email.toLowerCase()) || activeUser;
+      setProfile(latestUser);
+    }
+    loadLocalData();
+    setLoading(false);
+  }, [loadLocalData]);
 
-    if (cloudConnected && token && status.isNewLocal) {
-      setSyncState('syncing');
-      try {
+  // AUTOMATIC BACKGROUND SYNC
+  useEffect(() => {
+    if (!profile) return;
+
+    const performAutoSync = async () => {
+      const token = localStorage.getItem('mahasina_cloud_token');
+      const cloudConnected = localStorage.getItem('mahasina_cloud_connected') === 'true';
+      if (!token || !cloudConnected) return;
+
+      const status = getSyncStatus();
+      
+      // Jika ada data baru lokal, kirim (Push & Merge)
+      if (status.isNewLocal) {
+        setSyncState('syncing');
         const success = await syncWithGDrive(token);
         if (success) {
           setSyncState('success');
-          setTimeout(() => setSyncState('idle'), 3000);
+          loadLocalData();
+          setTimeout(() => setSyncState('idle'), 2000);
         } else {
           setSyncState('error');
-          setTimeout(() => setSyncState('idle'), 5000);
         }
-      } catch (e) {
-        setSyncState('error');
-        setTimeout(() => setSyncState('idle'), 5000);
+      } else {
+        // Jika tidak ada data baru, cek apakah ada update dari tim (Pull)
+        await pullFromGDrive(token);
+        loadLocalData();
       }
-    }
-  }, []);
+    };
+
+    // Jalankan setiap 3 menit
+    const interval = setInterval(performAutoSync, 180000);
+    return () => clearInterval(interval);
+  }, [profile, loadLocalData]);
 
   const handleRegistrationComplete = (newProfile: UserProfile) => {
     setProfile(newProfile);
-    triggerAutoSync();
+    window.location.reload(); // Reload to start auto-sync fresh
   };
 
   const handleLogout = () => {
@@ -154,14 +166,12 @@ const App: React.FC = () => {
   const handleUpdateAcademic = (newConfig: AcademicConfig) => {
     setAcademicConfig(newConfig);
     saveAppData({ academicConfig: newConfig });
-    triggerAutoSync();
   };
 
   const handleTeacherCheckIn = (record: TeacherAttendance) => {
     const updated = [...teacherAttendance, record];
     setTeacherAttendance(updated);
     saveAppData({ teacherAttendance: updated });
-    triggerAutoSync();
   };
 
   const handleTeacherCheckOut = (attendanceId: string) => {
@@ -173,14 +183,12 @@ const App: React.FC = () => {
     );
     setTeacherAttendance(updated);
     saveAppData({ teacherAttendance: updated });
-    triggerAutoSync();
   };
 
   const handleDeleteTeacherAttendance = (id: string) => {
     const updated = teacherAttendance.filter(a => a.id !== id);
     setTeacherAttendance(updated);
     saveAppData({ teacherAttendance: updated });
-    triggerAutoSync();
   };
 
   const updateMasterData = (type: string, data: any[]) => {
@@ -195,7 +203,6 @@ const App: React.FC = () => {
     if (type === 'Achievements') { setAchievementTemplates(data); update.achievementTemplates = data; }
     if (type === 'Announcements') { setAnnouncements(data); update.announcements = data; }
     saveAppData(update);
-    triggerAutoSync();
   };
 
   const handleResetMasterData = (type: string) => {
@@ -210,7 +217,6 @@ const App: React.FC = () => {
         updateMasterData('Achievements', PREDEFINED_ACHIEVEMENTS);
         return;
     }
-    
     updateMasterData(type, mockData);
   };
 
@@ -218,42 +224,36 @@ const App: React.FC = () => {
     const updated = [...attendance, ...newRecords];
     setAttendance(updated);
     saveAppData({ attendance: updated });
-    triggerAutoSync();
   };
 
   const handleUpdateAttendance = (record: AttendanceRecord) => {
     const updated = attendance.map(a => a.id === record.id ? record : a);
     setAttendance(updated);
     saveAppData({ attendance: updated });
-    triggerAutoSync();
   };
 
   const handleSavePrayerAttendance = (newRecords: PrayerRecord[]) => {
     const updated = [...prayerAttendance, ...newRecords];
     setPrayerAttendance(updated);
     saveAppData({ prayerAttendance: updated });
-    triggerAutoSync();
   };
 
   const handleUpdatePrayerAttendance = (record: PrayerRecord) => {
     const updated = prayerAttendance.map(a => a.id === record.id ? record : a);
     setPrayerAttendance(updated);
     saveAppData({ prayerAttendance: updated });
-    triggerAutoSync();
   };
 
   const handleDeleteAttendance = (id: string) => {
     const updated = attendance.filter(a => a.id !== id);
     setAttendance(updated);
     saveAppData({ attendance: updated });
-    triggerAutoSync();
   };
 
   const handleDeletePrayerRecord = (id: string) => {
     const updated = prayerAttendance.filter(a => a.id !== id);
     setPrayerAttendance(updated);
     saveAppData({ prayerAttendance: updated });
-    triggerAutoSync();
   };
 
   const handleSaveReport = (newReport: ReportItem) => {
@@ -267,14 +267,12 @@ const App: React.FC = () => {
     }
     setReports(updated);
     saveAppData({ reports: updated });
-    triggerAutoSync();
   };
 
   const handleDeleteReport = (id: string) => {
     const updated = reports.filter(r => r.id !== id);
     setReports(updated);
     saveAppData({ reports: updated });
-    triggerAutoSync();
   };
 
   if (loading) {
@@ -438,8 +436,8 @@ const App: React.FC = () => {
           {syncState === 'success' && <CheckCircle size={18} />}
           {syncState === 'error' && <AlertCircle size={18} />}
           <span className="text-[10px] font-black uppercase tracking-[0.2em]">
-            {syncState === 'syncing' ? 'Sinkronisasi Data...' : 
-             syncState === 'success' ? 'Update Berhasil' : 'Koneksi Terputus'}
+            {syncState === 'syncing' ? 'Memperbarui Data Tim...' : 
+             syncState === 'success' ? 'Selesai Gabung' : 'Koneksi Terputus'}
           </span>
         </div>
       )}

@@ -48,36 +48,35 @@ const Layout: React.FC<LayoutProps> = ({
   const handleQuickSync = async () => {
     const token = localStorage.getItem('mahasina_cloud_token');
     if (!token) {
-      alert("Token Cloud habis. Silakan Logout dan Login kembali untuk menyegarkan akses Google.");
+      alert("Sesi Cloud habis. Silakan Logout dan Login kembali untuk memperbarui akses Google Drive.");
       return;
     }
     
     setIsProcessing(true);
     try {
       if (cloudStatus.pending) {
-        // Jika ada data lokal baru, kirim (Push)
+        // Ada data baru di HP -> Kirim (Push)
         const pushSuccess = await syncWithGDrive(token);
         if (pushSuccess) {
-           // Setelah berhasil push, langsung tarik (Pull) untuk mendapatkan data rekan lain
-           await pullFromGDrive(token);
-           alert("Sinkronisasi Berhasil: Data Anda terkirim & data terbaru rekan lain telah ditarik.");
+           await pullFromGDrive(token); // Setelah kirim, tarik data rekan lain
+           alert("Data berhasil dikirim dan digabungkan dengan data tim di Cloud.");
            window.location.reload();
         } else {
-           alert("Gagal mengirim data. Periksa koneksi internet Anda.");
+           alert("Gagal mengirim data. Cek koneksi internet.");
         }
       } else {
-        // Jika tidak ada data baru dari kita, cukup tarik (Pull) data terbaru
+        // Tidak ada data baru di HP -> Hanya ambil (Pull) data terbaru tim
         const pullSuccess = await pullFromGDrive(token);
         if (pullSuccess) {
-           alert("Data terbaru dari rekan lain berhasil ditarik.");
+           alert("Data tim terbaru berhasil ditarik dari Cloud.");
            window.location.reload();
         } else {
-           alert("Data di HP Anda sudah versi terbaru.");
+           alert("Data Anda sudah versi terbaru.");
         }
       }
     } catch (e) {
       console.error(e);
-      alert("Terjadi kesalahan saat sinkronisasi.");
+      alert("Terjadi kesalahan sistem saat sinkronisasi.");
     } finally {
       setIsProcessing(false);
       checkStatus();
@@ -193,7 +192,7 @@ const Layout: React.FC<LayoutProps> = ({
                <button 
                 disabled={!cloudStatus.connected || isProcessing}
                 onClick={handleQuickSync}
-                title={cloudStatus.pending ? "Klik untuk mengirim data ke Cloud" : "Klik untuk menarik data terbaru"}
+                title={cloudStatus.pending ? "Klik untuk mengirim data Anda ke Cloud" : "Klik untuk mengambil data terbaru dari tim"}
                 className={`p-3 rounded-xl transition-all flex items-center gap-2 ${
                   isProcessing ? 'bg-indigo-50 text-indigo-600' :
                   cloudStatus.pending ? 'bg-amber-500 text-white shadow-lg animate-bounce' : 

@@ -4,7 +4,7 @@ import {
   Activity, Clock, CheckCircle, ShieldAlert, Trophy, 
   Download, Filter, ChevronRight, Award, AlertTriangle, 
   PieChart as PieIcon, BarChart3, UserCheck, Calendar, Search, FileText, UserMinus,
-  Info as InfoIcon
+  Info as InfoIcon, Zap, Users
 } from 'lucide-react';
 import { 
   UserRole, AttendanceRecord, AttendanceStatus, Student, 
@@ -104,6 +104,16 @@ const Dashboard: React.FC<DashboardProps> = ({
   const isMusyrif = profile.role === UserRole.MUSYRIF;
   const isPetugasSantri = profile.role === UserRole.SANTRI_OFFICER;
 
+  // ANALITIK AKTIVITAS TIM
+  const teamActivity = useMemo(() => {
+    const combined = [...(attendance || []), ...(reports || [])];
+    const uniqueReporters = new Set(combined.map(c => c.recordedBy || c.reporter));
+    return {
+      activeMembers: uniqueReporters.size,
+      totalEntriesToday: combined.filter(c => c.date === new Date().toLocaleDateString('id-ID')).length
+    };
+  }, [attendance, reports]);
+
   // DYNAMIC SESSIONS FROM SCHEDULES (SAFE)
   const dynamicSessions = useMemo(() => {
     if (!schedules) return [];
@@ -146,39 +156,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
   }, [attendance, timeRange, customDate, filterSession, filterClass, filterLevel, filterGender, isMusyrif, isSuperAdmin, profile.classes, students]);
 
-  const filteredTeachers = useMemo(() => {
-    if (!teacherAttendance) return [];
-    let list = teacherAttendance.filter(a => isWithinRange(a.date, timeRange, customDate));
-    if (filterClass !== 'Semua') list = list.filter(a => a.class === filterClass);
-    return list.filter(a => {
-      const matchLvl = filterLevel === 'Semua' || a.level === filterLevel;
-      const matchGdr = filterGender === 'Semua' || a.gender === filterGender;
-      return matchLvl && matchGdr;
-    });
-  }, [teacherAttendance, timeRange, customDate, filterClass, filterLevel, filterGender]);
-
-  const getFilteredReports = (type: 'Violation' | 'Achievement') => {
-    if (!reports) return [];
-    let list = reports.filter(r => r.type === type && isWithinRange(r.date, timeRange, customDate));
-    if (isMusyrif && !isSuperAdmin) {
-      list = list.filter(r => {
-        const s = students.find(std => std.id === r.studentId);
-        return profile.classes?.includes(s?.formalClass || '');
-      });
-    }
-    if (filterClass !== 'Semua') list = list.filter(r => {
-      const s = students.find(std => std.id === r.studentId);
-      return s?.formalClass === filterClass;
-    });
-    return list.filter(r => {
-      const s = students.find(std => std.id === r.studentId);
-      if (!s) return false;
-      const matchLvl = filterLevel === 'Semua' || s.level === filterLevel;
-      const matchGdr = filterGender === 'Semua' || s.gender === filterGender;
-      return matchLvl && matchGdr;
-    });
-  };
-
   const stats = {
     H: filteredAttendance.filter(a => a.status === AttendanceStatus.H).length,
     S: filteredAttendance.filter(a => a.status === AttendanceStatus.S).length,
@@ -201,11 +178,38 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
+      
+      {/* STATUS BAR OTOMATIS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-[2rem] flex items-center justify-between group overflow-hidden relative">
+           <div className="absolute -right-4 -bottom-4 text-emerald-100 group-hover:scale-110 transition-transform"><Users size={100}/></div>
+           <div className="relative z-10">
+              <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Tim Bertugas Hari Ini</p>
+              <h4 className="text-2xl font-black text-emerald-950 mt-1">{teamActivity.activeMembers} <span className="text-sm font-bold opacity-50">Petugas</span></h4>
+           </div>
+           <div className="text-right relative z-10">
+              <p className="text-[9px] font-black text-emerald-600 bg-white px-3 py-1 rounded-lg shadow-sm uppercase tracking-tighter">Total {teamActivity.totalEntriesToday} Input</p>
+           </div>
+        </div>
+        <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-[2rem] flex items-center justify-between group overflow-hidden relative">
+           <div className="absolute -right-4 -bottom-4 text-indigo-100 group-hover:scale-110 transition-transform"><Zap size={100}/></div>
+           <div className="relative z-10">
+              <p className="text-[10px] font-black text-indigo-800 uppercase tracking-widest">Status Sinkronisasi</p>
+              <h4 className="text-xl font-black text-indigo-950 mt-1 uppercase">Otomatis Aktif</h4>
+           </div>
+           <div className="text-right relative z-10">
+              <span className="flex items-center gap-1.5 text-[9px] font-black text-indigo-600 uppercase">
+                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"/> Live Cloud
+              </span>
+           </div>
+        </div>
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
          <div>
-            <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase leading-none">Dashboard</h2>
+            <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase leading-none">Analitik Data</h2>
             <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mt-2 italic">
-               {isSuperAdmin ? 'Analitik Global Pesantren' : `Laporan Tugas: ${profile.fullName}`}
+               {isSuperAdmin ? 'Pantauan Real-time Pusat' : `Area Tugas: ${profile.fullName}`}
             </p>
          </div>
          <div className="flex bg-slate-100 p-1 rounded-2xl shadow-inner shrink-0 overflow-x-auto no-scrollbar max-w-full">
