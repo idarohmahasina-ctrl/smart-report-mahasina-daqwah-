@@ -59,7 +59,7 @@ const initialData: AppData = {
     {
       id: 'ann-1',
       title: 'Selamat Datang di Smart Report Mahasina',
-      content: 'Gunakan aplikasi ini untuk memantau absensi dan pelaporan santri secara real-time. Mohon admin Idaroh memastikan data master sudah terupdate.',
+      content: 'Gunakan aplikasi ini untuk memantau absensi dan pelaporan santri secara real-time. Mohon ustadz/ah melakukan sinkronisasi setiap selesai menginput.',
       date: new Date().toLocaleDateString('id-ID'),
       author: 'Idaroh Pusat',
       priority: 'Normal'
@@ -76,8 +76,38 @@ const initialData: AppData = {
 export const getAppData = (): AppData => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) return initialData;
-  const parsed = JSON.parse(data);
-  return { ...initialData, ...parsed };
+  try {
+    const parsed = JSON.parse(data);
+    return { ...initialData, ...parsed };
+  } catch (e) {
+    return initialData;
+  }
+};
+
+// Fungsi Pintar untuk Menggabungkan Data (Merge)
+const mergeData = (local: AppData, cloud: AppData): AppData => {
+  const mergeById = (localArr: any[], cloudArr: any[]) => {
+    const map = new Map();
+    [...(cloudArr || []), ...(localArr || [])].forEach(item => {
+      if (item && item.id) map.set(item.id, item);
+    });
+    return Array.from(map.values());
+  };
+
+  return {
+    ...cloud, // Prioritaskan config dari cloud (Admin)
+    profile: local.profile, // Profile tetap lokal
+    attendance: mergeById(local.attendance, cloud.attendance),
+    prayerAttendance: mergeById(local.prayerAttendance, cloud.prayerAttendance),
+    teacherAttendance: mergeById(local.teacherAttendance, cloud.teacherAttendance),
+    reports: mergeById(local.reports, cloud.reports),
+    // Master data biasanya hanya diubah oleh Admin, jadi kita ambil yang terbaru
+    students: cloud.students?.length > 0 ? cloud.students : local.students,
+    teachers: cloud.teachers?.length > 0 ? cloud.teachers : local.teachers,
+    schedules: cloud.schedules?.length > 0 ? cloud.schedules : local.schedules,
+    announcements: mergeById(local.announcements, cloud.announcements),
+    lastSynced: new Date().toISOString()
+  };
 };
 
 export const saveAppData = (data: Partial<AppData>) => {
@@ -103,25 +133,46 @@ export const saveSyncStatus = (status: any) => {
   localStorage.setItem(SYNC_KEY, JSON.stringify(status));
 };
 
+const FILE_NAME = 'mahasina_backup.json';
+
+// PUSH (Kirim & Merge ke Cloud)
 export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
   try {
-    const data = getAppData();
-    const fileName = 'mahasina_backup.json';
-    const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and trashed=false`, {
+    const localData = getAppData();
+    
+    // 1. Cari file di Drive
+    const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}' and trashed=false&fields=files(id,name)`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
-    if (!searchRes.ok) throw new Error('Failed to search GDrive');
     const searchData = await searchRes.json();
-    const fileContent = JSON.stringify(data);
-    const metadata = { name: fileName, mimeType: 'application/json' };
+    
+    let finalData = localData;
+    let fileId = null;
+
+    // 2. Jika file ada, tarik dulu dan merge agar tidak menimpa data orang lain
     if (searchData.files && searchData.files.length > 0) {
-      const fileId = searchData.files[0].id;
+      fileId = searchData.files[0].id;
+      const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (fileRes.ok) {
+        const cloudData = await fileRes.json();
+        finalData = mergeData(localData, cloudData);
+      }
+    }
+
+    const fileContent = JSON.stringify(finalData);
+    
+    if (fileId) {
+      // Update file yang ada
       await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: fileContent
       });
     } else {
+      // Buat file baru jika belum ada sama sekali
+      const metadata = { name: FILE_NAME, mimeType: 'application/json' };
       const form = new FormData();
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       form.append('file', new Blob([fileContent], { type: 'application/json' }));
@@ -131,10 +182,41 @@ export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
         body: form
       });
     }
+
+    // Update lokal dengan hasil merge
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(finalData));
     saveSyncStatus({ pending: false, timestamp: new Date().toISOString(), isNewLocal: false, autoSync: true });
     return true;
   } catch (error) {
     console.error('GDrive Sync Error:', error);
+    return false;
+  }
+};
+
+// PULL (Tarik & Merge ke HP)
+export const pullFromGDrive = async (accessToken: string): Promise<boolean> => {
+  try {
+    const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}' and trashed=false`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    const searchData = await searchRes.json();
+    if (searchData.files && searchData.files.length > 0) {
+      const fileId = searchData.files[0].id;
+      const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (fileRes.ok) {
+        const cloudData = await fileRes.json();
+        const localData = getAppData();
+        const merged = mergeData(localData, cloudData);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        saveSyncStatus({ pending: false, timestamp: new Date().toISOString(), isNewLocal: false, autoSync: true });
+        return true;
+      }
+    }
+    return false;
+  } catch (error) {
+    console.error('GDrive Pull Error:', error);
     return false;
   }
 };

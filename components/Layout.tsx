@@ -5,9 +5,9 @@ import { UserRole, AcademicConfig } from '../types.ts';
 import { 
   Settings as SettingsIcon, Home, UserCheck, 
   ShieldAlert, Trophy, Info, LogOut, Menu, X, User, ChevronRight,
-  Cloud, CloudOff, RefreshCw, Zap, LayoutDashboard
+  Cloud, CloudOff, RefreshCw, Zap, LayoutDashboard, DownloadCloud, UploadCloud, AlertCircle
 } from 'lucide-react';
-import { getSyncStatus } from '../services/dataService.ts';
+import { getSyncStatus, syncWithGDrive, pullFromGDrive } from '../services/dataService.ts';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -24,20 +24,65 @@ const Layout: React.FC<LayoutProps> = ({
   children, activeTab, setActiveTab, role, userName, userEmail, onLogout, academicConfig
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [cloudStatus, setCloudStatus] = useState({ connected: false, pending: false });
+  const [cloudStatus, setCloudStatus] = useState({ connected: false, pending: false, lastSync: '' });
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const isSuperAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
 
+  const checkStatus = () => {
+    const connected = localStorage.getItem('mahasina_cloud_connected') === 'true';
+    const sync = getSyncStatus();
+    setCloudStatus({ 
+      connected, 
+      pending: sync.isNewLocal,
+      lastSync: sync.timestamp ? new Date(sync.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'
+    });
+  };
+
   useEffect(() => {
-    const checkStatus = () => {
-      const connected = localStorage.getItem('mahasina_cloud_connected') === 'true';
-      const sync = getSyncStatus();
-      setCloudStatus({ connected, pending: sync.isNewLocal });
-    };
     checkStatus();
-    const interval = setInterval(checkStatus, 3000);
+    const interval = setInterval(checkStatus, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleQuickSync = async () => {
+    const token = localStorage.getItem('mahasina_cloud_token');
+    if (!token) {
+      alert("Token Cloud habis. Silakan Logout dan Login kembali untuk menyegarkan akses Google.");
+      return;
+    }
+    
+    setIsProcessing(true);
+    try {
+      if (cloudStatus.pending) {
+        // Jika ada data lokal baru, kirim (Push)
+        const pushSuccess = await syncWithGDrive(token);
+        if (pushSuccess) {
+           // Setelah berhasil push, langsung tarik (Pull) untuk mendapatkan data rekan lain
+           await pullFromGDrive(token);
+           alert("Sinkronisasi Berhasil: Data Anda terkirim & data terbaru rekan lain telah ditarik.");
+           window.location.reload();
+        } else {
+           alert("Gagal mengirim data. Periksa koneksi internet Anda.");
+        }
+      } else {
+        // Jika tidak ada data baru dari kita, cukup tarik (Pull) data terbaru
+        const pullSuccess = await pullFromGDrive(token);
+        if (pullSuccess) {
+           alert("Data terbaru dari rekan lain berhasil ditarik.");
+           window.location.reload();
+        } else {
+           alert("Data di HP Anda sudah versi terbaru.");
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Terjadi kesalahan saat sinkronisasi.");
+    } finally {
+      setIsProcessing(false);
+      checkStatus();
+    }
+  };
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <Home size={20} /> },
@@ -64,7 +109,6 @@ const Layout: React.FC<LayoutProps> = ({
   return (
     <div className="flex h-screen bg-[#fcfdfd] overflow-hidden font-sans">
       
-      {/* Sidebar Overlay for Mobile */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
@@ -72,10 +116,7 @@ const Layout: React.FC<LayoutProps> = ({
         />
       )}
 
-      {/* Sidebar - Desktop & Mobile Drawer */}
       <aside className={`fixed lg:static inset-y-0 left-0 w-72 bg-emerald-950 text-white flex flex-col z-50 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 shadow-2xl lg:shadow-none'}`}>
-        
-        {/* Sidebar Header */}
         <div className="p-8 pb-10">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center p-1.5 shadow-xl transition-transform hover:rotate-3">
@@ -88,7 +129,6 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
         </div>
 
-        {/* Sidebar Navigation */}
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto no-scrollbar">
           {menuItems.map((item) => (
             <button
@@ -109,7 +149,6 @@ const Layout: React.FC<LayoutProps> = ({
           ))}
         </nav>
 
-        {/* Sidebar Footer */}
         <div className="p-6 border-t border-emerald-900/50 bg-emerald-950/50">
           <button 
             onClick={onLogout} 
@@ -121,13 +160,10 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
-        
-        {/* Top Status Bar */}
-        <div className="w-full flex items-start justify-between px-4 py-4 md:px-10 lg:px-12 z-30 shrink-0">
+        <div className="w-full flex items-center justify-between px-4 py-4 md:px-10 lg:px-12 z-30 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50">
           
-          <div className="flex items-start gap-2 md:gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <button 
               onClick={() => setIsSidebarOpen(true)}
               className="lg:hidden p-2 -ml-1 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
@@ -136,40 +172,48 @@ const Layout: React.FC<LayoutProps> = ({
             </button>
             <div className="flex flex-col gap-0.5 mt-0.5">
               <h2 className="text-[11px] sm:text-sm md:text-base font-black text-slate-800 leading-none tracking-tight">
-                Ahlan wa Sahlan, <span className="text-emerald-700">{userName}</span>
+                Ahlan, <span className="text-emerald-700">{userName.split(' ')[0]}</span>
               </h2>
               <div className="flex items-center gap-2">
                 <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest">{role}</span>
-                <span className="text-slate-200 text-[8px]">|</span>
-                <div className="flex items-center gap-1">
-                  {cloudStatus.connected ? (
-                    cloudStatus.pending ? <RefreshCw size={10} className="text-amber-500 animate-spin" /> : <Cloud size={10} className="text-emerald-500" />
-                  ) : <CloudOff size={10} className="text-slate-300" />}
-                  <span className={`text-[7px] md:text-[8px] font-black uppercase tracking-widest ${cloudStatus.connected ? 'text-slate-600' : 'text-slate-400'}`}>
-                    {cloudStatus.connected ? (cloudStatus.pending ? 'Sinkron...' : 'Cloud Aktif') : 'Offline'}
-                  </span>
-                </div>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 md:gap-6 text-right">
-            <div className="flex flex-col gap-0 mt-0.5">
-              <h3 className="text-[9px] md:text-xs font-black text-slate-800 uppercase leading-none tracking-tight">Ponpes Mahasina</h3>
-              <p className="text-[7px] md:text-[8px] font-bold text-emerald-700 uppercase tracking-widest leading-none mt-0.5">Darul Quran wal Hadis</p>
-              <div className="flex items-center justify-end gap-1.5 mt-1 opacity-80">
-                 <span className="text-[7px] md:text-[8px] font-black text-slate-400 uppercase tracking-widest">{academicConfig.semester}</span>
-                 <span className="text-[7px] text-slate-300">•</span>
-                 <span className="text-[7px] md:text-[8px] font-black text-slate-800 uppercase tracking-widest">{academicConfig.schoolYear}</span>
-              </div>
+          <div className="flex items-center gap-3 md:gap-6">
+            <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-100">
+               <div className="hidden md:flex flex-col items-end pr-2 pl-3">
+                  <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">
+                    {cloudStatus.pending ? 'BUTUH UPDATE' : 'SINKRON'}
+                  </span>
+                  <span className={`text-[8px] font-black uppercase ${cloudStatus.pending ? 'text-amber-600' : 'text-slate-800'}`}>
+                    {cloudStatus.lastSync}
+                  </span>
+               </div>
+               <button 
+                disabled={!cloudStatus.connected || isProcessing}
+                onClick={handleQuickSync}
+                title={cloudStatus.pending ? "Klik untuk mengirim data ke Cloud" : "Klik untuk menarik data terbaru"}
+                className={`p-3 rounded-xl transition-all flex items-center gap-2 ${
+                  isProcessing ? 'bg-indigo-50 text-indigo-600' :
+                  cloudStatus.pending ? 'bg-amber-500 text-white shadow-lg animate-bounce' : 
+                  'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                } disabled:opacity-30`}
+               >
+                 {isProcessing ? <RefreshCw size={16} className="animate-spin"/> : 
+                  cloudStatus.pending ? <AlertCircle size={16}/> : <DownloadCloud size={16}/>}
+                 <span className="hidden sm:inline text-[9px] font-black uppercase tracking-widest">
+                    {isProcessing ? 'Proses...' : cloudStatus.pending ? 'Kirim Sekarang' : 'Tarik Data'}
+                 </span>
+               </button>
             </div>
-            <div className="w-9 h-9 md:w-12 md:h-12 bg-white rounded-xl md:rounded-2xl p-1 shadow-sm border border-slate-100 flex items-center justify-center shrink-0">
+            
+            <div className="w-9 h-9 md:w-11 md:h-11 bg-white rounded-xl p-1 shadow-sm border border-slate-100 flex items-center justify-center shrink-0">
               <img src={APP_LOGO} alt="Mahasina" className="w-full h-full object-contain" />
             </div>
           </div>
         </div>
 
-        {/* Main Content Scrollable */}
         <main className="flex-1 overflow-y-auto no-scrollbar bg-[#f8fafc]">
           <div className="px-4 pb-12 md:px-10 lg:px-12 max-w-[1400px] mx-auto">
             {children}
