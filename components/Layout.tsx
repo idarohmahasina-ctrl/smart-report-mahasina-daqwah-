@@ -5,9 +5,11 @@ import { UserRole, AcademicConfig } from '../types.ts';
 import { 
   Settings as SettingsIcon, Home, UserCheck, 
   ShieldAlert, Trophy, Info, LogOut, Menu, 
-  Cloud, Zap, LayoutDashboard, CloudOff, RefreshCw
+  Cloud, Zap, LayoutDashboard, CloudOff, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { getSyncStatus } from '../services/dataService.ts';
+
+declare const google: any;
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -24,20 +26,38 @@ const Layout: React.FC<LayoutProps> = ({
   children, activeTab, setActiveTab, role, userName, userEmail, onLogout, academicConfig
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [syncVisual, setSyncVisual] = useState<'idle' | 'syncing' | 'error'>('idle');
+  const [cloudStatus, setCloudStatus] = useState<'connected' | 'expired' | 'none'>('none');
 
   const isSuperAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const isNew = getSyncStatus().isNewLocal;
-      if (isNew) {
-        setSyncVisual('syncing');
-        setTimeout(() => setSyncVisual('idle'), 2000);
-      }
-    }, 5000);
-    return () => clearInterval(interval);
+    const checkCloud = () => {
+      const hasToken = !!localStorage.getItem('mahasina_cloud_token');
+      if (hasToken) setCloudStatus('connected');
+      else if (localStorage.getItem('mahasina_cloud_connected') === 'true') setCloudStatus('expired');
+      else setCloudStatus('none');
+    };
+    checkCloud();
+    const intv = setInterval(checkCloud, 5000);
+    return () => clearInterval(intv);
   }, []);
+
+  const handleReconnect = () => {
+    if (typeof google === 'undefined') return;
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: '769350037876-j7u6mul9fb3be11984h4jre7i9afsktd.apps.googleusercontent.com',
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (res: any) => {
+        if (res.access_token) {
+          localStorage.setItem('mahasina_cloud_token', res.access_token);
+          localStorage.setItem('mahasina_cloud_connected', 'true');
+          setCloudStatus('connected');
+          window.location.reload();
+        }
+      }
+    });
+    client.requestAccessToken();
+  };
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <Home size={20} /> },
@@ -48,15 +68,12 @@ const Layout: React.FC<LayoutProps> = ({
     { id: 'prestasi', label: 'Input Prestasi', icon: <Trophy size={20} /> },
     { id: 'informasi', label: 'Informasi Data', icon: <Info size={20} /> },
     { id: 'pengaturan', label: 'Pengaturan', icon: <SettingsIcon size={20} /> },
-    { id: 'panel-kontrol', label: 'Panel Kontrol', icon: <LayoutDashboard size={20} />, superOnly: true },
-  ].filter(item => {
-    if (item.superOnly && !isSuperAdmin) return false;
-    return true;
-  });
+  ];
 
   return (
     <div className="flex h-screen bg-[#fcfdfd] overflow-hidden font-sans">
       {isSidebarOpen && <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />}
+      
       <aside className={`fixed lg:static inset-y-0 left-0 w-72 bg-emerald-950 text-white flex flex-col z-50 transition-transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="p-8 pb-10 flex items-center gap-4">
           <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center p-1.5 shadow-xl">
@@ -75,30 +92,42 @@ const Layout: React.FC<LayoutProps> = ({
         <div className="p-6 border-t border-emerald-900/50 bg-emerald-950/50">
           <button onClick={onLogout} className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-emerald-900/30 hover:bg-red-900/30 text-emerald-400 transition-all">
             <LogOut size={18} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Keluar</span>
+            <span className="text-[10px] font-black uppercase tracking-widest">Keluar Sesi</span>
           </button>
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
-        <div className="w-full flex items-center justify-between px-6 py-4 md:px-10 z-30 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50">
-          <div className="flex items-center gap-2">
+        <header className="w-full flex items-center justify-between px-6 py-4 md:px-10 z-30 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50">
+          <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 text-slate-500"><Menu size={22} /></button>
             <div className="flex flex-col">
-              <h2 className="text-sm font-black text-slate-800 leading-none tracking-tight">Ahlan, {userName.split(' ')[0]}</h2>
-              <div className="flex items-center gap-2 mt-1">
-                 <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{role}</span>
-                 <div className="flex items-center gap-1">
-                    <div className={`w-1.5 h-1.5 rounded-full ${syncVisual === 'syncing' ? 'bg-blue-500 animate-ping' : 'bg-emerald-500'}`} />
-                    <span className="text-[7px] font-black text-slate-300 uppercase tracking-tighter">Live Cloud Sync</span>
-                 </div>
-              </div>
+              <h2 className="text-sm font-black text-slate-800 leading-none tracking-tight">Ustadz/ah {userName.split(' ')[0]}</h2>
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">{role}</p>
             </div>
           </div>
-          <div className="w-10 h-10 bg-white rounded-xl p-1 shadow-sm border border-slate-100 flex items-center justify-center">
-            <img src={APP_LOGO} alt="Logo" className="w-full h-full object-contain" />
+
+          <div className="flex items-center gap-4">
+             {cloudStatus === 'connected' && (
+               <div className="hidden md:flex items-center gap-2 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 animate-in fade-in">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"/>
+                  <span className="text-[9px] font-black text-emerald-700 uppercase">Cloud Aktif</span>
+               </div>
+             )}
+             
+             {cloudStatus === 'expired' && (
+               <button onClick={handleReconnect} className="flex items-center gap-2 bg-red-50 px-4 py-2 rounded-xl border border-red-100 hover:bg-red-100 transition-all group animate-bounce">
+                  <AlertCircle size={14} className="text-red-600"/>
+                  <span className="text-[9px] font-black text-red-700 uppercase group-hover:underline">Klik Untuk Re-Sync</span>
+               </button>
+             )}
+
+             <div className="w-10 h-10 bg-white rounded-xl p-1 shadow-sm border border-slate-100 flex items-center justify-center">
+               <img src={APP_LOGO} alt="Logo" className="w-full h-full object-contain" />
+             </div>
           </div>
-        </div>
+        </header>
+
         <main className="flex-1 overflow-y-auto no-scrollbar bg-[#f8fafc]">
           <div className="px-4 pb-12 md:px-10 lg:px-12 max-w-[1400px] mx-auto pt-6">{children}</div>
         </main>

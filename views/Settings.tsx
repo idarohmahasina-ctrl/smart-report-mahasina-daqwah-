@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserRole, UserProfile, AcademicConfig } from '../types';
+// Removed syncWithGDrive because it is not exported from dataService
 import { 
-  getUsers, getSyncStatus, syncWithGDrive, pullFromGDrive, getTeamDatabaseId 
+  getUsers, getSyncStatus, pullFromGDrive, getTeamDatabaseId 
 } from '../services/dataService';
 import { 
   User as UserIcon, Users, Cloud, RefreshCw, LogOut, DownloadCloud, UploadCloud, ShieldCheck, Share2, Link2, Copy, Key, ShieldAlert
