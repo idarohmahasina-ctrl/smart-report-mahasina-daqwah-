@@ -65,7 +65,7 @@ export const getAppData = (): AppData => {
   }
 };
 
-// --- AUTO CLOUD ENGINE ---
+// --- CORE SYNC ENGINE ---
 
 export const pushToGDrive = async (token: string): Promise<boolean> => {
   try {
@@ -75,13 +75,21 @@ export const pushToGDrive = async (token: string): Promise<boolean> => {
 
     const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${dbId}?uploadType=media`, {
       method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: { 
+        Authorization: `Bearer ${token}`, 
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify(localData)
     });
 
     if (response.ok) {
       localStorage.setItem(SYNC_KEY, JSON.stringify({ isNewLocal: false, timestamp: new Date().toISOString() }));
+      console.log("☁️ Auto-Push Success");
       return true;
+    }
+    
+    if (response.status === 401) {
+      localStorage.removeItem('mahasina_cloud_token'); // Token hangus
     }
     return false;
   } catch (e) {
@@ -95,18 +103,19 @@ export const saveAppData = (data: Partial<AppData>) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
   localStorage.setItem(SYNC_KEY, JSON.stringify({ isNewLocal: true, timestamp: new Date().toISOString() }));
   
-  // TRIGGER AUTO PUSH: Jika ada token, langsung kirim
+  // Langsung push jika ada internet & token
   const token = localStorage.getItem('mahasina_cloud_token');
   if (token) {
     pushToGDrive(token);
   }
 };
 
-const merge = (local: any[], remote: any[]) => {
+const mergeArrays = (local: any[], remote: any[]) => {
   const map = new Map();
-  [...(remote || []), ...(local || [])].forEach(item => {
-    if (item && item.id) map.set(item.id, item);
-  });
+  // Masukkan data remote dulu
+  (remote || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
+  // Timpa/Tambah dengan data local
+  (local || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
   return Array.from(map.values());
 };
 
@@ -119,24 +128,32 @@ export const pullFromGDrive = async (token: string): Promise<boolean> => {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    if (!response.ok) return false;
+    if (!response.ok) {
+       if (response.status === 401) localStorage.removeItem('mahasina_cloud_token');
+       return false;
+    }
+
     const remoteData: AppData = await response.json();
     const localData = getAppData();
 
-    // Silent Merge: Hanya update jika ada data baru
+    // SINKRONISASI TOTAL: Mengambil SEMUA data dari cloud
+    // Jika cloud lebih baru atau local kosong, kita utamakan cloud untuk master data
     const mergedData: AppData = {
-      ...remoteData,
-      attendance: merge(localData.attendance, remoteData.attendance),
-      prayerAttendance: merge(localData.prayerAttendance, remoteData.prayerAttendance),
-      teacherAttendance: merge(localData.teacherAttendance, remoteData.teacherAttendance),
-      reports: merge(localData.reports, remoteData.reports),
+      ...remoteData, // Ambil semua dari remote (termasuk santri, guru, dll)
+      // Khusus untuk transaksi, kita gabungkan agar input yang belum ter-push tidak hilang
+      attendance: mergeArrays(localData.attendance, remoteData.attendance),
+      prayerAttendance: mergeArrays(localData.prayerAttendance, remoteData.prayerAttendance),
+      teacherAttendance: mergeArrays(localData.teacherAttendance, remoteData.teacherAttendance),
+      reports: mergeArrays(localData.reports, remoteData.reports),
       lastUpdate: new Date().toISOString()
     };
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedData));
     localStorage.setItem(SYNC_KEY, JSON.stringify({ isNewLocal: false, timestamp: new Date().toISOString() }));
+    console.log("☁️ Auto-Pull Success");
     return true;
   } catch (e) {
+    console.error("Sync Error:", e);
     return false;
   }
 };
@@ -168,11 +185,6 @@ export const getTeachersFromSchedules = (schedules: Schedule[]): string[] => {
   return Array.from(new Set(names)).sort();
 };
 
-// Add normalizeName fix for Registration.tsx
-/**
- * Normalizes a name for comparison by converting to lowercase, 
- * trimming, and removing extra spaces.
- */
 export const normalizeName = (name: string): string => {
   if (!name) return '';
   return name.toLowerCase().trim().replace(/\s+/g, ' ');

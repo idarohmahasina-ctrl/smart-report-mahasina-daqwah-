@@ -25,41 +25,16 @@ import {
 const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
-  const [prayerAttendance, setPrayerAttendance] = useState<PrayerRecord[]>([]);
-  const [reports, setReports] = useState<ReportItem[]>([]);
-  const [teacherAttendance, setTeacherAttendance] = useState<TeacherAttendance[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [orsam, setOrsam] = useState<OrganizationMember[]>([]);
-  const [orklas, setOrklas] = useState<OrganizationMember[]>([]);
-  const [extraDataLists, setExtraDataLists] = useState<ExtraDataList[]>([]);
-  const [violationTemplates, setViolationTemplates] = useState<TemplateItem[]>([]);
-  const [achievementTemplates, setAchievementTemplates] = useState<TemplateItem[]>([]);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [academicConfig, setAcademicConfig] = useState<AcademicConfig>({
-    schoolYear: '2025/2026', semester: 'II (Genap)', isHoliday: false, sessionHolidays: {}
-  });
+  
+  // State Data Master & Transaksi
+  const [appData, setAppData] = useState<AppData>(getAppData());
 
   const [loading, setLoading] = useState(true);
 
-  const loadLocalState = useCallback(() => {
+  // Fungsi tunggal untuk memuat data dari Local Storage ke State React
+  const refreshUI = useCallback(() => {
     const data = getAppData();
-    setAttendance(data.attendance || []);
-    setPrayerAttendance(data.prayerAttendance || []);
-    setReports(data.reports || []);
-    setTeacherAttendance(data.teacherAttendance || []);
-    setStudents(data.students || []);
-    setTeachers(data.teachers || []);
-    setSchedules(data.schedules || []);
-    setOrsam(data.orsam || []);
-    setOrklas(data.orklas || []);
-    setExtraDataLists(data.extraDataLists || []);
-    setViolationTemplates(data.violationTemplates || PREDEFINED_VIOLATIONS);
-    setAchievementTemplates(data.achievementTemplates || PREDEFINED_ACHIEVEMENTS);
-    setAnnouncements(data.announcements || []);
-    setAcademicConfig(data.academicConfig);
+    setAppData(data);
   }, []);
 
   useEffect(() => {
@@ -73,40 +48,45 @@ const App: React.FC = () => {
     const activeUser = getActiveSession();
     if (activeUser) setProfile(activeUser);
     
-    loadLocalState();
+    refreshUI();
     setLoading(false);
 
-    // SILENT AUTO-PULL (Tarik data otomatis dari ustadz lain setiap 20 detik)
+    // SILENT AUTO-PULL: Cek data baru setiap 15 detik
     const silentPullInterval = setInterval(() => {
       const token = localStorage.getItem('mahasina_cloud_token');
       if (token) {
-        pullFromGDrive(token).then(success => {
-          if (success) loadLocalState(); // Refresh UI jika ada data baru masuk
+        pullFromGDrive(token).then(hasChanges => {
+          if (hasChanges) {
+            refreshUI(); // Data master (santri dll) akan otomatis ter-update di layar
+          }
         });
       }
-    }, 20000);
+    }, 15000);
 
     return () => clearInterval(silentPullInterval);
-  }, [loadLocalState]);
+  }, [refreshUI]);
 
   const handleSaveAttendance = (newRecords: AttendanceRecord[]) => {
-    const updated = [...attendance, ...newRecords];
-    setAttendance(updated);
-    saveAppData({ attendance: updated }); // Akan otomatis Push ke Drive
+    const updated = [...appData.attendance, ...newRecords];
+    saveAppData({ attendance: updated });
+    refreshUI();
   };
 
   const handleSaveReport = (newReport: ReportItem) => {
-    const updated = [newReport, ...reports];
-    setReports(updated);
-    saveAppData({ reports: updated }); // Akan otomatis Push ke Drive
+    const updated = [newReport, ...appData.reports];
+    saveAppData({ reports: updated });
+    refreshUI();
   };
 
   const updateMasterData = (type: string, data: any[]) => {
     const update: Partial<AppData> = {};
-    if (type === 'Siswa') { setStudents(data); update.students = data; }
-    if (type === 'Guru') { setTeachers(data); update.teachers = data; }
-    if (type === 'Jadwal') { setSchedules(data); update.schedules = data; }
-    saveAppData(update);
+    if (type === 'Siswa') update.students = data;
+    if (type === 'Guru') update.teachers = data;
+    if (type === 'Jadwal') update.schedules = data;
+    
+    saveAppData(update); // Simpan & Push ke Drive
+    refreshUI(); // Update tampilan saat itu juga
+    alert(`${type} berhasil diupload dan sedang dikirim ke Cloud...`);
   };
 
   const handleLogout = () => {
@@ -115,7 +95,13 @@ const App: React.FC = () => {
     window.location.reload();
   };
 
-  if (loading) return <div className="min-h-screen bg-emerald-950 flex items-center justify-center text-white font-black uppercase tracking-widest">Mengkoneksikan...</div>;
+  if (loading) return (
+    <div className="min-h-screen bg-emerald-950 flex flex-col items-center justify-center text-white font-black uppercase tracking-[0.3em]">
+      <div className="w-12 h-12 border-4 border-emerald-500 border-t-white rounded-full animate-spin mb-6" />
+      Memuat Data...
+    </div>
+  );
+
   if (!profile) return <Registration onComplete={(p) => setProfile(p)} />;
 
   return (
@@ -126,14 +112,82 @@ const App: React.FC = () => {
       userName={profile.fullName}
       userEmail={profile.email}
       onLogout={handleLogout}
-      academicConfig={academicConfig}
+      academicConfig={appData.academicConfig}
     >
-      {activeTab === 'dashboard' && <Dashboard attendance={attendance} reports={reports} profile={profile} students={students} teacherAttendance={teacherAttendance} schedules={schedules} academicConfig={academicConfig} />}
-      {activeTab === 'absen-santri' && <Attendance mode="Santri" onSave={handleSaveAttendance} onTeacherCheckIn={() => {}} role={profile.role} currentUser={profile.fullName} students={students} teacherAttendance={teacherAttendance} schedules={schedules} academicConfig={academicConfig} />}
-      {activeTab === 'absen-sholat' && <PrayerAttendance students={students} onSave={(recs) => { setPrayerAttendance([...prayerAttendance, ...recs]); saveAppData({ prayerAttendance: [...prayerAttendance, ...recs] }); }} allPrayerRecords={prayerAttendance} currentUser={profile.fullName} />}
-      {activeTab === 'pelanggaran' && <Reports type="Violation" onSave={handleSaveReport} role={profile.role} currentUser={profile.fullName} students={students} allReports={reports} templates={violationTemplates} />}
-      {activeTab === 'informasi' && <Information role={profile.role} userEmail={profile.email} data={{ students, teachers, schedules, orsam, orklas, extraDataLists, violationTemplates, achievementTemplates, announcements }} onUpdateData={updateMasterData} />}
-      {activeTab === 'pengaturan' && <Settings userEmail={profile.email} academicConfig={academicConfig} onUpdateAcademic={() => {}} availableClasses={[]} />}
+      {activeTab === 'dashboard' && (
+        <Dashboard 
+          attendance={appData.attendance} 
+          reports={appData.reports} 
+          profile={profile} 
+          students={appData.students} 
+          teacherAttendance={appData.teacherAttendance} 
+          schedules={appData.schedules} 
+          academicConfig={appData.academicConfig} 
+        />
+      )}
+      {activeTab === 'absen-santri' && (
+        <Attendance 
+          mode="Santri" 
+          onSave={handleSaveAttendance} 
+          onTeacherCheckIn={() => {}} 
+          role={profile.role} 
+          currentUser={profile.fullName} 
+          students={appData.students} 
+          teacherAttendance={appData.teacherAttendance} 
+          schedules={appData.schedules} 
+          academicConfig={appData.academicConfig} 
+        />
+      )}
+      {activeTab === 'absen-sholat' && (
+        <PrayerAttendance 
+          students={appData.students} 
+          onSave={(recs) => { 
+            const updated = [...appData.prayerAttendance, ...recs];
+            saveAppData({ prayerAttendance: updated }); 
+            refreshUI();
+          }} 
+          allPrayerRecords={appData.prayerAttendance} 
+          currentUser={profile.fullName} 
+        />
+      )}
+      {activeTab === 'pelanggaran' && (
+        <Reports 
+          type="Violation" 
+          onSave={handleSaveReport} 
+          role={profile.role} 
+          currentUser={profile.fullName} 
+          students={appData.students} 
+          allReports={appData.reports} 
+          templates={appData.violationTemplates} 
+        />
+      )}
+      {activeTab === 'prestasi' && (
+        <Reports 
+          type="Achievement" 
+          onSave={handleSaveReport} 
+          role={profile.role} 
+          currentUser={profile.fullName} 
+          students={appData.students} 
+          allReports={appData.reports} 
+          templates={appData.achievementTemplates} 
+        />
+      )}
+      {activeTab === 'informasi' && (
+        <Information 
+          role={profile.role} 
+          userEmail={profile.email} 
+          data={appData} 
+          onUpdateData={updateMasterData} 
+        />
+      )}
+      {activeTab === 'pengaturan' && (
+        <Settings 
+          userEmail={profile.email} 
+          academicConfig={appData.academicConfig} 
+          onUpdateAcademic={(conf) => { saveAppData({ academicConfig: conf }); refreshUI(); }} 
+          availableClasses={[]} 
+        />
+      )}
     </Layout>
   );
 };

@@ -9,7 +9,7 @@ import {
   pullFromGDrive,
   normalizeName 
 } from '../services/dataService';
-import { Mail, User, ChevronRight, UserCheck2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Mail, User, ChevronRight, UserCheck2, RefreshCw, AlertCircle, ShieldCheck } from 'lucide-react';
 
 declare const google: any;
 
@@ -52,7 +52,7 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
     if (typeof google !== 'undefined') {
       const client = google.accounts.oauth2.initTokenClient({
         client_id: '769350037876-j7u6mul9fb3be11984h4jre7i9afsktd.apps.googleusercontent.com',
-        scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.resource',
+        scope: 'https://www.googleapis.com/auth/drive.file',
         callback: async (res: any) => {
           if (res.access_token) {
             localStorage.setItem('mahasina_cloud_token', res.access_token);
@@ -80,7 +80,7 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
       <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl p-10 md:p-14 space-y-10 animate-in fade-in zoom-in-95 duration-500">
         <div className="text-center">
            <img src={APP_LOGO} className="w-20 h-20 mx-auto mb-6 bg-emerald-50 p-2 rounded-2xl" alt="Logo" />
-           <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Smart Report</h1>
+           <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter leading-none">Smart Report</h1>
            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-2">Portal Digital Mahasina</p>
         </div>
 
@@ -109,20 +109,26 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
                 </div>
              </div>
 
-             <div className="space-y-3">
-                {fullName.length >= 3 && (
-                  <div className={`p-4 rounded-2xl border flex items-center gap-4 animate-in zoom-in-95 ${detectedTeacher ? 'bg-emerald-50 border-emerald-100' : 'bg-blue-50 border-blue-100'}`}>
-                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${detectedTeacher ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white'}`}>
-                        {detectedTeacher ? <UserCheck2 size={20}/> : <AlertCircle size={20}/>}
-                     </div>
-                     <div>
-                        <p className="text-[10px] font-black text-slate-800 uppercase leading-none">Status:</p>
-                        <p className={`text-[11px] font-black uppercase mt-1 ${detectedTeacher ? 'text-emerald-700' : 'text-blue-700'}`}>
-                           {detectedTeacher ? `Guru: ${detectedTeacher}` : 'Petugas Umum'}
-                        </p>
-                     </div>
-                  </div>
-                )}
+             <div className="space-y-4">
+                <div className={`p-5 rounded-[2rem] border flex items-center gap-4 animate-in zoom-in-95 ${detectedTeacher ? 'bg-emerald-50 border-emerald-100' : 'bg-blue-50 border-blue-100'}`}>
+                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${detectedTeacher ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white'}`}>
+                      {detectedTeacher ? <UserCheck2 size={20}/> : <AlertCircle size={20}/>}
+                   </div>
+                   <div>
+                      <p className="text-[10px] font-black text-slate-800 uppercase leading-none">Status Perangkat:</p>
+                      <p className={`text-[11px] font-black uppercase mt-1 ${detectedTeacher ? 'text-emerald-700' : 'text-blue-700'}`}>
+                         {detectedTeacher ? `Guru: ${detectedTeacher}` : 'Petugas Umum'}
+                      </p>
+                   </div>
+                </div>
+
+                <div className="bg-amber-50 p-5 rounded-[2rem] border border-amber-100 flex items-start gap-4">
+                   <ShieldCheck className="text-amber-600 mt-1 shrink-0" size={20}/>
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black text-amber-800 uppercase leading-none">Instruksi Penting:</p>
+                      <p className="text-[9px] font-medium text-amber-700 leading-relaxed">Nanti saat jendela Google muncul, pastikan Anda **mencentang kotak izin** untuk mengelola file Google Drive agar sinkronisasi otomatis berjalan.</p>
+                   </div>
+                </div>
                 
                 <button onClick={finalizeRegistration} className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl flex items-center justify-center gap-3 uppercase text-[11px] tracking-widest hover:bg-slate-800 transition-all">
                    Masuk Dashboard
@@ -135,7 +141,7 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
           <div className="text-center py-10 space-y-6 animate-in zoom-in-95">
              <RefreshCw className="w-12 h-12 text-emerald-600 animate-spin mx-auto" />
              <h2 className="text-lg font-black text-slate-800 uppercase">Menghubungkan...</h2>
-             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Sinkronisasi Cloud Aktif</p>
+             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Memproses Token Keamanan Cloud</p>
           </div>
         )}
       </div>
