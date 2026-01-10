@@ -89,15 +89,22 @@ const App: React.FC = () => {
 
   const loadLocalData = useCallback(() => {
     const data = getAppData();
+    
+    // LOGIKA CERDAS: Gunakan mock data HANYA jika localstorage benar-benar baru pertama kali dibuat
+    const isFirstTime = !localStorage.getItem('mahasina_report_v2');
+
     setAttendance(data.attendance || []);
     setPrayerAttendance(data.prayerAttendance || []);
     setReports(data.reports || []);
     setTeacherAttendance(data.teacherAttendance || []);
-    setStudents(data.students.length > 0 ? data.students : MOCK_STUDENTS);
-    setTeachers(data.teachers.length > 0 ? data.teachers : MOCK_TEACHERS);
-    setSchedules(data.schedules.length > 0 ? data.schedules : MOCK_SCHEDULE);
-    setOrsam(data.orsam.length > 0 ? data.orsam : MOCK_ORSAM);
-    setOrklas(data.orklas.length > 0 ? data.orklas : MOCK_ORKLAS);
+    
+    setStudents(data.students.length > 0 ? data.students : (isFirstTime ? MOCK_STUDENTS : []));
+    setTeachers(data.teachers.length > 0 ? data.teachers : (isFirstTime ? MOCK_TEACHERS : []));
+    setSchedules(data.schedules.length > 0 ? data.schedules : (isFirstTime ? MOCK_SCHEDULE : []));
+    
+    setOrsam(data.orsam.length > 0 ? data.orsam : (isFirstTime ? MOCK_ORSAM : []));
+    setOrklas(data.orklas.length > 0 ? data.orklas : (isFirstTime ? MOCK_ORKLAS : []));
+    
     setExtraDataLists(data.extraDataLists || []);
     setViolationTemplates(data.violationTemplates?.length > 0 ? data.violationTemplates : PREDEFINED_VIOLATIONS);
     setAchievementTemplates(data.achievementTemplates?.length > 0 ? data.achievementTemplates : PREDEFINED_ACHIEVEMENTS);
@@ -127,7 +134,6 @@ const App: React.FC = () => {
 
       const status = getSyncStatus();
       
-      // Jika ada data baru lokal, kirim (Push & Merge)
       if (status.isNewLocal) {
         setSyncState('syncing');
         const success = await syncWithGDrive(token);
@@ -139,20 +145,18 @@ const App: React.FC = () => {
           setSyncState('error');
         }
       } else {
-        // Jika tidak ada data baru, cek apakah ada update dari tim (Pull)
         await pullFromGDrive(token);
         loadLocalData();
       }
     };
 
-    // Jalankan setiap 3 menit
     const interval = setInterval(performAutoSync, 180000);
     return () => clearInterval(interval);
   }, [profile, loadLocalData]);
 
   const handleRegistrationComplete = (newProfile: UserProfile) => {
     setProfile(newProfile);
-    window.location.reload(); // Reload to start auto-sync fresh
+    window.location.reload(); 
   };
 
   const handleLogout = () => {

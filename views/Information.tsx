@@ -35,11 +35,8 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Filter khusus Santri
   const [studentSessionFilter, setStudentSessionFilter] = useState<string>('Madrasah');
   const [studentClassFilter, setStudentClassFilter] = useState<string>('');
-
-  // Filter khusus Jadwal
   const [scheduleDayFilter, setScheduleDayFilter] = useState<string>('Semua');
 
   const isSuperAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
@@ -61,34 +58,53 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      const rows = text.split('\n').map(r => r.trim()).filter(r => r !== '');
-      if (rows.length < 2) {
-        alert("File kosong atau format salah.");
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
+      if (lines.length < 2) {
+        alert("File kosong atau hanya berisi header.");
         return;
       }
 
-      const headers = rows[0].split(',').map(h => h.replace(/"/g, '').trim());
+      const firstLine = lines[0];
+      const delimiter = firstLine.includes(';') ? ';' : ',';
       
-      const newData = rows.slice(1).map((row, idx) => {
-        const values = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g)?.map(v => v.replace(/"/g, '').trim()) || [];
-        const obj: any = {};
-        headers.forEach((h, i) => obj[h] = values[i] || '');
+      const rawHeaders = firstLine.split(delimiter).map(h => h.replace(/"/g, '').trim());
+      const headersMap: Record<string, number> = {};
+      rawHeaders.forEach((h, i) => headersMap[h.toUpperCase()] = i);
 
+      const getVal = (rowArr: string[], possibleNames: string[]) => {
+        for (const name of possibleNames) {
+          const idx = headersMap[name.toUpperCase()];
+          if (idx !== undefined) return rowArr[idx]?.replace(/"/g, '').trim() || '';
+        }
+        return '';
+      };
+
+      const newData = lines.slice(1).map((line, idx) => {
+        const regex = new RegExp(`("${delimiter}"|[^"${delimiter}]+)(?=${delimiter}|$)`, 'g');
+        const values = line.match(regex)?.map(v => v.replace(/"/g, '').trim()) || line.split(delimiter);
+        
         if (type === 'Siswa') {
           const sessionClasses: Record<string, string> = {};
-          headers.forEach((h, i) => {
-            if (h.startsWith('Kelas ') && h !== 'Kelas Madrasah (Formal)') {
-              const sessionName = h.replace('Kelas ', '').trim();
-              if (values[i]) sessionClasses[sessionName] = values[i];
+          rawHeaders.forEach((h, i) => {
+            const headerClean = h.toUpperCase().trim();
+            // Cek jika kolom dimulai dengan 'KELAS ' tapi bukan kelas formal
+            if (headerClean.startsWith('KELAS ') && headerClean !== 'KELAS MADRASAH (FORMAL)') {
+              const sessionName = h.replace(/Kelas /i, '').trim();
+              const cellValue = values[i]?.replace(/"/g, '').trim();
+              // HANYA MASUKKAN JIKA ISI KOLOM TIDAK KOSONG
+              if (cellValue && cellValue !== '') {
+                sessionClasses[sessionName] = cellValue;
+              }
             }
           });
+
           return {
             id: `std-${Date.now()}-${idx}`,
-            nis: obj['NIS'] || '',
-            name: obj['Nama'] || '',
-            gender: obj['Gender'] || 'Putra',
-            level: obj['Tingkat'] || 'MTs',
-            formalClass: obj['Kelas Madrasah (Formal)'] || '',
+            nis: getVal(values, ['NIS', 'NISN', 'NOMOR INDUK']),
+            name: getVal(values, ['NAMA', 'NAMA LENGKAP', 'NAMA SANTRI']),
+            gender: getVal(values, ['GENDER', 'JENIS KELAMIN', 'JK']) || 'Putra',
+            level: getVal(values, ['TINGKAT', 'JENJANG']) || 'MTs',
+            formalClass: getVal(values, ['KELAS MADRASAH (FORMAL)', 'KELAS FORMAL', 'KELAS']),
             sessionClasses: sessionClasses
           };
         }
@@ -96,53 +112,46 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
         if (type === 'Jadwal') {
           return {
             id: `sch-${Date.now()}-${idx}`,
-            day: obj['Hari'] || 'Senin',
-            time: obj['Waktu'] || '',
-            subject: obj['Mata Pelajaran'] || '',
-            teacherName: obj['Guru'] || '',
-            class: obj['Kelas/Unit'] || '',
-            sessionType: obj['Sesi'] || 'Madrasah',
-            level: obj['Tingkat'] || 'MTs',
-            gender: obj['Gender'] || 'Putra'
+            day: getVal(values, ['HARI']) || 'Senin',
+            time: getVal(values, ['WAKTU', 'JAM']),
+            subject: getVal(values, ['MATA PELAJARAN', 'MAPEL']),
+            teacherName: getVal(values, ['GURU', 'USTADZ', 'USTADZAH', 'PENGAJAR']),
+            class: getVal(values, ['KELAS/UNIT', 'UNIT', 'KELAS']),
+            sessionType: getVal(values, ['SESI', 'JENIS SESI']) || 'Madrasah',
+            level: getVal(values, ['TINGKAT', 'JENJANG']) || 'MTs',
+            gender: getVal(values, ['GENDER', 'JK']) || 'Putra'
           };
         }
 
         if (type === 'Guru') {
            return {
              id: `t-${Date.now()}-${idx}`,
-             name: obj['Nama'] || '',
-             subject: obj['Mata Pelajaran Utama'] || '',
-             phone: obj['No HP'] || '',
-             email: obj['Email'] || '',
-             gender: obj['Gender'] || 'Putra',
-             isWaliKelas: (obj['Wali Kelas?'] || '').toLowerCase() === 'ya',
-             waliKelasFor: obj['Wali Kelas Di'] || '',
-             teachingClasses: (obj['Mengajar Di Kelas'] || '').split(';').map((s: string) => s.trim())
+             name: getVal(values, ['NAMA', 'NAMA GURU']),
+             subject: getVal(values, ['MATA PELAJARAN UTAMA', 'MAPEL']),
+             phone: getVal(values, ['NO HP', 'WHATSAPP', 'TELEPON']),
+             email: getVal(values, ['EMAIL']),
+             gender: getVal(values, ['GENDER', 'JK']) || 'Putra',
+             isWaliKelas: getVal(values, ['WALI KELAS?']).toLowerCase() === 'ya',
+             waliKelasFor: getVal(values, ['WALI KELAS DI']),
+             teachingClasses: getVal(values, ['MENGAJAR DI KELAS']).split(';').map(s => s.trim())
            };
         }
 
-        if (type === 'Peraturan') {
-          return {
-            id: `rule-${Date.now()}-${idx}`,
-            category: obj['Kategori'] as ViolationCategory,
-            label: obj['Nama Pelanggaran/Prestasi'] || '',
-            points: parseInt(obj['Poin'] || '0')
-          };
-        }
-
-        return obj;
+        return values;
+      }).filter(item => {
+        if (typeof item === 'object' && 'name' in item) return !!item.name;
+        return true;
       });
 
-      if (confirm(`Berhasil memproses ${newData.length} data. Ganti data lama dengan data ini?`)) {
-        if (type === 'Peraturan') {
-          // Pisahkan mana yang poin positif (Prestasi) dan negatif (Pelanggaran)
-          const violations = newData.filter(d => d.points > 0); 
-          onUpdateData('Violations', violations);
-          alert("Katalog Poin berhasil diperbarui.");
-        } else {
-          onUpdateData(type, newData);
-          alert(`Data ${type} berhasil diperbarui.`);
-        }
+      if (newData.length === 0) {
+        alert("Gagal memproses data. Pastikan judul kolom di file CSV sesuai.");
+        return;
+      }
+
+      if (confirm(`Terdeteksi ${newData.length} baris data valid. Timpa data lama dengan data baru ini?`)) {
+        onUpdateData(type, newData);
+        alert(`Sinkronisasi ${newData.length} Data ${type} Berhasil.`);
+        setTimeout(() => window.location.reload(), 500);
       }
     };
     reader.readAsText(file);
@@ -158,8 +167,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
       content = "Hari,Waktu,Mata Pelajaran,Guru,Kelas/Unit,Sesi,Tingkat,Gender\nSenin,07:30 - 09:00,Nahwu,Ustadz Zulkifli,7A,Madrasah,MTs,Putra\nSenin,14:00 - 15:30,Tahfidz,Ustadzah Nurul,7B,Al-Quran,MTs,Putri";
     } else if (type === 'Guru') {
       content = "Nama,Mata Pelajaran Utama,No HP,Email,Gender,Wali Kelas?,Wali Kelas Di,Mengajar Di Kelas\nUstadz Zulkifli,Nahwu,0812345,zulkifli@mahasina.id,Putra,Ya,8A,8A;8B;9A";
-    } else if (type === 'Peraturan') {
-      content = "Kategori,Nama Pelanggaran/Prestasi,Poin\nIbadah,Terlambat Shalat Berjamaah,5\nAkhlak,Berkelahi,100\nAkademik,Juara Lomba Nasional,100";
     }
 
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
@@ -170,10 +177,10 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     a.click();
   };
 
-  // Logic filter data yang ditampilkan
   const filteredStudents = useMemo(() => {
     return data.students.filter(s => {
       const matchSearch = (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (s.nis || '').includes(searchTerm);
+      // Logika tampilan di tabel: jika Madarasah cek formalClass, jika sesi lain cek sessionClasses
       const studentClassInSession = studentSessionFilter === 'Madrasah' ? s.formalClass : s.sessionClasses?.[studentSessionFilter];
       const matchClass = !studentClassFilter || studentClassInSession === studentClassFilter;
       return matchSearch && matchClass;
@@ -218,7 +225,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                  <button onClick={() => {setSelectedCategory(null); setSearchTerm('');}} className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-50 hover:text-emerald-600 transition-all"><ArrowLeft size={24}/></button>
                  <div>
                     <h2 className="text-2xl font-black uppercase tracking-tight">{selectedCategory}</h2>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Gunakan template untuk upload massal</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Sistem Otomatis Mendeteksi Pemisah CSV (Excel)</p>
                  </div>
               </div>
               <div className="flex gap-3 w-full md:w-auto">
@@ -232,7 +239,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
               </div>
            </div>
 
-           {/* VIEW DATA GURU */}
            {selectedCategory === 'Guru' && (
              <div className="bg-white p-10 rounded-[4rem] border shadow-sm space-y-8">
                 <div className="relative">
@@ -265,14 +271,13 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                                <td className="py-6 font-mono text-[10px] text-slate-500">{t.phone}</td>
                             </tr>
                          ))}
+                         {filteredTeachers.length === 0 && <tr><td colSpan={4} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest text-[10px]">Belum Ada Data Guru</td></tr>}
                       </tbody>
                    </table>
-                   {filteredTeachers.length === 0 && <div className="py-20 text-center text-slate-200 font-black uppercase italic tracking-widest">Belum Ada Data Guru</div>}
                 </div>
              </div>
            )}
 
-           {/* VIEW DATA SANTRI (Sudah Ada, disesuaikan) */}
            {selectedCategory === 'Siswa' && (
              <div className="bg-white p-10 rounded-[4rem] border shadow-sm space-y-10">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -300,30 +305,36 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                         {filteredStudents.map(s => (
-                            <tr key={s.id} className="group hover:bg-slate-50 transition-colors">
-                               <td className="py-6">
-                                  <p className="text-sm font-black uppercase text-slate-800 tracking-tight">{s.name}</p>
-                                  <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 tracking-widest">{s.nis} • {s.gender}</p>
-                               </td>
-                               <td className="py-6">
-                                  <span className="px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-lg text-[10px] font-black uppercase">{s.formalClass}</span>
-                               </td>
-                               <td className="py-6">
-                                  <span className="px-3 py-1.5 bg-blue-50 text-blue-800 rounded-lg text-[10px] font-black uppercase">
-                                     {studentSessionFilter === 'Madrasah' ? s.formalClass : (s.sessionClasses?.[studentSessionFilter] || '-')}
-                                  </span>
-                               </td>
-                            </tr>
-                         ))}
+                         {filteredStudents.map(s => {
+                            const studentClassInSession = studentSessionFilter === 'Madrasah' ? s.formalClass : s.sessionClasses?.[studentSessionFilter];
+                            return (
+                              <tr key={s.id} className="group hover:bg-slate-50 transition-colors">
+                                <td className="py-6">
+                                    <p className="text-sm font-black uppercase text-slate-800 tracking-tight">{s.name}</p>
+                                    <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 tracking-widest">{s.nis} • {s.gender}</p>
+                                </td>
+                                <td className="py-6">
+                                    <span className="px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-lg text-[10px] font-black uppercase">{s.formalClass}</span>
+                                </td>
+                                <td className="py-6">
+                                    {studentClassInSession ? (
+                                      <span className="px-3 py-1.5 bg-blue-50 text-blue-800 rounded-lg text-[10px] font-black uppercase">
+                                        {studentClassInSession}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest italic">Tidak Terdaftar</span>
+                                    )}
+                                </td>
+                              </tr>
+                            );
+                         })}
+                         {filteredStudents.length === 0 && <tr><td colSpan={3} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest text-[10px]">Belum Ada Data Santri</td></tr>}
                       </tbody>
                    </table>
-                   {filteredStudents.length === 0 && <div className="py-20 text-center text-slate-200 font-black uppercase italic tracking-widest">Data Santri Kosong</div>}
                 </div>
              </div>
            )}
 
-           {/* VIEW DATA JADWAL */}
            {selectedCategory === 'Jadwal' && (
              <div className="bg-white p-10 rounded-[4rem] border shadow-sm space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -368,14 +379,13 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                                </td>
                             </tr>
                          ))}
+                         {filteredSchedules.length === 0 && <tr><td colSpan={3} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest text-[10px]">Belum Ada Jadwal KBM</td></tr>}
                       </tbody>
                    </table>
-                   {filteredSchedules.length === 0 && <div className="py-20 text-center text-slate-200 font-black uppercase italic tracking-widest">Jadwal Masih Kosong</div>}
                 </div>
              </div>
            )}
 
-           {/* VIEW DATA PERATURAN / KATALOG POIN */}
            {selectedCategory === 'Peraturan' && (
              <div className="bg-white p-10 rounded-[4rem] border shadow-sm space-y-8">
                 <div className="relative">
@@ -412,7 +422,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                 </div>
              </div>
            )}
-
         </div>
       )}
     </div>
