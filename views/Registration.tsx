@@ -35,7 +35,7 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
   const appData = getAppData();
   
   const unlinkedTeachers = useMemo(() => {
-    return appData.teachers.filter(t => !t.email || t.email.trim() === '');
+    return (appData.teachers || []).filter(t => !t.email || t.email.trim() === '');
   }, [appData.teachers]);
 
   const filteredTeachers = useMemo(() => {
@@ -44,12 +44,11 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
 
   const startDiscovery = (profile: UserProfile) => {
     setActiveSession(profile);
-    setDiscoveryStatus('Memverifikasi Izin Akses Google Drive...');
+    setDiscoveryStatus('Memverifikasi Izin Google Drive...');
     setView('discovery');
 
-    // Pastikan library Google Client sudah siap
     if (typeof google === 'undefined') {
-      alert("Gagal memuat sistem Google. Mohon refresh halaman.");
+      alert("Gagal memuat Google SDK. Mohon refresh halaman.");
       setView('login');
       return;
     }
@@ -61,15 +60,16 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
         if (response.access_token) {
           localStorage.setItem('mahasina_cloud_token', response.access_token);
           localStorage.setItem('mahasina_cloud_connected', 'true');
-          setDiscoveryStatus('Menarik Data Master Tim Mahasina...');
+          setDiscoveryStatus('Menarik Data Tim Mahasina...');
           
+          // Paksa tarik data dari cloud ke memori lokal
           const success = await pullFromGDrive(response.access_token);
           if (success) {
-            setDiscoveryStatus('Berhasil Terhubung! Menyiapkan Dashboard...');
+            setDiscoveryStatus('Sinkronisasi Berhasil!');
             setTimeout(() => onComplete(profile), 1000);
           } else {
-            // Jika pull gagal tapi punya ID, coba sinkronisasi ulang
-            onComplete(profile);
+            setDiscoveryStatus('Menyiapkan Dashboard Mandiri...');
+            setTimeout(() => onComplete(profile), 1000);
           }
         } else {
           onComplete(profile);
@@ -87,15 +87,15 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
     e.preventDefault();
     const emailLower = formData.email.toLowerCase().trim();
     
-    // Bypass IDAROH
+    // Admin Pusat
     if (emailLower === 'idarohmahasina@gmail.com') {
       const admin = { id: 'admin', fullName: 'Idaroh Pusat', email: emailLower, phone: '-', role: UserRole.IDAROH, classes: [] };
       startDiscovery(admin);
       return;
     }
 
-    // Cek di Guru Master
-    const masterTeacher = appData.teachers.find(t => t.email?.toLowerCase().trim() === emailLower);
+    // Cek Guru yang sudah tertaut
+    const masterTeacher = (appData.teachers || []).find(t => t.email?.toLowerCase().trim() === emailLower);
     if (masterTeacher) {
       const teacherProfile: UserProfile = {
         id: masterTeacher.id,
@@ -109,24 +109,18 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
       return;
     }
 
-    // Cek di user yang sudah daftar lokal
-    const users = getUsers();
-    const user = users.find(u => u.email.toLowerCase().trim() === emailLower);
-    if (user) {
-      startDiscovery(user);
+    // Jika belum tertaut, izinkan pilih profil guru (Claim)
+    if (appData.teachers && appData.teachers.length > 0) {
+      setView('claim_profile');
     } else {
-      // Jika benar-benar baru, arahkan untuk pilih nama guru
-      if (appData.teachers.length > 0) {
-        setView('claim_profile');
-      } else {
-        // Fallback: Jika database masih kosong, izinkan admin masuk dulu untuk upload
-        setError('Data pengajar belum tersedia. Hubungi Admin Idaroh.');
-      }
+      // Jika database benar-benar kosong (awal sekali), paksa re-auth dulu
+      const newUser = { id: `user-${Date.now()}`, fullName: 'User Baru', email: emailLower, phone: '-', role: UserRole.GURU, classes: [] };
+      startDiscovery(newUser);
     }
   };
 
   const handleClaimProfile = (teacher: Teacher) => {
-    if (confirm(`Apakah benar Anda adalah ${teacher.name}? Email ini akan ditautkan secara permanen.`)) {
+    if (confirm(`Apakah Anda adalah ${teacher.name}? Akun ini akan tertaut ke email ${formData.email}.`)) {
       linkTeacherEmail(teacher.id, formData.email);
       const teacherProfile: UserProfile = {
         id: teacher.id,
@@ -149,29 +143,19 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
             <div className="text-center mb-10">
               <img src={APP_LOGO} alt="Logo" className="w-20 h-20 mx-auto mb-6 bg-white rounded-full p-2 shadow-xl" />
               <h1 className="text-2xl font-black text-slate-800 tracking-tighter uppercase leading-tight">Smart Report<br/>Mahasina</h1>
-              <p className="text-emerald-700 text-[8px] font-black uppercase tracking-[0.3em] mt-3">Sistem Mengenali Guru & Santri</p>
+              <p className="text-emerald-700 text-[8px] font-black uppercase tracking-[0.3em] mt-3 italic">Portal Digital Santri & Guru</p>
             </div>
             
-            {error && (
-              <div className="mb-6 p-5 bg-red-50 text-red-600 rounded-2xl flex items-start gap-3 border border-red-100">
-                <AlertCircle size={20} className="shrink-0" />
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black uppercase tracking-widest">Akses Ditolak</p>
-                  <p className="text-[9px] font-medium leading-relaxed uppercase">{error}</p>
-                </div>
-              </div>
-            )}
-
             <form onSubmit={handleLogin} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Masukkan Email Google Anda</label>
+                <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Gunakan Email Google Anda</label>
                 <div className="relative">
                   <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"><Mail size={18} /></span>
-                  <input required type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full pl-14 pr-6 py-5 bg-slate-50 rounded-[2rem] outline-none font-black text-xs shadow-inner border-2 border-transparent focus:border-emerald-600 transition-all" placeholder="contoh: ustadza@gmail.com" />
+                  <input required type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full pl-14 pr-6 py-5 bg-slate-50 rounded-[2rem] outline-none font-black text-xs shadow-inner border-2 border-transparent focus:border-emerald-600 transition-all" placeholder="ustadz.fulan@gmail.com" />
                 </div>
               </div>
               <button type="submit" className="w-full bg-emerald-800 text-white font-black py-5 rounded-[2rem] shadow-xl flex items-center justify-center gap-3 uppercase tracking-[0.2em] text-[10px] hover:bg-emerald-700 active:scale-95 transition-all">
-                Masuk Sistem <ChevronRight size={16}/>
+                Masuk & Sinkron <ChevronRight size={16}/>
               </button>
             </form>
           </div>
@@ -182,25 +166,20 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
              <div className="flex items-center gap-4">
                 <button onClick={() => setView('login')} className="p-3 bg-slate-100 rounded-xl text-slate-400"><ArrowLeft size={18}/></button>
                 <div>
-                  <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Siapa Nama Anda?</h2>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Pilih nama Anda dari daftar database.</p>
+                  <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Cari Profil Anda</h2>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Pilih nama Anda di database.</p>
                 </div>
              </div>
-
              <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-                <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl outline-none font-black text-[10px] uppercase shadow-inner border-2 border-transparent focus:border-emerald-600" placeholder="Cari Nama Anda Di Sini..." />
+                <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl outline-none font-black text-[10px] uppercase shadow-inner" placeholder="Cari Nama..." />
              </div>
-
              <div className="space-y-3 max-h-[300px] overflow-y-auto no-scrollbar pr-1">
                 {filteredTeachers.map(t => (
                   <button key={t.id} onClick={() => handleClaimProfile(t)} className="w-full text-left p-5 bg-white border border-slate-100 rounded-2xl hover:bg-emerald-50 hover:border-emerald-200 transition-all flex items-center justify-between group shadow-sm">
                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center group-hover:bg-emerald-800 group-hover:text-white transition-all font-black">{t.name[0]}</div>
-                        <div>
-                          <p className="text-[11px] font-black text-slate-800 uppercase">{t.name}</p>
-                          <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Mapel: {t.subject}</p>
-                        </div>
+                        <div className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center font-black">{t.name[0]}</div>
+                        <p className="text-[11px] font-black text-slate-800 uppercase">{t.name}</p>
                      </div>
                      <UserCheck2 size={18} className="text-slate-200 group-hover:text-emerald-600 transition-all"/>
                   </button>
@@ -211,15 +190,10 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete, availableClasse
 
         {view === 'discovery' && (
           <div className="text-center py-10 space-y-8 animate-in zoom-in-95">
-             <div className="relative w-24 h-24 mx-auto">
-                <div className="absolute inset-0 bg-emerald-100 rounded-full animate-ping opacity-25"></div>
-                <div className="relative bg-white w-24 h-24 rounded-full flex items-center justify-center shadow-xl border-4 border-emerald-500">
-                   <RefreshCw size={40} className="text-emerald-600 animate-spin" />
-                </div>
-             </div>
+             <RefreshCw size={50} className="text-emerald-600 animate-spin mx-auto" />
              <div>
                 <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">{discoveryStatus}</h2>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Sinkronisasi Server Mahasina...</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Mohon Tunggu Sebentar...</p>
              </div>
           </div>
         )}

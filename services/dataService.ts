@@ -75,21 +75,18 @@ export const getAppData = (): AppData => {
   }
 };
 
-// Deteksi otomatis ID Database dari URL jika ada
+// LOGIKA JOIN LINK: Bersihkan segalanya jika ada ID tim baru
 const urlParams = new URLSearchParams(window.location.search);
 const joinId = urlParams.get('join');
 if (joinId) {
   const currentId = localStorage.getItem(TEAM_DB_ID_KEY);
   if (currentId !== joinId) {
-    // Jika ID berbeda atau baru masuk lewat link, bersihkan cache lama
-    localStorage.removeItem(STORAGE_KEY);
+    // Reset total untuk memastikan re-auth dan re-sync
+    localStorage.clear(); 
+    sessionStorage.clear();
     localStorage.setItem(TEAM_DB_ID_KEY, joinId);
     localStorage.setItem('mahasina_mock_disabled', 'true');
-    // Hapus token lama agar dipaksa re-auth untuk file baru
-    localStorage.removeItem('mahasina_cloud_token');
-    localStorage.removeItem('mahasina_cloud_connected');
-    
-    // Redirect ke halaman bersih tanpa param agar tidak loop
+    // Hilangkan parameter dari URL dan refresh
     window.location.href = window.location.pathname; 
   }
 }
@@ -113,7 +110,7 @@ const mergeData = (local: AppData, cloud: AppData): AppData => {
     return Array.from(map.values());
   };
 
-  // Jika Cloud memiliki data master, utamakan cloud sepenuhnya
+  // KRUSIAL: Jika Cloud ada isinya, Master Data (Siswa/Guru/Jadwal) HARUS ikut Cloud
   return {
     ...cloud, 
     attendance: combine(local.attendance, cloud.attendance),
@@ -146,6 +143,7 @@ export const syncWithGDrive = async (accessToken: string): Promise<boolean> => {
     const localData = getAppData();
     let fileId = getTeamDatabaseId();
     
+    // Cari file jika ID belum ada
     if (!fileId) {
       const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${GLOBAL_DB_NAME}' and trashed=false`, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -210,11 +208,9 @@ export const pullFromGDrive = async (accessToken: string): Promise<boolean> => {
     
     if (fileRes.ok) {
       const cloudData = await fileRes.json();
-      const localData = getAppData();
-      // Paksa merge agar data cloud menimpa data sampel lokal
-      const merged = mergeData(localData, cloudData);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
       localStorage.setItem('mahasina_mock_disabled', 'true');
+      localStorage.setItem(SYNC_KEY, JSON.stringify({ pending: false, timestamp: new Date().toISOString(), isNewLocal: false }));
       return true;
     }
     return false;
