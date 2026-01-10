@@ -67,10 +67,6 @@ export const getAppData = (): AppData => {
 
 // --- DRIVE DISCOVERY ENGINE ---
 
-/**
- * Mencari file database di Google Drive jika ID belum diketahui.
- * Ini membantu device baru menemukan file yang sama.
- */
 export const findDatabaseInDrive = async (token: string): Promise<string | null> => {
   try {
     const response = await fetch(
@@ -89,9 +85,6 @@ export const findDatabaseInDrive = async (token: string): Promise<string | null>
   }
 };
 
-/**
- * Membuat file database baru di Drive
- */
 export const createDatabaseInDrive = async (token: string): Promise<string | null> => {
   try {
     const metadata = {
@@ -151,9 +144,7 @@ export const pushToGDrive = async (token: string): Promise<boolean> => {
 
 const merge = (local: any[], remote: any[]) => {
   const map = new Map();
-  // Utamakan data remote untuk konsistensi antar perangkat
   (remote || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
-  // Tambahkan data local yang belum ada di remote
   (local || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
   return Array.from(map.values());
 };
@@ -176,10 +167,8 @@ export const pullFromGDrive = async (token: string): Promise<boolean> => {
     const remoteData: AppData = await response.json();
     const localData = getAppData();
 
-    // SINKRONISASI TOTAL: Mengganti Master Data Local dengan Master Data Cloud
     const mergedData: AppData = {
       ...remoteData,
-      // Transaksi digabung agar tidak ada data hilang jika dua orang input bersamaan
       attendance: merge(localData.attendance, remoteData.attendance),
       prayerAttendance: merge(localData.prayerAttendance, remoteData.prayerAttendance),
       teacherAttendance: merge(localData.teacherAttendance, remoteData.teacherAttendance),
@@ -227,9 +216,18 @@ export const clearAppData = () => {
   sessionStorage.clear();
 };
 
+/**
+ * Robust Normalization: Menghapus gelar-gelar umum di Mahasina 
+ * agar pencocokan nama lebih akurat.
+ */
 export const normalizeName = (name: string): string => {
   if (!name) return '';
-  return name.toLowerCase().trim().replace(/\s+/g, ' ');
+  return name
+    .toLowerCase()
+    .replace(/(ustadz|ustadzah|ust|usth|kyai|nyai|ibu|bapak|pak|bu|dr|h\.|hj\.)/g, '') // Hapus gelar
+    .replace(/[.,]/g, '') // Hapus titik koma
+    .trim()
+    .replace(/\s+/g, ' '); // Sederhanakan spasi
 };
 
 export const getTeachersFromSchedules = (schedules: Schedule[]): string[] => {
