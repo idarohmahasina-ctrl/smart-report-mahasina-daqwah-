@@ -75,6 +75,14 @@ export const getAppData = (): AppData => {
   }
 };
 
+export const linkTeacherEmail = (teacherId: string, email: string) => {
+  const current = getAppData();
+  const updatedTeachers = current.teachers.map(t => 
+    t.id === teacherId ? { ...t, email: email.toLowerCase().trim() } : t
+  );
+  saveAppData({ teachers: updatedTeachers });
+};
+
 export const setTeamDatabaseId = (id: string) => {
   localStorage.setItem(TEAM_DB_ID_KEY, id);
 };
