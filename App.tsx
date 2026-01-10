@@ -48,7 +48,7 @@ import {
   PREDEFINED_ACHIEVEMENTS, 
   CLASSES as DEFAULT_CLASSES 
 } from './constants.tsx';
-import { RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -76,7 +76,7 @@ const App: React.FC = () => {
   });
 
   const [loading, setLoading] = useState(true);
-  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const [isSyncingInitial, setIsSyncingInitial] = useState(false);
 
   const loadLocalData = useCallback(() => {
     const data = getAppData();
@@ -108,9 +108,12 @@ const App: React.FC = () => {
       const token = localStorage.getItem('mahasina_cloud_token');
       const dbId = getTeamDatabaseId();
       if (token && dbId) {
-        console.log("Auto-sync: Menarik data terbaru tim...");
-        await pullFromGDrive(token);
-        loadLocalData();
+        setIsSyncingInitial(true);
+        const success = await pullFromGDrive(token);
+        if (success) {
+          loadLocalData();
+        }
+        setIsSyncingInitial(false);
       }
     };
     autoPull();
@@ -145,7 +148,7 @@ const App: React.FC = () => {
 
   const handleRegistrationComplete = (newProfile: UserProfile) => {
     setProfile(newProfile);
-    window.location.reload(); 
+    // Tidak perlu reload berat, biarkan effect autoPull bekerja
   };
 
   const handleLogout = () => {
@@ -264,11 +267,17 @@ const App: React.FC = () => {
     return DEFAULT_CLASSES;
   }, [students]);
 
-  if (loading) {
+  if (loading || isSyncingInitial) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-emerald-950 text-white p-6 text-center">
-        <img src={APP_LOGO} className="w-24 h-24 animate-pulse mb-6 bg-white p-2 rounded-full shadow-2xl" alt="Loading" />
-        <p className="text-xl font-black tracking-tighter uppercase leading-none">Smart Report<br/>Mahasina</p>
+        <div className="relative mb-8">
+           <img src={APP_LOGO} className="w-24 h-24 animate-pulse bg-white p-2 rounded-full shadow-2xl" alt="Loading" />
+           <div className="absolute inset-0 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <h2 className="text-xl font-black tracking-widest uppercase mb-2">Smart Report Mahasina</h2>
+        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.3em] animate-bounce">
+          {isSyncingInitial ? 'Menarik Data Terbaru Tim...' : 'Menyiapkan Dashboard...'}
+        </p>
       </div>
     );
   }

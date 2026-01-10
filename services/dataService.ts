@@ -81,13 +81,15 @@ const joinId = urlParams.get('join');
 if (joinId) {
   const currentId = localStorage.getItem(TEAM_DB_ID_KEY);
   if (currentId !== joinId) {
-    // Jika ID berbeda, bersihkan data lokal agar tidak campur aduk
+    // Jika ID berbeda atau baru masuk lewat link, bersihkan cache lama
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem('mahasina_cloud_connected');
-    localStorage.removeItem('mahasina_cloud_token');
     localStorage.setItem(TEAM_DB_ID_KEY, joinId);
     localStorage.setItem('mahasina_mock_disabled', 'true');
-    // Force refresh agar App.tsx menangkap state bersih
+    // Hapus token lama agar dipaksa re-auth untuk file baru
+    localStorage.removeItem('mahasina_cloud_token');
+    localStorage.removeItem('mahasina_cloud_connected');
+    
+    // Redirect ke halaman bersih tanpa param agar tidak loop
     window.location.href = window.location.pathname; 
   }
 }
@@ -111,13 +113,13 @@ const mergeData = (local: AppData, cloud: AppData): AppData => {
     return Array.from(map.values());
   };
 
+  // Jika Cloud memiliki data master, utamakan cloud sepenuhnya
   return {
     ...cloud, 
     attendance: combine(local.attendance, cloud.attendance),
     prayerAttendance: combine(local.prayerAttendance, cloud.prayerAttendance),
     teacherAttendance: combine(local.teacherAttendance, cloud.teacherAttendance),
     reports: combine(local.reports, cloud.reports),
-    // Data Master selalu utamakan Cloud jika Cloud ada isinya
     students: (cloud.students && cloud.students.length > 0) ? cloud.students : local.students,
     teachers: (cloud.teachers && cloud.teachers.length > 0) ? cloud.teachers : local.teachers,
     schedules: (cloud.schedules && cloud.schedules.length > 0) ? cloud.schedules : local.schedules,
@@ -209,6 +211,7 @@ export const pullFromGDrive = async (accessToken: string): Promise<boolean> => {
     if (fileRes.ok) {
       const cloudData = await fileRes.json();
       const localData = getAppData();
+      // Paksa merge agar data cloud menimpa data sampel lokal
       const merged = mergeData(localData, cloudData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
       localStorage.setItem('mahasina_mock_disabled', 'true');
