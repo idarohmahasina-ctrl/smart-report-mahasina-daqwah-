@@ -5,7 +5,8 @@ import {
   PrayerRecord, Announcement
 } from '../types';
 import { 
-  PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS
+  PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS,
+  MOCK_STUDENTS, MOCK_TEACHERS, MOCK_SCHEDULE, MOCK_ATTENDANCE, MOCK_REPORTS, MOCK_PRAYER
 } from '../constants';
 
 const STORAGE_KEY = 'mahasina_report_v2';
@@ -15,9 +16,8 @@ const TEAM_DB_ID_KEY = 'mahasina_team_database_id';
 
 export interface ExtraDataList {
   id: string;
-  title: string;
+  name: string;
   data: any[];
-  uploadedAt: string;
 }
 
 export interface AppData {
@@ -39,17 +39,17 @@ export interface AppData {
 }
 
 const initialData: AppData = {
-  attendance: [],
-  prayerAttendance: [],
+  attendance: MOCK_ATTENDANCE,
+  prayerAttendance: MOCK_PRAYER,
   teacherAttendance: [],
-  reports: [],
-  students: [],
-  teachers: [],
-  schedules: [],
+  reports: MOCK_REPORTS,
+  students: MOCK_STUDENTS,
+  teachers: MOCK_TEACHERS,
+  schedules: MOCK_SCHEDULE,
   orsam: [],
   orklas: [],
   announcements: [],
-  academicConfig: { schoolYear: '2025/2026', semester: 'II (Genap)', isHoliday: false, sessionHolidays: {} },
+  academicConfig: { schoolYear: '2024/2025', semester: 'II (Genap)', isHoliday: false, sessionHolidays: {} },
   extraDataLists: [],
   violationTemplates: PREDEFINED_VIOLATIONS,
   achievementTemplates: PREDEFINED_ACHIEVEMENTS,
@@ -59,79 +59,76 @@ export const getAppData = (): AppData => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) return initialData;
   try {
-    return { ...initialData, ...JSON.parse(data) };
+    const parsed = JSON.parse(data);
+    return { ...initialData, ...parsed };
   } catch (e) {
     return initialData;
   }
 };
 
-// --- DRIVE DISCOVERY ENGINE ---
+export const saveAppDataLocal = (data: AppData) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+};
 
-export const findDatabaseInDrive = async (token: string): Promise<string | null> => {
+export const getSyncStatus = () => {
+  const meta = localStorage.getItem(SYNC_KEY);
+  if (!meta) return { isNewLocal: false, timestamp: '' };
   try {
-    // Cari file dengan nama spesifik dan bukan di sampah
-    const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name='mahasina_db.json' and trashed=false&fields=files(id, name, modifiedTime)&orderBy=modifiedTime desc`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const data = await response.json();
-    if (data.files && data.files.length > 0) {
-      const id = data.files[0].id;
-      localStorage.setItem(TEAM_DB_ID_KEY, id);
-      return id;
-    }
-    return null;
+    return JSON.parse(meta);
   } catch (e) {
-    console.error("Discovery error:", e);
-    return null;
+    return { isNewLocal: false, timestamp: '' };
   }
 };
 
-export const createDatabaseInDrive = async (token: string): Promise<string | null> => {
+const smartMerge = (local: any[], remote: any[]) => {
+  const map = new Map();
+  (local || []).forEach(item => { if (item?.id) map.set(item.id, item); });
+  (remote || []).forEach(item => { if (item?.id) map.set(item.id, item); });
+  return Array.from(map.values());
+};
+
+export const pullFromGDrive = async (token: string): Promise<boolean> => {
   try {
-    const metadata = {
-      name: 'mahasina_db.json',
-      mimeType: 'application/json',
+    const dbId = localStorage.getItem(TEAM_DB_ID_KEY);
+    if (!dbId || !token) return false;
+
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${dbId}?alt=media`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!response.ok) return false;
+    
+    const remoteData: AppData = await response.json();
+    if (!remoteData) return false;
+
+    const localData = getAppData();
+    const mergedData: AppData = {
+      ...remoteData,
+      attendance: smartMerge(localData.attendance, remoteData.attendance),
+      prayerAttendance: smartMerge(localData.prayerAttendance, remoteData.prayerAttendance),
+      teacherAttendance: smartMerge(localData.teacherAttendance, remoteData.teacherAttendance),
+      reports: smartMerge(localData.reports, remoteData.reports),
+      lastUpdate: remoteData.lastUpdate || new Date().toISOString()
     };
 
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', new Blob([JSON.stringify(initialData)], { type: 'application/json' }));
-
-    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    
-    const data = await response.json();
-    if (data.id) {
-      localStorage.setItem(TEAM_DB_ID_KEY, data.id);
-      return data.id;
-    }
-    return null;
+    saveAppDataLocal(mergedData);
+    localStorage.setItem(SYNC_KEY, JSON.stringify({ isNewLocal: false, timestamp: new Date().toISOString() }));
+    return true;
   } catch (e) {
-    return null;
+    return false;
   }
 };
-
-// --- SYNC ENGINE ---
 
 export const pushToGDrive = async (token: string): Promise<boolean> => {
   try {
-    let dbId = localStorage.getItem(TEAM_DB_ID_KEY);
-    if (!dbId) {
-      dbId = await findDatabaseInDrive(token);
-      if (!dbId) dbId = await createDatabaseInDrive(token);
-    }
-    
+    const dbId = localStorage.getItem(TEAM_DB_ID_KEY);
     if (!dbId || !token) return false;
 
     const localData = getAppData();
     const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${dbId}?uploadType=media`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(localData)
+      body: JSON.stringify({ ...localData, lastUpdate: new Date().toISOString() })
     });
 
     if (response.ok) {
@@ -144,65 +141,58 @@ export const pushToGDrive = async (token: string): Promise<boolean> => {
   }
 };
 
-const merge = (local: any[], remote: any[]) => {
-  const map = new Map();
-  // Data remote dianggap benar untuk Master Data
-  (remote || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
-  // Data local ditambahkan jika tidak ada di remote
-  (local || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
-  return Array.from(map.values());
-};
-
-export const pullFromGDrive = async (token: string): Promise<boolean> => {
-  try {
-    let dbId = localStorage.getItem(TEAM_DB_ID_KEY);
-    if (!dbId) {
-      dbId = await findDatabaseInDrive(token);
-    }
-    
-    if (!dbId || !token) return false;
-
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${dbId}?alt=media`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    if (!response.ok) return false;
-    
-    const remoteData: AppData = await response.json();
-    const localData = getAppData();
-
-    // SINKRONISASI KRUSIAL: Ambil semua data master dari Cloud
-    const mergedData: AppData = {
-      ...remoteData, // Prioritas Data Cloud (Santri, Guru, Jadwal)
-      attendance: merge(localData.attendance, remoteData.attendance),
-      prayerAttendance: merge(localData.prayerAttendance, remoteData.prayerAttendance),
-      teacherAttendance: merge(localData.teacherAttendance, remoteData.teacherAttendance),
-      reports: merge(localData.reports, remoteData.reports),
-      lastUpdate: new Date().toISOString()
-    };
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedData));
-    localStorage.setItem(SYNC_KEY, JSON.stringify({ isNewLocal: false, timestamp: new Date().toISOString() }));
-    return true;
-  } catch (e) {
-    console.error("Pull error:", e);
-    return false;
-  }
-};
-
 export const saveAppData = (data: Partial<AppData>) => {
   const current = getAppData();
   const newData = { ...current, ...data, lastUpdate: new Date().toISOString() };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+  saveAppDataLocal(newData);
   localStorage.setItem(SYNC_KEY, JSON.stringify({ isNewLocal: true, timestamp: new Date().toISOString() }));
   
   const token = localStorage.getItem('mahasina_cloud_token');
   if (token) pushToGDrive(token);
 };
 
-export const getActiveSession = (): UserProfile | null => {
-  const s = sessionStorage.getItem(SESSION_KEY);
-  return s ? JSON.parse(s) : null;
+export const findDatabaseInDrive = async (token: string): Promise<string | null> => {
+  const existingId = localStorage.getItem(TEAM_DB_ID_KEY);
+  if (existingId) return existingId;
+
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name='mahasina_db.json' and trashed=false&fields=files(id, name)&orderBy=modifiedTime desc`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const data = await response.json();
+    if (data.files && data.files.length > 0) {
+      const id = data.files[0].id;
+      localStorage.setItem(TEAM_DB_ID_KEY, id);
+      return id;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+};
+
+export const createDatabaseInDrive = async (token: string): Promise<string | null> => {
+  try {
+    const metadata = { name: 'mahasina_db.json', mimeType: 'application/json' };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', new Blob([JSON.stringify(initialData)], { type: 'application/json' }));
+
+    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form
+    });
+    const data = await response.json();
+    if (data.id) {
+      localStorage.setItem(TEAM_DB_ID_KEY, data.id);
+      return data.id;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
 };
 
 export const setActiveSession = (u: UserProfile | null) => {
@@ -210,41 +200,20 @@ export const setActiveSession = (u: UserProfile | null) => {
   else sessionStorage.removeItem(SESSION_KEY);
 };
 
-export const setTeamDatabaseId = (id: string) => localStorage.setItem(TEAM_DB_ID_KEY, id);
-export const getTeamDatabaseId = () => localStorage.getItem(TEAM_DB_ID_KEY);
-export const getSyncStatus = () => {
-  const s = localStorage.getItem(SYNC_KEY);
-  return s ? JSON.parse(s) : { isNewLocal: false, timestamp: '' };
+export const getActiveSession = (): UserProfile | null => {
+  const s = sessionStorage.getItem(SESSION_KEY);
+  return s ? JSON.parse(s) : null;
 };
+
+export const setTeamDatabaseId = (id: string) => {
+  if (id && id !== "null") {
+    localStorage.setItem(TEAM_DB_ID_KEY, id);
+  }
+};
+
+export const getTeamDatabaseId = () => localStorage.getItem(TEAM_DB_ID_KEY);
 
 export const clearAppData = () => {
-  localStorage.clear();
   sessionStorage.clear();
-};
-
-export const normalizeName = (name: string): string => {
-  if (!name) return '';
-  return name
-    .toLowerCase()
-    .replace(/(ustadz|ustadzah|ust|usth|kyai|nyai|ibu|bapak|pak|bu|dr|h\.|hj\.)/g, '')
-    .replace(/[.,]/g, '')
-    .trim()
-    .replace(/\s+/g, ' ');
-};
-
-export const getTeachersFromSchedules = (schedules: Schedule[]): string[] => {
-  const names = (schedules || []).map(s => s.teacherName?.trim()).filter(Boolean);
-  return Array.from(new Set(names)).sort();
-};
-
-export const getUsers = (): UserProfile[] => {
-  const data = getAppData();
-  const users: UserProfile[] = (data.teachers || []).map(t => ({
-    id: t.id, fullName: t.name, phone: t.phone, email: t.email, role: t.isWaliKelas ? UserRole.MUSYRIF : UserRole.GURU
-  }));
-  const adminEmail = 'idarohmahasina@gmail.com';
-  if (!users.some(u => u.email.toLowerCase() === adminEmail)) {
-    users.push({ id: 'u-admin', fullName: 'Admin Idaroh', phone: '-', email: adminEmail, role: UserRole.IDAROH });
-  }
-  return users;
+  localStorage.removeItem(SYNC_KEY);
 };

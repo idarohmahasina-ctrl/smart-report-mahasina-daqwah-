@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { PrayerTime, PrayerStatus, Student, PrayerRecord, SessionType } from '../types';
+import { PrayerTime, PrayerStatus, Student, PrayerRecord, SessionType } from '../../types';
 import { 
   PlusCircle, History, Zap, Search, Users, ChevronRight, Save, Clock, Filter,
   Activity, CheckCircle, FileText, Download, Award, AlertTriangle
@@ -8,7 +8,7 @@ import {
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend 
 } from 'recharts';
-import { downloadCSV } from '../utils/csvExport';
+import { downloadCSV } from './csvExport';
 
 const COLORS = ['#10b981', '#3b82f6', '#6366f1', '#f59e0b', '#f97316', '#ef4444'];
 
@@ -213,10 +213,11 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
               <div className="space-y-3">
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Waktu Sholat</label>
                  <div className="flex flex-wrap gap-2">
-                    {Object.values(PrayerTime).map(pt => (
+                    {/* Fixed: Cast Object.values(PrayerTime) to string[] to fix unknown type error */}
+                    {(Object.values(PrayerTime) as string[]).map(pt => (
                       <button 
                         key={pt} 
-                        onClick={() => setSelectedPrayer(pt)} 
+                        onClick={() => setSelectedPrayer(pt as PrayerTime)} 
                         className={`flex-1 min-w-[100px] px-4 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${selectedPrayer === pt ? 'bg-emerald-800 border-emerald-800 text-white shadow-lg' : 'bg-slate-50 border-transparent text-slate-400 hover:border-slate-200'}`}
                       >
                          {pt}
@@ -334,7 +335,8 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                     <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Waktu Sholat</label>
                     <select value={reportPrayer} onChange={e => setReportPrayer(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
                        <option value="Semua">SEMUA WAKTU</option>
-                       {Object.values(PrayerTime).map(p => <option key={p} value={p}>{p}</option>)}
+                       {/* Fixed: Cast Object.values(PrayerTime) to string[] to fix unknown type error */}
+                       {(Object.values(PrayerTime) as string[]).map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                  </div>
                  <div className="space-y-1">
@@ -424,7 +426,8 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                             ].filter(d => d.val > 0)} 
                             cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="val"
                           >
-                             {Object.keys(stats).map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
+                             {/* Fixed: Cast Object.keys(stats) as string[] to fix unknown type error in Cell mapping */}
+                             {(Object.keys(stats) as string[]).map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
                           </Pie>
                           <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', fontSize: '10px'}} />
                           <Legend verticalAlign="bottom" height={36} iconType="circle" />

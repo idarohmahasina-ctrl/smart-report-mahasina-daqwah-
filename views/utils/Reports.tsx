@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { ReportItem, UserRole, ViolationCategory, Student, TemplateItem } from '../types';
+import { ReportItem, UserRole, ViolationCategory, Student, TemplateItem } from '../../types';
 import { 
   Search, ShieldAlert, Trophy, History, PlusCircle, Send, ChevronRight, Clock as ClockIcon, 
   AlertTriangle, User, FileText, CheckCircle, Filter, Edit, Award, ArrowLeft, UserCheck, X
@@ -167,7 +167,8 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                      <div className="space-y-3">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><Filter size={14}/> 2. Kategori {isViolation ? 'Pelanggaran' : 'Prestasi'}</label>
                         <select value={category} onChange={e => {setCategory(e.target.value as any); setSelectedRule(''); setIsCustom(false);}} className="w-full px-8 py-5 bg-slate-50 rounded-2xl outline-none font-black text-xs uppercase border-2 border-transparent focus:border-emerald-600 appearance-none shadow-inner cursor-pointer">
-                           {Object.values(ViolationCategory).filter(c => c !== ViolationCategory.LAINNYA).map(c => <option key={c} value={c}>{c}</option>)}
+                           {/* Fixed: Cast Object.values(ViolationCategory) as string[] to fix unknown type error */}
+                           {(Object.values(ViolationCategory) as string[]).filter(c => c !== ViolationCategory.LAINNYA).map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                      </div>
                      <div className="space-y-3">

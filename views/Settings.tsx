@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { UserRole, UserProfile, AcademicConfig } from '../types';
 // Removed syncWithGDrive because it is not exported from dataService
 import { 
-  getUsers, getSyncStatus, pullFromGDrive, getTeamDatabaseId 
+  getSyncStatus, pullFromGDrive, getTeamDatabaseId, getActiveSession 
 } from '../services/dataService';
 import { 
   User as UserIcon, Users, Cloud, RefreshCw, LogOut, DownloadCloud, UploadCloud, ShieldCheck, Share2, Link2, Copy, Key, ShieldAlert
@@ -19,16 +19,17 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ userEmail, academicConfig, onUpdateAcademic, availableClasses }) => {
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  // Removed unused and non-existent getUsers/users state
   const [cloudStatus, setCloudStatus] = useState({ connected: false, pending: false, hasToken: false });
   const [isSyncing, setIsSyncing] = useState(false);
   const [copyStatus, setCopyStatus] = useState('Salin Link');
 
   const isSuperAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
-  const currentUserProfile = getUsers().find(u => u.email.toLowerCase().trim() === userEmail.toLowerCase().trim());
+  // Fix: Use getActiveSession() to reliably get the current user's profile and role
+  const currentUserProfile = getActiveSession();
 
   useEffect(() => {
-    setUsers(getUsers());
+    // Removed call to non-existent getUsers()
     const connected = localStorage.getItem('mahasina_cloud_connected') === 'true';
     const hasToken = !!localStorage.getItem('mahasina_cloud_token');
     const sync = getSyncStatus();
