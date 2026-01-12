@@ -10,11 +10,13 @@ import Settings from './views/Settings.tsx';
 import PrayerAttendance from './views/utils/PrayerAttendance.tsx';
 import ControlPanel from './views/ControlPanel.tsx';
 import { UserCheck } from 'lucide-react';
+import { auth } from './services/firebase.ts';
+import { onAuthStateChanged } from 'firebase/auth';
 import { 
-  UserProfile
+  UserProfile, UserRole
 } from './types.ts';
 import { 
-  saveAppData, clearAppData, addAttendanceRecord, addReportRecord,
+  saveAppData, addAttendanceRecord, addReportRecord,
   getActiveSession, subscribeToAppData, setActiveSession
 } from './services/dataService.ts';
 
@@ -23,32 +25,42 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [appData, setAppData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    // Listener untuk memastikan data profil selalu sinkron
-    const checkSession = () => {
-      const current = getActiveSession();
-      if (JSON.stringify(current) !== JSON.stringify(profile)) {
-        setProfile(current);
+    // 1. Listen ke status Firebase Auth (Sangat penting untuk PWA/Mobile)
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const currentSession = getActiveSession();
+        // Jika user login via Google tapi profile lokal belum ada atau berbeda
+        if (!currentSession || currentSession.id !== user.uid) {
+          const newProfile: UserProfile = {
+            id: user.uid,
+            fullName: user.displayName || currentSession?.fullName || "User Mahasina",
+            email: user.email?.toLowerCase() || "",
+            phone: currentSession?.phone || "-",
+            role: (user.email?.toLowerCase() === 'idarohmahasina@gmail.com') ? UserRole.IDAROH : (currentSession?.role || UserRole.GURU)
+          };
+          setActiveSession(newProfile);
+          setProfile(newProfile);
+        }
       }
-    };
+    });
 
-    const interval = setInterval(checkSession, 1000);
-    
-    const unsubscribe = subscribeToAppData((data) => {
+    // 2. Sync data dari Firestore
+    const unsubscribeData = subscribeToAppData((data) => {
       setAppData(data);
       setLoading(false);
     });
 
     return () => {
-      unsubscribe();
-      clearInterval(interval);
+      unsubscribeAuth();
+      unsubscribeData();
     };
-  }, [profile]);
+  }, []);
 
   const handleLogout = () => {
     if (confirm("Logout dari aplikasi Smart Report?")) {
+      auth.signOut();
       setActiveSession(null);
       setProfile(null);
       window.location.reload();
@@ -56,24 +68,13 @@ const App: React.FC = () => {
   };
 
   const handleLoginComplete = (newProfile: UserProfile) => {
-    setActiveSession(newProfile);
     setProfile(newProfile);
   };
 
   if (loading && !appData) return (
     <div className="min-h-screen bg-[#064e3b] flex flex-col items-center justify-center text-white space-y-6">
-      <div className="relative">
-        <div className="w-20 h-20 border-4 border-white/10 border-t-emerald-400 rounded-full animate-spin" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-10 h-10 bg-emerald-500/20 rounded-full animate-pulse" />
-        </div>
-      </div>
-      <div className="text-center space-y-3">
-        <p className="font-black uppercase tracking-[0.4em] text-[10px]">Smart Report Mahasina</p>
-        <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest animate-pulse">
-          Menghubungkan ke Cloud Mahasina...
-        </p>
-      </div>
+      <div className="w-16 h-16 border-4 border-white/10 border-t-emerald-400 rounded-full animate-spin" />
+      <p className="font-black uppercase tracking-[0.3em] text-[10px] animate-pulse">Memuat Database Mahasina...</p>
     </div>
   );
 
@@ -115,7 +116,7 @@ const App: React.FC = () => {
              <div>
                 <h3 className="text-2xl font-black uppercase tracking-tight text-slate-800">Presensi Guru Otomatis</h3>
                 <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-4 leading-relaxed">
-                   Ustadz/ah, sistem secara cerdas mencatat kehadiran Anda saat Anda melakukan absensi santri di kelas sesuai jadwal. Tidak perlu klik tombol tambahan.
+                   Ustadz/ah, sistem secara cerdas mencatat kehadiran Anda saat melakukan absensi santri di kelas.
                 </p>
              </div>
           </div>
