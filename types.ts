@@ -182,3 +182,27 @@ export interface ReportItem {
   status: 'Belum Ditindak' | 'Ditindak';
   actionNote?: string;
 }
+
+// Added ExtraDataList for modular information tracking
+export interface ExtraDataList {
+  id: string;
+  name: string;
+  items: any[];
+}
+
+// Added AppData to centralize state definition for the entire application
+export interface AppData {
+  attendance: AttendanceRecord[];
+  prayerAttendance: PrayerRecord[];
+  reports: ReportItem[];
+  students: Student[];
+  teachers: Teacher[];
+  schedules: Schedule[];
+  academicConfig: AcademicConfig;
+  violationTemplates: any[];
+  achievementTemplates: any[];
+  orsam: OrganizationMember[];
+  orklas: OrganizationMember[];
+  extraDataLists: ExtraDataList[];
+  announcements: Announcement[];
+}

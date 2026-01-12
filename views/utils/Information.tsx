@@ -1,11 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
-import { UserRole, Student, Teacher, Schedule, OrganizationMember, TemplateItem, Announcement, ViolationCategory } from '../types';
+import { UserRole, Student, Teacher, Schedule, OrganizationMember, TemplateItem, Announcement, ViolationCategory } from '../../types.ts';
 import { 
   Search, Download, Upload, FileText, Info as InfoIcon, Users, 
   Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark
 } from 'lucide-react';
-import { ExtraDataList } from '../services/dataService';
+import { ExtraDataList } from '../../services/dataService.ts';
 
 // Removed local interface definition for ExtraDataList as it is now centrally exported from dataService.ts
 

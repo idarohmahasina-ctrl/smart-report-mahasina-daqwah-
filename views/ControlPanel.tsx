@@ -3,13 +3,13 @@ import React, { useState, useMemo } from 'react';
 import { 
   AttendanceRecord, PrayerRecord, TeacherAttendance, ReportItem, Student, 
   AttendanceStatus, PrayerStatus, UserRole
-} from '../types';
+} from '../types.ts';
 import { 
   ShieldCheck, Lock, Trash2, Edit3, Search, Filter, Database, 
   ChevronDown, X, Check, AlertTriangle, Download, FileText, UserCheck, Zap,
   AlertCircle
 } from 'lucide-react';
-import { downloadCSV } from '../utils/csvExport';
+import { downloadCSV } from './utils/csvExport.ts';
 
 interface ControlPanelProps {
   data: {

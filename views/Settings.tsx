@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserRole, UserProfile, AcademicConfig } from '../types';
-// Removed syncWithGDrive because it is not exported from dataService
+import { UserRole, UserProfile, AcademicConfig } from '../types.ts';
 import { 
-  getSyncStatus, pullFromGDrive, getTeamDatabaseId, getActiveSession 
-} from '../services/dataService';
+  getSyncStatus, pullFromGDrive, getTeamDatabaseId, getActiveSession, clearAppData 
+} from '../services/dataService.ts';
 import { 
-  User as UserIcon, Users, Cloud, RefreshCw, LogOut, DownloadCloud, UploadCloud, ShieldCheck, Share2, Link2, Copy, Key, ShieldAlert
+  User as UserIcon, Users, Cloud, RefreshCw, LogOut, DownloadCloud, UploadCloud, 
+  ShieldCheck, Share2, Link2, Copy, Key, ShieldAlert, Trash2, AlertCircle 
 } from 'lucide-react';
 
 declare const google: any;
@@ -19,17 +19,13 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ userEmail, academicConfig, onUpdateAcademic, availableClasses }) => {
-  // Removed unused and non-existent getUsers/users state
   const [cloudStatus, setCloudStatus] = useState({ connected: false, pending: false, hasToken: false });
-  const [isSyncing, setIsSyncing] = useState(false);
   const [copyStatus, setCopyStatus] = useState('Salin Link');
 
   const isSuperAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
-  // Fix: Use getActiveSession() to reliably get the current user's profile and role
   const currentUserProfile = getActiveSession();
 
   useEffect(() => {
-    // Removed call to non-existent getUsers()
     const connected = localStorage.getItem('mahasina_cloud_connected') === 'true';
     const hasToken = !!localStorage.getItem('mahasina_cloud_token');
     const sync = getSyncStatus();
@@ -70,8 +66,19 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, academicConfig, onUpdate
     setTimeout(() => setCopyStatus('Salin Link'), 2000);
   };
 
+  const handleResetApp = () => {
+    const confirm1 = confirm("⚠️ PERINGATAN: Ini akan menghapus SELURUH data absensi, santri, dan laporan yang tersimpan di perangkat ini. Lanjutkan?");
+    if (confirm1) {
+      const confirm2 = confirm("Apakah Anda benar-benar yakin? Tindakan ini tidak dapat dibatalkan.");
+      if (confirm2) {
+        clearAppData();
+        window.location.reload();
+      }
+    }
+  };
+
   return (
-    <div className="space-y-10 pb-24 animate-in fade-in duration-700 max-w-6xl mx-auto px-4 pt-6">
+    <div className="space-y-10 pb-32 animate-in fade-in duration-700 max-w-6xl mx-auto px-4 pt-6">
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Akun Section */}
@@ -102,16 +109,9 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, academicConfig, onUpdate
                  </div>
                  <button onClick={handleRequestToken} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase hover:bg-slate-50 transition-all">Perbarui Izin</button>
               </div>
-              
-              {!cloudStatus.hasToken && (
-                <div className="flex items-start gap-3 px-6 text-red-600 animate-pulse">
-                   <ShieldAlert size={14} className="mt-1 shrink-0"/>
-                   <p className="text-[8px] font-black uppercase leading-tight">Tanpa izin Drive, data tidak bisa sinkron ke ustadz lain.</p>
-                </div>
-              )}
            </div>
 
-           <button onClick={() => {sessionStorage.removeItem('mahasina_active_session'); window.location.reload();}} className="w-full py-5 bg-red-50 text-red-600 rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-red-100">
+           <button onClick={() => {sessionStorage.removeItem('mahasina_active_session'); window.location.reload();}} className="w-full py-5 bg-slate-100 text-slate-600 rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-slate-200">
               <LogOut size={18}/> Log Out Sesi
            </button>
         </div>
@@ -143,9 +143,6 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, academicConfig, onUpdate
                   <div className="flex items-center gap-2 text-indigo-800 font-black text-[9px] uppercase tracking-widest">
                     <Share2 size={14}/> Bagikan Akses Ke Guru
                   </div>
-                  <p className="text-[8px] text-slate-500 leading-relaxed font-bold uppercase tracking-tighter">
-                    Salin link di bawah dan kirim ke grup WA Ustadz/ah agar mereka otomatis terhubung ke database Mahasina ini.
-                  </p>
                   <div className="flex items-center gap-2">
                      <div className="flex-1 bg-slate-50 p-3 rounded-lg border text-[8px] font-mono text-slate-400 truncate uppercase">
                         {getTeamDatabaseId() ? `${window.location.origin}/?join=${getTeamDatabaseId()}` : 'Hubungkan Dulu'}
@@ -158,6 +155,23 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, academicConfig, onUpdate
               )}
            </div>
         </div>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="bg-red-50/50 rounded-[3rem] border-2 border-red-100 p-10 space-y-6">
+         <div className="flex items-center gap-4 text-red-700">
+            <AlertCircle size={24} />
+            <h3 className="text-xl font-black uppercase tracking-tight">Zona Bahaya</h3>
+         </div>
+         <p className="text-[10px] font-bold text-red-600/60 uppercase tracking-widest leading-relaxed max-w-2xl">
+            Tindakan di bawah ini akan menghapus seluruh database lokal dari browser Anda. Pastikan data sudah tersinkron ke Cloud jika tidak ingin kehilangan data.
+         </p>
+         <button 
+           onClick={handleResetApp} 
+           className="px-8 py-5 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-3 hover:bg-red-700 shadow-xl shadow-red-200 transition-all active:scale-95"
+         >
+            <Trash2 size={18}/> Reset Semua Data & Database
+         </button>
       </div>
     </div>
   );

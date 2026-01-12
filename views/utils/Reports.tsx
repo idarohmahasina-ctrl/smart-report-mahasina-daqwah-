@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { ReportItem, UserRole, ViolationCategory, Student, TemplateItem } from '../../types';
+import { ReportItem, UserRole, ViolationCategory, Student, TemplateItem } from '../../types.ts';
 import { 
   Search, ShieldAlert, Trophy, History, PlusCircle, Send, ChevronRight, Clock as ClockIcon, 
   AlertTriangle, User, FileText, CheckCircle, Filter, Edit, Award, ArrowLeft, UserCheck, X

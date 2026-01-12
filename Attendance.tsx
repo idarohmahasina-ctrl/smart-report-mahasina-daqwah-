@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   AttendanceStatus, AttendanceRecord, UserRole, Student, TeacherAttendance, Schedule, AcademicConfig
-} from '../types';
+} from './types.ts';
 import { 
   Clock, UserCheck, CheckCircle, Save, Search, BookOpen, ChevronRight, Calendar, UserPlus, X, Lock, ListFilter, Sparkles
 } from 'lucide-react';

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { PrayerTime, PrayerStatus, Student, PrayerRecord, SessionType } from '../../types';
+import { PrayerTime, PrayerStatus, Student, PrayerRecord, SessionType } from '../../types.ts';
 import { 
   PlusCircle, History, Zap, Search, Users, ChevronRight, Save, Clock, Filter,
   Activity, CheckCircle, FileText, Download, Award, AlertTriangle
@@ -8,7 +8,7 @@ import {
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend 
 } from 'recharts';
-import { downloadCSV } from './csvExport';
+import { downloadCSV } from './csvExport.ts';
 
 const COLORS = ['#10b981', '#3b82f6', '#6366f1', '#f59e0b', '#f97316', '#ef4444'];
 
