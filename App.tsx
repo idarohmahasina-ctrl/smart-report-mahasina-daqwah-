@@ -36,7 +36,6 @@ const App: React.FC = () => {
       setLoading(false);
     });
 
-    // Timeout jika loading terlalu lama (mungkin karena database baru dibuat)
     const timer = setTimeout(() => {
       if (loading) setRetryCount(prev => prev + 1);
     }, 5000);
