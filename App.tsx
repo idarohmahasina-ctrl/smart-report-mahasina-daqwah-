@@ -15,46 +15,52 @@ import {
 } from './types.ts';
 import { 
   saveAppData, clearAppData, addAttendanceRecord, addReportRecord,
-  getActiveSession, subscribeToAppData
+  getActiveSession, subscribeToAppData, setActiveSession
 } from './services/dataService.ts';
 
 const App: React.FC = () => {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(getActiveSession());
   const [activeTab, setActiveTab] = useState('dashboard');
   const [appData, setAppData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    const activeUser = getActiveSession();
-    if (activeUser) {
-      setProfile(activeUser);
-    }
+    // Listener untuk memastikan data profil selalu sinkron
+    const checkSession = () => {
+      const current = getActiveSession();
+      if (JSON.stringify(current) !== JSON.stringify(profile)) {
+        setProfile(current);
+      }
+    };
+
+    const interval = setInterval(checkSession, 1000);
     
     const unsubscribe = subscribeToAppData((data) => {
       setAppData(data);
       setLoading(false);
     });
 
-    const timer = setTimeout(() => {
-      if (loading) setRetryCount(prev => prev + 1);
-    }, 5000);
-
     return () => {
       unsubscribe();
-      clearTimeout(timer);
+      clearInterval(interval);
     };
-  }, [retryCount]);
+  }, [profile]);
 
   const handleLogout = () => {
     if (confirm("Logout dari aplikasi Smart Report?")) {
-      clearAppData();
+      setActiveSession(null);
       setProfile(null);
       window.location.reload();
     }
   };
 
-  if (loading) return (
+  const handleLoginComplete = (newProfile: UserProfile) => {
+    setActiveSession(newProfile);
+    setProfile(newProfile);
+  };
+
+  if (loading && !appData) return (
     <div className="min-h-screen bg-[#064e3b] flex flex-col items-center justify-center text-white space-y-6">
       <div className="relative">
         <div className="w-20 h-20 border-4 border-white/10 border-t-emerald-400 rounded-full animate-spin" />
@@ -65,13 +71,13 @@ const App: React.FC = () => {
       <div className="text-center space-y-3">
         <p className="font-black uppercase tracking-[0.4em] text-[10px]">Smart Report Mahasina</p>
         <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest animate-pulse">
-          {retryCount > 0 ? 'Menyiapkan Database...' : 'Menghubungkan ke Cloud Jakarta...'}
+          Menghubungkan ke Cloud Mahasina...
         </p>
       </div>
     </div>
   );
 
-  if (!profile) return <Registration onComplete={(p) => setProfile(p)} />;
+  if (!profile) return <Registration onComplete={handleLoginComplete} />;
 
   return (
     <Layout
@@ -81,7 +87,7 @@ const App: React.FC = () => {
       userName={profile.fullName}
       userEmail={profile.email}
       onLogout={handleLogout}
-      academicConfig={appData.academicConfig}
+      academicConfig={appData?.academicConfig || {}}
     >
       <div className="animate-slide-up">
         {activeTab === 'dashboard' && <Dashboard {...appData} profile={profile} />}

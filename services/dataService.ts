@@ -9,7 +9,7 @@ import {
 } from '../types.ts';
 import { PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS } from '../constants.tsx';
 
-const SESSION_KEY = 'mahasina_active_session';
+const SESSION_KEY = 'mahasina_active_session_v2'; // Versi baru dengan localStorage
 
 export type { ExtraDataList };
 
@@ -29,19 +29,15 @@ const initialData: AppData = {
   announcements: [],
 };
 
-// Listen for real-time updates from Firestore
 export const subscribeToAppData = (callback: (data: AppData) => void) => {
   const docRef = doc(db, "settings", "master_data");
   
   return onSnapshot(docRef, (snapshot) => {
     if (snapshot.exists()) {
       const remoteData = snapshot.data();
-      // Pastikan data yang diterima memiliki struktur lengkap AppData
-      // Jika user baru membuat field "initialized", maka field lain akan diambil dari initialData
       const mergedData: AppData = {
         ...initialData,
         ...remoteData,
-        // Pastikan array tetap array jika field ada tapi kosong
         attendance: remoteData.attendance || [],
         prayerAttendance: remoteData.prayerAttendance || [],
         reports: remoteData.reports || [],
@@ -54,14 +50,12 @@ export const subscribeToAppData = (callback: (data: AppData) => void) => {
       
       callback(mergedData);
     } else {
-      // Jika dokumen benar-benar belum ada, buat baru
       setDoc(docRef, initialData);
       callback(initialData);
     }
   });
 };
 
-// Update application data partially
 export const saveAppData = async (data: Partial<AppData>) => {
   const docRef = doc(db, "settings", "master_data");
   try {
@@ -70,7 +64,6 @@ export const saveAppData = async (data: Partial<AppData>) => {
       lastUpdate: new Date().toISOString()
     });
   } catch (e) {
-    // Jika gagal update (misal doc belum ada field master), gunakan setDoc dengan merge
     await setDoc(docRef, data, { merge: true });
   }
 };
@@ -90,18 +83,26 @@ export const addReportRecord = async (newReport: ReportItem) => {
 };
 
 export const setActiveSession = (u: UserProfile | null) => {
-  if (u) sessionStorage.setItem(SESSION_KEY, JSON.stringify(u));
-  else sessionStorage.removeItem(SESSION_KEY);
+  if (u) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(u));
+  } else {
+    localStorage.removeItem(SESSION_KEY);
+  }
 };
 
 export const getActiveSession = (): UserProfile | null => {
-  const s = sessionStorage.getItem(SESSION_KEY);
-  return s ? JSON.parse(s) : null;
+  const s = localStorage.getItem(SESSION_KEY);
+  if (!s) return null;
+  try {
+    return JSON.parse(s);
+  } catch (e) {
+    return null;
+  }
 };
 
 export const clearAppData = () => {
-  sessionStorage.clear();
-  localStorage.clear();
+  localStorage.removeItem(SESSION_KEY);
+  // Jangan hapus semua localStorage agar data lain tidak hilang
 };
 
 export const pullFromGDrive = async (token: string) => { return false; };
