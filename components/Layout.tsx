@@ -6,7 +6,7 @@ import {
   Settings as SettingsIcon, UserCheck, 
   ShieldAlert, Trophy, Info, LogOut, Menu, 
   Zap, LayoutDashboard, ShieldCheck,
-  Bell, CloudCheck, CloudOff, ChevronRight
+  Bell, Cloud, CloudOff, ChevronRight
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -111,7 +111,7 @@ const Layout: React.FC<LayoutProps> = ({
           
           <div className="flex items-center gap-3">
              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors ${isOnline ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-red-50 border-red-100 text-red-600'}`}>
-                {isOnline ? <CloudCheck size={14}/> : <CloudOff size={14}/>}
+                {isOnline ? <Cloud size={14}/> : <CloudOff size={14}/>}
                 <span className="text-[8px] font-black uppercase tracking-widest hidden sm:inline">
                   {isOnline ? 'Cloud Terhubung' : 'Offline'}
                 </span>
