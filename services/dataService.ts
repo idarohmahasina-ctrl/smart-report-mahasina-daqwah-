@@ -1,15 +1,15 @@
 
 import { db } from './firebase.ts';
 import { 
-  doc, setDoc, onSnapshot, updateDoc, arrayUnion
+  doc, setDoc, onSnapshot, updateDoc, arrayUnion, getDoc
 } from "firebase/firestore";
 import { 
   UserProfile, AttendanceRecord, ReportItem, Student, 
-  Teacher, Schedule, AcademicConfig, PrayerRecord, AppData, ExtraDataList
+  Teacher, Schedule, AcademicConfig, PrayerRecord, AppData, ExtraDataList, UserRole
 } from '../types.ts';
 import { PREDEFINED_VIOLATIONS, PREDEFINED_ACHIEVEMENTS } from '../constants.tsx';
 
-const SESSION_KEY = 'mahasina_active_session_v2'; // Versi baru dengan localStorage
+const SESSION_KEY = 'mahasina_active_session_v3';
 
 export type { ExtraDataList };
 
@@ -27,6 +27,25 @@ const initialData: AppData = {
   orklas: [],
   extraDataLists: [],
   announcements: [],
+};
+
+// Fungsi untuk mengecek user berdasarkan email di Firestore
+export const getUserByEmail = async (email: string): Promise<UserProfile | null> => {
+  const cleanEmail = email.toLowerCase().trim();
+  const docRef = doc(db, "users", cleanEmail);
+  const docSnap = await getDoc(docRef);
+  
+  if (docSnap.exists()) {
+    return docSnap.data() as UserProfile;
+  }
+  return null;
+};
+
+// Fungsi untuk mendaftarkan user baru ke Firestore
+export const registerUser = async (profile: UserProfile) => {
+  const cleanEmail = profile.email.toLowerCase().trim();
+  const docRef = doc(db, "users", cleanEmail);
+  await setDoc(docRef, profile);
 };
 
 export const subscribeToAppData = (callback: (data: AppData) => void) => {
@@ -102,7 +121,6 @@ export const getActiveSession = (): UserProfile | null => {
 
 export const clearAppData = () => {
   localStorage.removeItem(SESSION_KEY);
-  // Jangan hapus semua localStorage agar data lain tidak hilang
 };
 
 export const pullFromGDrive = async (token: string) => { return false; };

@@ -10,10 +10,8 @@ import Settings from './views/Settings.tsx';
 import PrayerAttendance from './views/utils/PrayerAttendance.tsx';
 import ControlPanel from './views/ControlPanel.tsx';
 import { UserCheck } from 'lucide-react';
-import { auth } from './services/firebase.ts';
-import { onAuthStateChanged } from 'firebase/auth';
 import { 
-  UserProfile, UserRole
+  UserProfile
 } from './types.ts';
 import { 
   saveAppData, addAttendanceRecord, addReportRecord,
@@ -27,40 +25,19 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Listen ke status Firebase Auth (Sangat penting untuk PWA/Mobile)
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        const currentSession = getActiveSession();
-        // Jika user login via Google tapi profile lokal belum ada atau berbeda
-        if (!currentSession || currentSession.id !== user.uid) {
-          const newProfile: UserProfile = {
-            id: user.uid,
-            fullName: user.displayName || currentSession?.fullName || "User Mahasina",
-            email: user.email?.toLowerCase() || "",
-            phone: currentSession?.phone || "-",
-            role: (user.email?.toLowerCase() === 'idarohmahasina@gmail.com') ? UserRole.IDAROH : (currentSession?.role || UserRole.GURU)
-          };
-          setActiveSession(newProfile);
-          setProfile(newProfile);
-        }
-      }
-    });
-
-    // 2. Sync data dari Firestore
+    // Sync data dari Firestore
     const unsubscribeData = subscribeToAppData((data) => {
       setAppData(data);
       setLoading(false);
     });
 
     return () => {
-      unsubscribeAuth();
       unsubscribeData();
     };
   }, []);
 
   const handleLogout = () => {
     if (confirm("Logout dari aplikasi Smart Report?")) {
-      auth.signOut();
       setActiveSession(null);
       setProfile(null);
       window.location.reload();
@@ -74,7 +51,7 @@ const App: React.FC = () => {
   if (loading && !appData) return (
     <div className="min-h-screen bg-[#064e3b] flex flex-col items-center justify-center text-white space-y-6">
       <div className="w-16 h-16 border-4 border-white/10 border-t-emerald-400 rounded-full animate-spin" />
-      <p className="font-black uppercase tracking-[0.3em] text-[10px] animate-pulse">Memuat Database Mahasina...</p>
+      <p className="font-black uppercase tracking-[0.3em] text-[10px] animate-pulse">Menghubungkan ke Mahasina Cloud...</p>
     </div>
   );
 
@@ -116,7 +93,7 @@ const App: React.FC = () => {
              <div>
                 <h3 className="text-2xl font-black uppercase tracking-tight text-slate-800">Presensi Guru Otomatis</h3>
                 <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-4 leading-relaxed">
-                   Ustadz/ah, sistem secara cerdas mencatat kehadiran Anda saat melakukan absensi santri di kelas.
+                   Ustadz/ah, sistem secara cerdas mencatat kehadiran Anda saat Anda melakukan absensi santri di kelas.
                 </p>
              </div>
           </div>
