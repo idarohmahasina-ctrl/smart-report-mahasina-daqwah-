@@ -6,7 +6,7 @@ import {
   Settings as SettingsIcon, UserCheck, 
   ShieldAlert, Trophy, Info, LogOut, Menu, 
   Zap, LayoutDashboard, ShieldCheck,
-  Bell, Cloud, CloudOff, ChevronRight
+  Bell, Cloud, CloudOff, ChevronRight, UserRoundCheck
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -36,14 +36,18 @@ const Layout: React.FC<LayoutProps> = ({
     };
   }, []);
 
+  const isAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
+  const isPetugasSantri = role === UserRole.SANTRI_OFFICER;
+
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, visible: true },
     { id: 'absen-santri', label: 'Absen Santri', icon: <UserCheck size={20} />, visible: true },
     { id: 'absen-sholat', label: 'Absen Sholat', icon: <Zap size={20} />, visible: true },
+    { id: 'absen-guru', label: 'Absen Guru', icon: <UserRoundCheck size={20} />, visible: !isPetugasSantri },
     { id: 'pelanggaran', label: 'Laporan VP', icon: <ShieldAlert size={20} />, visible: true },
     { id: 'prestasi', label: 'Prestasi', icon: <Trophy size={20} />, visible: true },
-    { id: 'informasi', label: 'Data Master', icon: <Info size={20} />, visible: true },
-    { id: 'control-panel', label: 'Control Panel', icon: <ShieldCheck size={20} />, visible: userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com' },
+    { id: 'informasi', label: 'Data Master', icon: <Info size={20} />, visible: isAdmin || role === UserRole.GURU || role === UserRole.IDAROH },
+    { id: 'control-panel', label: 'Control Panel', icon: <ShieldCheck size={20} />, visible: isAdmin },
     { id: 'pengaturan', label: 'Pengaturan', icon: <SettingsIcon size={20} />, visible: true },
   ];
 
@@ -104,7 +108,7 @@ const Layout: React.FC<LayoutProps> = ({
               <div className="flex items-center gap-2 mt-1.5">
                 <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[7px] font-black uppercase tracking-widest border border-emerald-100">{role}</span>
                 <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">{academicConfig.semester}</span>
+                <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">{academicConfig?.semester}</span>
               </div>
             </div>
           </div>
@@ -130,7 +134,7 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
         </main>
 
-        {/* Mobile Floating Bottom Navigation - Fixed with pb-safe */}
+        {/* Mobile Floating Bottom Navigation */}
         <nav className="lg:hidden fixed bottom-6 left-6 right-6 bg-white/95 backdrop-blur-xl border border-slate-200 p-2 flex justify-around items-center z-50 shadow-2xl rounded-[2.5rem] pb-safe">
            {[
              { id: 'dashboard', label: 'Home', icon: <LayoutDashboard size={22} /> },

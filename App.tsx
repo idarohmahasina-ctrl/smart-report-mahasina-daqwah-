@@ -9,6 +9,7 @@ import Information from './views/utils/Information.tsx';
 import Settings from './views/Settings.tsx';
 import PrayerAttendance from './views/utils/PrayerAttendance.tsx';
 import ControlPanel from './views/ControlPanel.tsx';
+import { UserCheck } from 'lucide-react';
 import { 
   UserProfile
 } from './types.ts';
@@ -30,7 +31,6 @@ const App: React.FC = () => {
       setProfile(activeUser);
     }
     
-    // Subscribe ke Firebase real-time listener
     const unsubscribe = subscribeToAppData((data) => {
       setAppData(data);
       setLoading(false);
@@ -65,16 +65,8 @@ const App: React.FC = () => {
       <div className="text-center space-y-3">
         <p className="font-black uppercase tracking-[0.4em] text-[10px]">Smart Report Mahasina</p>
         <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest animate-pulse">
-          {retryCount > 0 ? 'Menyiapkan Database Pertama Anda...' : 'Menghubungkan ke Cloud Jakarta...'}
+          {retryCount > 0 ? 'Menyiapkan Database...' : 'Menghubungkan ke Cloud Jakarta...'}
         </p>
-        {retryCount > 1 && (
-          <button 
-            onClick={() => window.location.reload()} 
-            className="mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full text-[8px] font-black uppercase tracking-widest transition-all"
-          >
-            Refresh Koneksi
-          </button>
-        )}
       </div>
     </div>
   );
@@ -110,6 +102,17 @@ const App: React.FC = () => {
             currentUser={profile.fullName} 
             onSave={recs => saveAppData({ prayerAttendance: [...appData.prayerAttendance, ...recs] })} 
           />
+        )}
+        {activeTab === 'absen-guru' && (
+          <div className="bg-white p-12 md:p-20 rounded-[4rem] border shadow-sm text-center space-y-8 max-w-2xl mx-auto mt-10">
+             <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner"><UserCheck size={64} /></div>
+             <div>
+                <h3 className="text-2xl font-black uppercase tracking-tight text-slate-800">Presensi Guru Otomatis</h3>
+                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-4 leading-relaxed">
+                   Ustadz/ah, sistem secara cerdas mencatat kehadiran Anda saat Anda melakukan absensi santri di kelas sesuai jadwal. Tidak perlu klik tombol tambahan.
+                </p>
+             </div>
+          </div>
         )}
         {activeTab === 'pelanggaran' && (
           <Reports 
@@ -147,7 +150,7 @@ const App: React.FC = () => {
             }} 
           />
         )}
-        {activeTab === 'control-panel' && (
+        {activeTab === 'control-panel' && profile.email.toLowerCase() === 'idarohmahasina@gmail.com' && (
           <ControlPanel 
             data={appData} 
             actions={{
