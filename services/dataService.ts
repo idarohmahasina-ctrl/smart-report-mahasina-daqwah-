@@ -1,22 +1,20 @@
 
 import { db } from './firebase.ts';
 import { 
-  doc, setDoc, onSnapshot, updateDoc, arrayUnion, getDoc, collection, query, where, getDocs, deleteDoc
+  doc, setDoc, onSnapshot, getDoc
 } from "firebase/firestore";
 import { 
-  UserProfile, AttendanceRecord, ReportItem, AppData, UserRole
+  UserProfile, AppData
 } from '../types.ts';
 
 const SESSION_KEY = 'mahasina_active_session_v4';
 
-// Added ExtraDataList interface export
 export interface ExtraDataList {
   id: string;
   name: string;
   items: string[];
 }
 
-// User Registry di Firestore
 export const getUserByEmail = async (email: string): Promise<UserProfile | null> => {
   const cleanEmail = email.toLowerCase().trim();
   const docRef = doc(db, "users", cleanEmail);
@@ -41,6 +39,33 @@ export const saveAppData = async (data: Partial<AppData>) => {
   await setDoc(docRef, data, { merge: true });
 };
 
+// Fungsi Hard Reset untuk Admin Utama
+export const resetFirestoreData = async () => {
+  const docRef = doc(db, "settings", "master_data");
+  const emptyData: AppData = {
+    students: [],
+    teachers: [],
+    schedules: [],
+    attendance: [],
+    teacherAttendance: [],
+    reports: [],
+    prayerAttendance: [],
+    orsam: [],
+    orklas: [],
+    violationTemplates: [],
+    achievementTemplates: [],
+    extraDataLists: [],
+    announcements: [],
+    academicConfig: { 
+      schoolYear: '2024/2025', 
+      semester: 'II (Genap)', 
+      isHoliday: false, 
+      excludedClasses: {} 
+    }
+  };
+  await setDoc(docRef, emptyData);
+};
+
 export const setActiveSession = (u: UserProfile | null) => {
   if (u) localStorage.setItem(SESSION_KEY, JSON.stringify(u));
   else localStorage.removeItem(SESSION_KEY);
@@ -53,7 +78,6 @@ export const getActiveSession = (): UserProfile | null => {
 
 export const clearAppData = () => localStorage.removeItem(SESSION_KEY);
 
-// Added missing cloud sync utility functions
 export const getSyncStatus = () => {
   return { isNewLocal: false };
 };

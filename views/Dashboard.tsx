@@ -436,6 +436,7 @@ const Dashboard: React.FC<AppData & { profile: any }> = (data) => {
                       <th className="pb-6 text-[9px] font-black uppercase text-slate-400">Santri</th>
                       <th className="pb-6 text-[9px] font-black uppercase text-slate-400">Keterangan</th>
                       <th className="pb-6 text-[9px] font-black uppercase text-slate-400">Waktu</th>
+                      <th className="pb-6 text-[9px] font-black uppercase text-slate-400">Bukti Foto</th>
                       <th className="pb-6 text-[9px] font-black uppercase text-slate-400">Oleh</th>
                    </tr>
                 </thead>
@@ -453,6 +454,16 @@ const Dashboard: React.FC<AppData & { profile: any }> = (data) => {
                            <p className="text-[8px] font-medium text-slate-400 mt-1 max-w-[200px] truncate">{item.description || item.note}</p>
                         </td>
                         <td className="py-5 text-[9px] font-bold text-slate-500">{item.date} {item.time || item.timestamp}</td>
+                        <td className="py-5">
+                           {item.photoUrl ? (
+                             <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 shadow-sm cursor-zoom-in group relative" onClick={() => window.open(item.photoUrl)}>
+                                <img src={item.photoUrl} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                   <Camera size={14} className="text-white"/>
+                                </div>
+                             </div>
+                           ) : <span className="text-[8px] text-slate-300 italic uppercase">Tidak Ada</span>}
+                        </td>
                         <td className="py-5 text-[9px] font-black uppercase text-emerald-700">{item.recordedBy || item.reporter}</td>
                      </tr>
                    ))}

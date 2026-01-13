@@ -7,9 +7,10 @@ import {
 import { 
   ShieldCheck, Lock, Trash2, Edit3, Search, Filter, Database, 
   ChevronDown, X, Check, AlertTriangle, Download, FileText, UserCheck, Zap,
-  AlertCircle
+  AlertCircle, RefreshCcw, ShieldAlert, Camera
 } from 'lucide-react';
 import { downloadCSV } from './utils/csvExport.ts';
+import { resetFirestoreData, getActiveSession } from '../services/dataService.ts';
 
 interface ControlPanelProps {
   data: {
@@ -29,22 +30,51 @@ interface ControlPanelProps {
 const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
   const [activeModul, setActiveModul] = useState<'absen-santri' | 'absen-sholat' | 'laporan'>('absen-santri');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+
+  const profile = getActiveSession();
+  const isSuperAdmin = profile?.email.toLowerCase().trim() === 'idarohmahasina@gmail.com';
 
   const filteredData = useMemo(() => {
     let list: any[] = [];
-    if (activeModul === 'absen-santri') list = data.attendance;
-    else if (activeModul === 'absen-sholat') list = data.prayerAttendance;
-    else list = data.reports;
+    if (activeModul === 'absen-santri') list = data.attendance || [];
+    else if (activeModul === 'absen-sholat') list = data.prayerAttendance || [];
+    else list = data.reports || [];
 
     return list.filter(item => {
-      const studentName = data.students.find(s => s.id === item.studentId)?.name || '';
+      const studentName = data.students?.find(s => s.id === item.studentId)?.name || '';
       return studentName.toLowerCase().includes(searchTerm.toLowerCase()) || 
              (item.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     }).sort((a,b) => b.date.localeCompare(a.date));
   }, [activeModul, data, searchTerm]);
 
+  const handleHardReset = async () => {
+    const confirm1 = confirm("🚨 PERINGATAN KRITIS: Anda akan menghapus SELURUH database Mahasina di Cloud (Santri, Guru, Jadwal, & Laporan). Lanjutkan?");
+    if (!confirm1) return;
+
+    const confirm2 = confirm("Apakah Anda yakin? Data yang sudah dihapus tidak dapat dipulihkan kembali oleh siapapun.");
+    if (!confirm2) return;
+
+    const code = prompt("Ketik kata 'HAPUS' untuk mengkonfirmasi tindakan ini:");
+    if (code !== 'HAPUS') {
+      alert("Konfirmasi gagal. Reset dibatalkan.");
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      await resetFirestoreData();
+      alert("Sistem berhasil di-reset ke pengaturan pabrik. Aplikasi akan memuat ulang.");
+      window.location.reload();
+    } catch (err) {
+      alert("Gagal melakukan reset. Periksa koneksi internet.");
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   return (
-    <div className="space-y-8 pb-24 animate-in fade-in duration-700 max-w-6xl mx-auto">
+    <div className="space-y-10 pb-32 animate-in fade-in duration-700 max-w-6xl mx-auto">
       <div className="bg-emerald-950 p-12 rounded-[3.5rem] shadow-2xl relative overflow-hidden text-white border-b-4 border-emerald-500">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
@@ -85,7 +115,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                   <tr className="border-b-2 border-slate-50">
                      <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Santri / Unit</th>
                      <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Sesi / Waktu</th>
-                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status / Bukti</th>
                      <th className="pb-6 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Aksi</th>
                   </tr>
                </thead>
@@ -93,15 +123,22 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                   {filteredData.map((item) => (
                     <tr key={item.id} className="group hover:bg-slate-50 transition-all">
                       <td className="py-6 pr-4">
-                         <p className="text-[12px] font-black text-slate-800 uppercase leading-none">{data.students.find(s => s.id === item.studentId)?.name || 'Data Dihapus'}</p>
+                         <p className="text-[12px] font-black text-slate-800 uppercase leading-none">{data.students?.find(s => s.id === item.studentId)?.name || 'Data Dihapus'}</p>
                          <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">UNIT: {item.class}</p>
                       </td>
                       <td className="py-6 pr-4">
                          <p className="text-[10px] font-bold text-slate-700">{item.sessionType || item.prayerTime || item.type}</p>
-                         <p className="text-[8px] font-black text-slate-400 mt-1.5 uppercase">{item.date} • {item.recordedTime || item.timestamp}</p>
+                         <p className="text-[8px] font-black text-slate-400 mt-1.5 uppercase">{item.date} • {item.time || item.recordedTime || item.timestamp}</p>
                       </td>
                       <td className="py-6 pr-4">
-                         <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${item.status === 'Hadir' || item.status === 'Berjama\'ah' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{item.status || '-'}</span>
+                         <div className="flex items-center gap-3">
+                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${item.status === 'Hadir' || item.status === 'Berjama\'ah' || item.status === 'Ditindak' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{item.status || item.category || '-'}</span>
+                            {item.photoUrl && (
+                               <div onClick={() => window.open(item.photoUrl)} className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 cursor-zoom-in hover:scale-110 transition-transform shadow-sm">
+                                  <img src={item.photoUrl} className="w-full h-full object-cover" />
+                               </div>
+                            )}
+                         </div>
                       </td>
                       <td className="py-6">
                          <div className="flex justify-center gap-3">
@@ -112,8 +149,38 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                   ))}
                </tbody>
             </table>
+            {filteredData.length === 0 && (
+               <div className="py-20 text-center text-slate-300 font-black uppercase italic tracking-widest">Belum Ada Data</div>
+            )}
          </div>
       </div>
+
+      {/* Danger Zone: Factory Reset (Admin Only) */}
+      {isSuperAdmin && (
+        <div className="bg-red-50/50 rounded-[4rem] border-2 border-red-100 p-12 space-y-8 mt-12">
+           <div className="flex items-center gap-4 text-red-700">
+              <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center text-red-600"><ShieldAlert size={28}/></div>
+              <div>
+                 <h3 className="text-xl font-black uppercase tracking-tight">Factory Reset (Master Cloud)</h3>
+                 <p className="text-[9px] font-bold text-red-600/60 uppercase tracking-widest">Otoritas Admin Utama</p>
+              </div>
+           </div>
+           
+           <div className="p-8 bg-white rounded-3xl border border-red-100 space-y-6">
+              <p className="text-[10px] font-bold text-slate-500 uppercase leading-relaxed max-w-2xl">
+                Tindakan ini akan <span className="text-red-600 font-black underline">MENGHAPUS SEMUA DATA MASTER DAN TRANSAKSI</span> dari server Cloud Mahasina secara permanen. Aplikasi akan kembali ke kondisi kosong total.
+              </p>
+              <button 
+                disabled={isResetting}
+                onClick={handleHardReset}
+                className="w-full md:w-auto px-10 py-5 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-red-700 shadow-xl shadow-red-200 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {isResetting ? <RefreshCcw size={18} className="animate-spin" /> : <Trash2 size={18}/>}
+                Lakukan Factory Reset Cloud
+              </button>
+           </div>
+        </div>
+      )}
     </div>
   );
 };

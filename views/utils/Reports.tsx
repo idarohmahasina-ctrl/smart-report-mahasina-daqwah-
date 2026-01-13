@@ -1,9 +1,10 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { ReportItem, UserRole, ViolationCategory, Student, TemplateItem } from '../../types.ts';
 import { 
   Search, ShieldAlert, Trophy, History, PlusCircle, Send, ChevronRight, Clock as ClockIcon, 
-  AlertTriangle, User, FileText, CheckCircle, Filter, Edit, Award, ArrowLeft, UserCheck, X
+  AlertTriangle, User, FileText, CheckCircle, Filter, Edit, Award, ArrowLeft, UserCheck, X, Camera, Image as ImageIcon,
+  ImagePlus, Loader2
 } from 'lucide-react';
 
 interface ReportsProps {
@@ -26,20 +27,126 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
   const [incidentDescription, setIncidentDescription] = useState('');
   const [points, setPoints] = useState(0);
   const [actionNote, setActionNote] = useState('');
+  
+  // Photo & Compression State
+  const [showCamera, setShowCamera] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const nowTimeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
   const filteredStudents = useMemo(() => 
     students.filter(s => 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      s.nis.includes(searchTerm) ||
-      s.formalClass.toLowerCase().includes(searchTerm.toLowerCase())
+      (s.nis && s.nis.includes(searchTerm)) ||
+      (s.formalClass && s.formalClass.toLowerCase().includes(searchTerm.toLowerCase()))
     )
   , [students, searchTerm]);
 
   const categoryTemplates = useMemo(() => 
     templates.filter(t => t.category === category)
   , [templates, category]);
+
+  /**
+   * FUNGSI KOMPRESI GAMBAR (Penting untuk efisiensi memori)
+   * Mengecilkan resolusi ke max 800px & kualitas 0.7 JPEG
+   */
+  const processAndCompressImage = (base64Str: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800; // Resolusi cukup untuk bukti, tidak membebani DB
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Output Base64 dengan kualitas 70%
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+    });
+  };
+
+  // Kamera Logic
+  const startCamera = async () => {
+    setShowCamera(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch (err) {
+      alert("Gagal mengakses kamera. Pastikan izin kamera diberikan.");
+      setShowCamera(false);
+    }
+  };
+
+  const takePhoto = async () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext('2d');
+      if (context) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        context.drawImage(videoRef.current, 0, 0);
+        const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.9);
+        
+        setIsProcessing(true);
+        const compressed = await processAndCompressImage(dataUrl);
+        setCapturedPhoto(compressed);
+        setIsProcessing(false);
+        stopCamera();
+      }
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+    }
+    setShowCamera(false);
+  };
+
+  // Galeri Logic
+  const handleGalleryClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert("Mohon pilih file gambar (JPG/PNG).");
+      return;
+    }
+
+    setIsProcessing(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      const compressed = await processAndCompressImage(base64);
+      setCapturedPhoto(compressed);
+      setIsProcessing(false);
+    };
+    reader.readAsDataURL(file);
+    // Reset value agar bisa pilih file yang sama lagi jika perlu
+    e.target.value = '';
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,13 +167,14 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
       description: finalDescription,
       points: finalPoints,
       date: now.toLocaleDateString('id-ID'),
-      timestamp: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      time: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       reporter: currentUser,
       status: reportStatus,
-      actionNote: actionNote.trim() || undefined
+      actionNote: actionNote.trim() || undefined,
+      photoUrl: capturedPhoto || undefined
     });
 
-    alert(`Laporan berhasil terkirim pada ${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`);
+    alert(`Laporan ${type === 'Violation' ? 'Pelanggaran' : 'Prestasi'} berhasil terkirim!`);
     resetForm();
     setViewMode('history');
   };
@@ -79,6 +187,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
     setIncidentDescription(''); 
     setIsCustom(false); 
     setPoints(0);
+    setCapturedPhoto(null);
   };
 
   const isViolation = type === 'Violation';
@@ -86,7 +195,16 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
   return (
     <div className="max-w-5xl mx-auto pb-24 relative overflow-hidden">
       
-      {/* Sticky Sub-Navigation */}
+      {/* Hidden File Input untuk Galeri */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        className="hidden" 
+        accept="image/*" 
+        onChange={handleFileChange} 
+      />
+
+      {/* Navigasi Sub-Tab */}
       <div className="flex bg-slate-100 p-1.5 rounded-[2rem] w-fit mx-auto shadow-inner border border-slate-200 mb-10 sticky top-4 z-40 backdrop-blur-lg">
          <button 
            onClick={() => setViewMode('input')} 
@@ -103,7 +221,6 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
       </div>
 
       <div className="relative">
-        {/* INPUT FORM LAYER */}
         <div className={`transition-all duration-700 ease-in-out ${viewMode === 'input' ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none absolute w-full top-0'}`}>
           <div className="space-y-8">
             <div className={`p-12 rounded-[3.5rem] shadow-2xl relative overflow-hidden text-white ${isViolation ? 'bg-red-950 border-b-4 border-red-500' : 'bg-emerald-950 border-b-4 border-emerald-500'}`}>
@@ -114,7 +231,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                  </div>
                  <div>
                     <h2 className="text-3xl font-black uppercase tracking-tight leading-none">Smart Report {isViolation ? 'Pelanggaran' : 'Prestasi'}</h2>
-                    <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.4em] mt-4">Silakan lengkapi seluruh kolom di bawah ini</p>
+                    <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.4em] mt-4">Silakan lengkapi data & lampiran foto</p>
                  </div>
               </div>
             </div>
@@ -165,21 +282,20 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-8 border-t border-slate-100">
                      <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><Filter size={14}/> 2. Kategori {isViolation ? 'Pelanggaran' : 'Prestasi'}</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><Filter size={14}/> 2. Kategori Laporan</label>
                         <select value={category} onChange={e => {setCategory(e.target.value as any); setSelectedRule(''); setIsCustom(false);}} className="w-full px-8 py-5 bg-slate-50 rounded-2xl outline-none font-black text-xs uppercase border-2 border-transparent focus:border-emerald-600 appearance-none shadow-inner cursor-pointer">
-                           {/* Fixed: Cast Object.values(ViolationCategory) as string[] to fix unknown type error */}
                            {(Object.values(ViolationCategory) as string[]).filter(c => c !== ViolationCategory.LAINNYA).map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                      </div>
                      <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><FileText size={14}/> 3. Nama {isViolation ? 'Pelanggaran' : 'Prestasi'}</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><FileText size={14}/> 3. Nama Kejadian</label>
                         <select value={selectedRule} onChange={(e) => {
                            if (e.target.value === 'CUSTOM') { setIsCustom(true); setSelectedRule(''); setPoints(0); }
                            else { setIsCustom(false); setSelectedRule(e.target.value); setPoints(templates.find(t=>t.label===e.target.value)?.points || 0); }
                         }} className="w-full px-8 py-5 bg-slate-50 rounded-2xl outline-none font-black text-xs uppercase border-2 border-transparent focus:border-emerald-600 appearance-none shadow-inner cursor-pointer">
-                           <option value="">-- PILIH DARI KATALOG PONDOK --</option>
+                           <option value="">-- PILIH DARI KATALOG --</option>
                            {categoryTemplates.map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
-                           <option value="CUSTOM" className="text-amber-600 font-black">+ TULIS MANUAL (CUSTOM)</option>
+                           <option value="CUSTOM" className="text-amber-600 font-black">+ TULIS MANUAL</option>
                         </select>
                      </div>
                   </div>
@@ -191,39 +307,80 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                      </div>
                      <div className="md:col-span-3 space-y-3">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><Edit size={14}/> 5. Keterangan Rinci</label>
-                        <textarea value={incidentDescription} onChange={e => setIncidentDescription(e.target.value)} placeholder="Tuliskan detail atau kronologi kejadian..." className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-emerald-600 rounded-2xl outline-none font-medium text-xs h-20 shadow-inner resize-none" />
+                        <textarea value={incidentDescription} onChange={e => setIncidentDescription(e.target.value)} placeholder="Tuliskan detail kejadian..." className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-emerald-600 rounded-2xl outline-none font-medium text-xs h-20 shadow-inner resize-none" />
+                     </div>
+                  </div>
+
+                  {/* Foto Bukti dengan Support Galeri & Kompresi */}
+                  <div className="space-y-4 pt-4">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><Camera size={14}/> 6. Lampiran Foto Bukti (Kompresi Otomatis)</label>
+                     <div className="flex flex-col md:flex-row gap-6">
+                        {capturedPhoto ? (
+                           <div className="relative w-full md:w-64 aspect-video rounded-3xl overflow-hidden border-4 border-emerald-100 shadow-xl animate-in zoom-in-95">
+                              <img src={capturedPhoto} className="w-full h-full object-cover" alt="Bukti" />
+                              <button type="button" onClick={() => setCapturedPhoto(null)} className="absolute top-3 right-3 p-2 bg-red-600 text-white rounded-xl shadow-lg hover:bg-red-700 transition-colors">
+                                 <X size={16}/>
+                              </button>
+                           </div>
+                        ) : (
+                           <div className="grid grid-cols-2 gap-4 w-full md:w-auto">
+                              <button 
+                                type="button" 
+                                onClick={startCamera} 
+                                className={`aspect-video w-full md:w-40 rounded-3xl border-4 border-dashed border-slate-100 flex flex-col items-center justify-center gap-3 text-slate-300 hover:border-emerald-300 hover:text-emerald-400 transition-all bg-slate-50/50`}
+                              >
+                                 <Camera size={24}/>
+                                 <span className="text-[8px] font-black uppercase tracking-widest text-center">Kamera</span>
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={handleGalleryClick} 
+                                className={`aspect-video w-full md:w-40 rounded-3xl border-4 border-dashed border-slate-100 flex flex-col items-center justify-center gap-3 text-slate-300 hover:border-blue-300 hover:text-blue-400 transition-all bg-slate-50/50`}
+                              >
+                                 <ImagePlus size={24}/>
+                                 <span className="text-[8px] font-black uppercase tracking-widest text-center">Galeri</span>
+                              </button>
+                           </div>
+                        )}
+                        <div className="flex-1 p-6 bg-slate-50 rounded-3xl border border-slate-100 flex items-center">
+                           <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">
+                              {isProcessing ? (
+                                <span className="flex items-center gap-3 text-emerald-600 animate-pulse"><Loader2 className="animate-spin" size={14}/> SEDANG MENGOMPRES GAMBAR...</span>
+                              ) : 'Foto akan dikompres otomatis ke resolusi optimal agar hemat ruang penyimpanan.'}
+                           </p>
+                        </div>
                      </div>
                   </div>
 
                   <div className="space-y-3">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><ShieldAlert size={14}/> 6. Keterangan Ditindak (Opsional)</label>
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-3"><ShieldAlert size={14}/> 7. Keterangan Ditindak (Opsional)</label>
                      <input 
                        type="text" 
                        value={actionNote} 
                        onChange={e => setActionNote(e.target.value)} 
-                       placeholder="Contoh: Nasehat, Takzir lari, Hadiah Kitab, dll..." 
+                       placeholder="Tindakan yang sudah diambil..." 
                        className="w-full px-8 py-5 bg-slate-50 border-2 border-transparent focus:border-emerald-600 rounded-2xl outline-none font-black text-xs shadow-inner" 
                      />
                   </div>
 
                   <div className="pt-6 border-t border-slate-50">
-                    <button type="submit" className={`w-full py-7 rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-[12px] shadow-2xl flex items-center justify-center gap-5 active:scale-95 transition-all ${isViolation ? 'bg-red-950 text-white hover:bg-red-800' : 'bg-emerald-950 text-white hover:bg-emerald-800'}`}>
-                      <Send size={24}/> Kirim Laporan
+                    <button type="submit" disabled={isProcessing} className={`w-full py-7 rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-[12px] shadow-2xl flex items-center justify-center gap-5 active:scale-95 transition-all ${isViolation ? 'bg-red-950 text-white hover:bg-red-800' : 'bg-emerald-950 text-white hover:bg-emerald-800'} disabled:opacity-50`}>
+                      {isProcessing ? 'Tunggu Sebentar...' : <><Send size={24}/> Kirim Laporan</>}
                     </button>
-                    <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-6">Waktu Input Terarsip: {nowTimeStr} • {new Date().toLocaleDateString('id-ID')}</p>
+                    <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-6">Input: {nowTimeStr} • {new Date().toLocaleDateString('id-ID')}</p>
                   </div>
                </form>
             </div>
           </div>
         </div>
 
-        {/* HISTORY LAYER */}
+        {/* History Layer */}
         <div className={`transition-all duration-700 ease-in-out ${viewMode === 'history' ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 pointer-events-none absolute w-full top-0'}`}>
            <div className="bg-white p-10 md:p-14 rounded-[4rem] border border-slate-50 shadow-2xl space-y-10">
               <div className="flex justify-between items-end border-b border-slate-100 pb-8">
                  <div>
-                    <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Riwayat Input Anda</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Daftar laporan personal anda</p>
+                    <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Riwayat Laporan</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Daftar arsip laporan personal anda</p>
                  </div>
                  <div className="text-right">
                     <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-100 uppercase tracking-widest">
@@ -240,11 +397,11 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                             {isViolation ? <AlertTriangle size={28}/> : <Trophy size={28}/>}
                          </div>
                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-black text-slate-800 uppercase leading-none truncate">{students.find(s=>s.id===r.studentId)?.name || 'Siswa Dihapus'}</p>
+                            <p className="text-sm font-black text-slate-800 uppercase leading-none truncate">{students.find(s=>s.id===r.studentId)?.name || 'Santri'}</p>
                             <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase truncate max-w-[320px]">{r.description}</p>
                             <div className="flex flex-col gap-1 mt-3">
                                <div className="flex items-center gap-4 text-[8px] font-black text-emerald-700 uppercase tracking-widest">
-                                  <ClockIcon size={12}/> {r.date} • {r.timestamp} (Input Rinci)
+                                  <ClockIcon size={12}/> {r.date} • {r.time}
                                </div>
                                {r.actionNote && (
                                   <p className="text-[9px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 inline-block self-start mt-1">TINDAKAN: {r.actionNote}</p>
@@ -253,7 +410,15 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                          </div>
                       </div>
                       <div className="flex items-center gap-6 w-full md:w-auto justify-end">
-                         <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 uppercase tracking-tighter">{r.points} POIN</span>
+                         {r.photoUrl && (
+                            <div 
+                              onClick={() => window.open(r.photoUrl)}
+                              className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white shadow-md cursor-zoom-in hover:scale-110 transition-transform"
+                            >
+                               <img src={r.photoUrl} className="w-full h-full object-cover" alt="Bukti" />
+                            </div>
+                         )}
+                         <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 uppercase tracking-tighter">{r.points} PT</span>
                          <div className={`flex items-center gap-3 px-5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest ${r.status === 'Ditindak' ? 'bg-emerald-700 text-white shadow-lg' : 'bg-amber-100 text-amber-800'}`}>
                            {r.status === 'Ditindak' ? <CheckCircle size={14}/> : <ClockIcon size={14}/>} {r.status}
                          </div>
@@ -264,6 +429,28 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
            </div>
         </div>
       </div>
+
+      {/* Kamera Overlay */}
+      {showCamera && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
+           <div className="bg-white rounded-[3rem] overflow-hidden w-full max-w-lg space-y-6 p-8">
+              <div className="flex justify-between items-center">
+                 <h3 className="text-sm font-black uppercase tracking-widest">Kamera Bukti</h3>
+                 <button onClick={stopCamera} className="p-2 bg-slate-100 rounded-xl text-slate-400"><X/></button>
+              </div>
+              <div className="relative aspect-[4/3] bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl">
+                 <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+              </div>
+              <button 
+                onClick={takePhoto} 
+                className={`w-full py-5 text-white rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 ${isViolation ? 'bg-red-800' : 'bg-emerald-800'}`}
+              >
+                <Camera size={20}/> Ambil Foto
+              </button>
+              <canvas ref={canvasRef} className="hidden" />
+           </div>
+        </div>
+      )}
     </div>
   );
 };
