@@ -9,11 +9,12 @@ import {
   UserRole, AttendanceRecord, AttendanceStatus, Student, 
   UserProfile, TeacherAttendance, Schedule, AcademicConfig,
   ReportItem
-} from '../types';
+} from '../../types';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend 
 } from 'recharts';
 import { GoogleGenAI } from "@google/genai";
+import { isTeacherMatch } from './nameMatchers.ts';
 
 const COLORS = ['#10b981', '#3b82f6', '#6366f1', '#f59e0b', '#ef4444', '#64748b'];
 
@@ -69,7 +70,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const teacherScheduleToday = useMemo(() => {
     return schedules.filter(s => 
       s.day === todayDay && 
-      (s.teacherName.toLowerCase().includes(profile.fullName.toLowerCase()) || profile.role === UserRole.IDAROH)
+      (isTeacherMatch(profile.fullName, s.teacherName) || profile.role === UserRole.IDAROH)
     ).sort((a,b) => a.time.localeCompare(b.time));
   }, [schedules, todayDay, profile]);
 
@@ -97,7 +98,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         const prompt = `Analisis singkat Pesantren Mahasina (${todayDateStr}):
         - Santri Hadir: ${reportedToday.filter(a => a.status === AttendanceStatus.H).length}
         - Kasus Pelanggaran Baru: ${reports.filter(r => r.date === todayDateStr && r.type === 'Violation').length}
-        - Nama Ustadz: ${profile.fullName}.
+        - Nama Ustadz/ah: ${profile.fullName}.
         Berikan 1 kalimat motivasi Islami singkat dan 1 pengingat tugas. Maks 2 kalimat.`;
 
         const response = await ai.models.generateContent({
@@ -127,12 +128,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       
       {/* Welcome Banner */}
       <div className="relative bg-[#064e3b] p-8 md:p-12 rounded-[3.5rem] shadow-2xl overflow-hidden text-white group">
-        <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 group-hover:rotate-0 transition-transform duration-1000">
-           <Sparkles size={140} />
-        </div>
+        <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
         <div className="relative z-10 space-y-4">
            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-black uppercase tracking-tight">Assalamu'alaikum, Ustadz/ah</h2>
+              <h2 className="text-2xl font-black uppercase tracking-tight">Assalamu'alaikum, {profile.fullName.split(' ')[0]}</h2>
               <span className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">MahaAI Live</span>
            </div>
            <p className="text-emerald-200 font-medium text-lg italic max-w-2xl leading-relaxed border-l-4 border-emerald-500 pl-6 py-1">
@@ -142,12 +141,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-         {/* Stats Card Grid */}
          <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
                { label: 'Hadir', val: stats.H, icon: <CheckCircle/>, color: 'emerald' },
                { label: 'Alpha', val: stats.A, icon: <AlertTriangle/>, color: 'red' },
-               { label: 'Jadwal', val: schedules.filter(s => s.day === todayDay).length, icon: <Zap/>, color: 'indigo' },
+               { label: 'Jadwal Anda', val: teacherScheduleToday.length, icon: <Zap/>, color: 'indigo' },
                { label: 'Laporan', val: reports.length, icon: <Activity/>, color: 'amber' },
             ].map(s => (
                <div key={s.label} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center text-center gap-3 hover:shadow-xl hover:-translate-y-1 transition-all group">
@@ -162,10 +160,9 @@ const Dashboard: React.FC<DashboardProps> = ({
             ))}
          </div>
 
-         {/* Today's Schedule Sidebar */}
          <div className="bg-white p-8 rounded-[3.5rem] border border-slate-100 shadow-sm space-y-8">
             <div className="flex items-center justify-between">
-               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-3"><Clock size={18} className="text-emerald-600"/> Jadwal Anda</h3>
+               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-3"><Clock size={18} className="text-emerald-600"/> Jadwal Mengajar</h3>
                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg uppercase tracking-widest">{todayDay}</span>
             </div>
             <div className="space-y-4 max-h-[220px] overflow-y-auto no-scrollbar pr-1">
@@ -180,43 +177,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                )) : (
                  <div className="text-center py-10 opacity-30">
                     <Calendar size={32} className="mx-auto" />
-                    <p className="text-[10px] font-black uppercase mt-4">Tidak ada jadwal</p>
+                    <p className="text-[10px] font-black uppercase mt-4">Jadwal tidak ditemukan</p>
                  </div>
                )}
             </div>
          </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-         {/* Pie Chart Analysis */}
-         <div className="bg-white p-10 rounded-[4rem] border border-slate-100 shadow-sm space-y-10">
-            <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-3"><PieIcon size={20} className="text-emerald-600"/> Komposisi Absensi Hari Ini</h3>
-            <div className="h-72 w-full">
-               <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                     <Pie 
-                        data={[
-                           { name: 'Hadir', val: stats.H }, 
-                           { name: 'Alpha', val: stats.A }, 
-                           { name: 'Telat', val: stats.T }
-                        ].filter(d => d.val > 0)} 
-                        cx="50%" cy="50%" innerRadius={75} outerRadius={105} paddingAngle={8} dataKey="val"
-                        stroke="none"
-                     >
-                        {[0,4,3].map(idx => <Cell key={idx} fill={COLORS[idx % COLORS.length]} className="focus:outline-none" />)}
-                     </Pie>
-                     <Tooltip 
-                        contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase'}} 
-                        itemStyle={{padding: '4px 0'}}
-                     />
-                     <Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', paddingTop: '20px'}} />
-                  </PieChart>
-               </ResponsiveContainer>
-            </div>
-         </div>
-
-         {/* Disciplinary Ranking */}
-         <RankingCard title="Perlu Bimbingan (Pelanggaran)" data={violationRanking} type="KALI" color="red" />
       </div>
     </div>
   );

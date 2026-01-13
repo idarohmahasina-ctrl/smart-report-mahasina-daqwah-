@@ -1,7 +1,7 @@
 
 export enum UserRole {
   GURU = 'Guru',
-  MUSYRIF = 'Musyrif/ah (Wali Kelas)',
+  MUSYRIF = 'Musyrif/ah',
   IDAROH = 'Petugas Idaroh',
   SANTRI_OFFICER = 'Petugas Santri',
   PENGASUH = 'Pengasuh'
@@ -15,23 +15,18 @@ export enum AttendanceStatus {
   A = 'Alpha'
 }
 
-export enum PrayerStatus {
-  JAMAAH = 'Berjama\'ah',
-  UDZUR = 'Udzur',
-  SAKIT = 'Sakit',
-  IZIN = 'Izin',
-  TERLAMBAT = 'Terlambat',
-  ALPHA = 'Alpha'
-}
-
 export enum PrayerTime {
   SUBUH = 'Subuh',
   DHUHA = 'Dhuha',
   DZUHUR = 'Dzuhur',
   ASHAR = 'Ashar',
   MAGHRIB = 'Maghrib',
-  ISYA = 'Isya'
+  ISYA = 'Isya',
+  LALARAN = 'Lalaran Ahad Malam'
 }
+
+// Added SessionType definition
+export type SessionType = string;
 
 export enum ViolationCategory {
   AKADEMIK = 'Akademik',
@@ -42,38 +37,11 @@ export enum ViolationCategory {
   LAINNYA = 'Lain-lain'
 }
 
-// Fixed: Changed SessionType to enum so it can be used as a value in mock data and constants
-export enum SessionType {
-  MADRASAH = 'Madrasah',
-  MAJLIS = 'Majlis',
-  QURAN = 'Quran',
-  HADIS = 'Hadis',
-  KITAB = 'Kitab',
-  TAMBAHAN = 'Tambahan',
-  PEMINATAN = 'Peminatan'
-}
-
 export interface AcademicConfig {
   schoolYear: string;
   semester: 'I (Ganjil)' | 'II (Genap)';
   isHoliday: boolean;
-  sessionHolidays: Record<string, boolean>;
-}
-
-export interface TemplateItem {
-  id?: string;
-  label: string;
-  points: number;
-  category: ViolationCategory;
-}
-
-export interface Announcement {
-  id: string;
-  title: string;
-  content: string;
-  date: string;
-  author: string;
-  priority: 'Normal' | 'Penting';
+  excludedClasses: Record<string, boolean>;
 }
 
 export interface UserProfile {
@@ -82,7 +50,7 @@ export interface UserProfile {
   phone: string;
   email: string;
   role: UserRole;
-  classes?: string[];
+  isBlocked?: boolean;
 }
 
 export interface Student {
@@ -90,7 +58,7 @@ export interface Student {
   nis: string;
   name: string;
   formalClass: string; 
-  sessionClasses: Record<string, string>; // Dinamis: Sesi -> Nama Kelas
+  sessionClasses: Record<string, string>; // Sesi -> Nama Kelas
   level: 'MTs' | 'MA';
   gender: 'Putra' | 'Putri';
 }
@@ -99,23 +67,21 @@ export interface Teacher {
   id: string;
   name: string;
   subject: string;
-  phone: string;
   email: string;
-  gender: 'Putra' | 'Putri';
-  isWaliKelas: boolean;
-  waliKelasFor?: string;
   teachingClasses: string[];
+  // Added phone property to match usage
+  phone: string;
 }
 
 export interface Schedule {
   id: string;
-  class: string; 
-  level: 'MTs' | 'MA';
-  gender: 'Putra' | 'Putri';
   day: string;
   time: string;
   subject: string;
   teacherName: string;
+  class: string;
+  level: 'MTs' | 'MA';
+  gender: 'Putra' | 'Putri';
   sessionType: string;
 }
 
@@ -123,50 +89,37 @@ export interface OrganizationMember {
   id: string;
   position: string;
   name: string;
-  nis?: string;
+  nis: string;
   class: string;
-  department?: string;
+  division: string;
+  orgType: 'ORSAM' | 'ORKLAS';
+  gender: 'Putra' | 'Putri';
 }
 
 export interface AttendanceRecord {
   id: string;
   date: string;
-  recordedTime: string; 
+  time: string;
   studentId: string;
   status: AttendanceStatus;
-  note?: string;
+  note: string;
   recordedBy: string;
   class: string;
   sessionType: string;
-  subject: string;
 }
 
-export interface PrayerRecord {
-  id: string;
-  date: string;
-  recordedTime: string; 
-  studentId: string;
-  status: PrayerStatus;
-  note?: string;
-  recordedBy: string;
-  class: string;
-  prayerTime: PrayerTime;
-}
-
+// Renamed from TeacherAttendanceRecord to TeacherAttendance to match imports in other files
 export interface TeacherAttendance {
   id: string;
   date: string;
+  teacherEmail: string;
   teacherName: string;
   subject: string;
   class: string;
-  level: 'MTs' | 'MA';
-  gender: 'Putra' | 'Putri';
-  checkInTime: string;
-  checkOutTime?: string;
-  status: 'Hadir' | 'Terlambat' | 'Izin' | 'Alpha';
-  note?: string;
-  sessionType: string;
-  timeScheduled: string;
+  startTime: string;
+  endTime?: string;
+  photoUrl: string; // Base64
+  summary?: string;
 }
 
 export interface ReportItem {
@@ -177,32 +130,65 @@ export interface ReportItem {
   description: string;
   points: number;
   date: string;
-  timestamp: string; 
+  time: string;
   reporter: string;
   status: 'Belum Ditindak' | 'Ditindak';
   actionNote?: string;
+  photoUrl?: string;
 }
 
-// Added ExtraDataList for modular information tracking
-export interface ExtraDataList {
+// Added PrayerStatus enum missing in types.ts
+export enum PrayerStatus {
+  JAMAAH = "Berjama'ah",
+  UDZUR = 'Udzur',
+  SAKIT = 'Sakit',
+  IZIN = 'Izin',
+  TERLAMBAT = 'Terlambat',
+  ALPHA = 'Alpha'
+}
+
+// Added PrayerRecord interface missing in types.ts
+export interface PrayerRecord {
   id: string;
-  name: string;
-  items: any[];
+  date: string;
+  recordedTime: string;
+  studentId: string;
+  status: PrayerStatus;
+  recordedBy: string;
+  class: string;
+  prayerTime: PrayerTime;
+  note?: string;
 }
 
-// Added AppData to centralize state definition for the entire application
+// Added TemplateItem interface missing in types.ts
+export interface TemplateItem {
+  label: string;
+  points: number;
+  category: ViolationCategory;
+}
+
+// Added Announcement interface missing in types.ts
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+}
+
+// Added AppData interface missing parts (extraDataLists, announcements, etc.)
 export interface AppData {
-  attendance: AttendanceRecord[];
-  prayerAttendance: PrayerRecord[];
-  reports: ReportItem[];
   students: Student[];
   teachers: Teacher[];
   schedules: Schedule[];
-  academicConfig: AcademicConfig;
-  violationTemplates: any[];
-  achievementTemplates: any[];
+  attendance: AttendanceRecord[];
+  teacherAttendance: TeacherAttendance[];
+  reports: ReportItem[];
+  prayerAttendance: PrayerRecord[];
   orsam: OrganizationMember[];
   orklas: OrganizationMember[];
-  extraDataLists: ExtraDataList[];
+  violationTemplates: TemplateItem[];
+  achievementTemplates: TemplateItem[];
+  academicConfig: AcademicConfig;
+  extraDataLists: any[]; // Used in Information.tsx
   announcements: Announcement[];
 }

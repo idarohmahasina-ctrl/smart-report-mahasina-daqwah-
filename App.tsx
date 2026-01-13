@@ -4,58 +4,70 @@ import Layout from './components/Layout.tsx';
 import Registration from './views/utils/Registration.tsx';
 import Dashboard from './views/Dashboard.tsx';
 import Attendance from './Attendance.tsx';
+import TeacherAttendanceView from './views/TeacherAttendance.tsx';
 import Reports from './views/utils/Reports.tsx';
 import Information from './views/utils/Information.tsx';
 import Settings from './views/Settings.tsx';
-import PrayerAttendance from './views/utils/PrayerAttendance.tsx';
 import ControlPanel from './views/ControlPanel.tsx';
-import { UserCheck } from 'lucide-react';
+import { UserProfile, AppData, UserRole, TeacherAttendance } from './types.ts';
 import { 
-  UserProfile
-} from './types.ts';
-import { 
-  saveAppData, addAttendanceRecord, addReportRecord,
-  getActiveSession, subscribeToAppData, setActiveSession
+  saveAppData, getActiveSession, subscribeToAppData, setActiveSession 
 } from './services/dataService.ts';
 
 const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(getActiveSession());
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [appData, setAppData] = useState<any>(null);
+  const [appData, setAppData] = useState<AppData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Sync data dari Firestore
-    const unsubscribeData = subscribeToAppData((data) => {
-      setAppData(data);
+    // Timeout as fallback for infinite loading during slow sync
+    const timer = setTimeout(() => {
+      if (loading) setLoading(false);
+    }, 5000);
+
+    const unsubscribe = subscribeToAppData((data) => {
+      if (data) setAppData(data);
       setLoading(false);
     });
 
     return () => {
-      unsubscribeData();
+      unsubscribe();
+      clearTimeout(timer);
     };
-  }, []);
+  }, [loading]);
 
   const handleLogout = () => {
-    if (confirm("Logout dari aplikasi Smart Report?")) {
-      setActiveSession(null);
-      setProfile(null);
-      window.location.reload();
-    }
+    setActiveSession(null);
+    setProfile(null);
+    window.location.reload();
   };
 
-  const handleLoginComplete = (newProfile: UserProfile) => {
-    setProfile(newProfile);
+  const currentAppData: AppData = appData || {
+    students: [],
+    teachers: [],
+    schedules: [],
+    attendance: [],
+    teacherAttendance: [],
+    reports: [],
+    prayerAttendance: [],
+    orsam: [],
+    orklas: [],
+    violationTemplates: [],
+    achievementTemplates: [],
+    extraDataLists: [],
+    announcements: [],
+    academicConfig: { schoolYear: '2024/2025', semester: 'II (Genap)', isHoliday: false, excludedClasses: {} }
   };
 
   if (loading && !appData) return (
-    <div className="min-h-screen bg-[#064e3b] flex flex-col items-center justify-center text-white space-y-6">
-      <div className="w-16 h-16 border-4 border-white/10 border-t-emerald-400 rounded-full animate-spin" />
-      <p className="font-black uppercase tracking-[0.3em] text-[10px] animate-pulse">Menghubungkan ke Mahasina Cloud...</p>
+    <div className="h-screen bg-[#064e3b] flex flex-col items-center justify-center text-white space-y-6">
+      <div className="w-16 h-16 border-4 border-emerald-400 border-t-white rounded-full animate-spin" />
+      <p className="font-black uppercase tracking-[0.5em] text-[10px]">Mahasina Cloud Sync...</p>
     </div>
   );
 
-  if (!profile) return <Registration onComplete={handleLoginComplete} />;
+  if (!profile) return <Registration onComplete={(p) => setProfile(p)} />;
 
   return (
     <Layout
@@ -65,94 +77,41 @@ const App: React.FC = () => {
       userName={profile.fullName}
       userEmail={profile.email}
       onLogout={handleLogout}
-      academicConfig={appData?.academicConfig || {}}
+      academicConfig={currentAppData.academicConfig}
     >
-      <div className="animate-slide-up">
-        {activeTab === 'dashboard' && <Dashboard {...appData} profile={profile} />}
-        {activeTab === 'absen-santri' && (
-          <Attendance 
-            mode="Santri" 
-            role={profile.role} 
-            currentUser={profile.fullName} 
-            {...appData} 
-            onSave={recs => addAttendanceRecord(recs)} 
-            onTeacherCheckIn={() => {}} 
-          />
-        )}
-        {activeTab === 'absen-sholat' && (
-          <PrayerAttendance 
-            students={appData.students} 
-            allPrayerRecords={appData.prayerAttendance} 
-            currentUser={profile.fullName} 
-            onSave={recs => saveAppData({ prayerAttendance: [...appData.prayerAttendance, ...recs] })} 
-          />
-        )}
-        {activeTab === 'absen-guru' && (
-          <div className="bg-white p-12 md:p-20 rounded-[4rem] border shadow-sm text-center space-y-8 max-w-2xl mx-auto mt-10">
-             <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner"><UserCheck size={64} /></div>
-             <div>
-                <h3 className="text-2xl font-black uppercase tracking-tight text-slate-800">Presensi Guru Otomatis</h3>
-                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-4 leading-relaxed">
-                   Ustadz/ah, sistem secara cerdas mencatat kehadiran Anda saat Anda melakukan absensi santri di kelas.
-                </p>
-             </div>
-          </div>
-        )}
-        {activeTab === 'pelanggaran' && (
-          <Reports 
-            type="Violation" 
-            role={profile.role} 
-            currentUser={profile.fullName} 
-            students={appData.students} 
-            allReports={appData.reports} 
-            templates={appData.violationTemplates} 
-            onSave={rep => addReportRecord(rep)} 
-          />
-        )}
-        {activeTab === 'prestasi' && (
-          <Reports 
-            type="Achievement" 
-            role={profile.role} 
-            currentUser={profile.fullName} 
-            students={appData.students} 
-            allReports={appData.reports} 
-            templates={appData.achievementTemplates} 
-            onSave={rep => addReportRecord(rep)} 
-          />
-        )}
-        {activeTab === 'informasi' && (
-          <Information 
-            role={profile.role} 
-            userEmail={profile.email} 
-            data={appData} 
-            onUpdateData={(t, d) => { 
-              const update: any = {}; 
-              if (t==='Siswa') update.students = d; 
-              if (t==='Guru') update.teachers = d; 
-              if (t==='Jadwal') update.schedules = d; 
-              saveAppData(update); 
-            }} 
-          />
-        )}
-        {activeTab === 'control-panel' && profile.email.toLowerCase() === 'idarohmahasina@gmail.com' && (
-          <ControlPanel 
-            data={appData} 
-            actions={{
-              deleteAttendance: id => saveAppData({ attendance: appData.attendance.filter((a: any) => a.id !== id) }),
-              deletePrayer: id => saveAppData({ prayerAttendance: appData.prayerAttendance.filter((p: any) => p.id !== id) }),
-              deleteReport: id => saveAppData({ reports: appData.reports.filter((r: any) => r.id !== id) })
-            }} 
-          />
-        )}
-        {activeTab === 'pengaturan' && (
-          <Settings 
-            userEmail={profile.email} 
-            academicConfig={appData.academicConfig} 
-            onUpdateAcademic={c => saveAppData({ academicConfig: c })} 
-            availableClasses={[]} 
-          />
-        )}
-      </div>
+      {activeTab === 'dashboard' && <Dashboard {...currentAppData} profile={profile} />}
+      
+      {activeTab === 'absen-guru' && (
+        <TeacherAttendanceView 
+          data={currentAppData} 
+          profile={profile} 
+          onSave={(record: TeacherAttendance) => {
+            saveAppData({ teacherAttendance: [...(currentAppData.teacherAttendance || []), record] });
+          }} 
+        />
+      )}
+
+      {activeTab === 'absen-santri' && <Attendance {...currentAppData} role={profile.role} currentUser={profile.fullName} onSave={(recs:any) => saveAppData({ attendance: [...currentAppData.attendance, ...recs] })} />}
+      
+      {activeTab === 'input-pelanggaran' && <Reports type="Violation" role={profile.role} currentUser={profile.fullName} students={currentAppData.students} allReports={currentAppData.reports} templates={currentAppData.violationTemplates} onSave={rep => saveAppData({ reports: [rep, ...currentAppData.reports] })} />}
+      
+      {activeTab === 'input-prestasi' && <Reports type="Achievement" role={profile.role} currentUser={profile.fullName} students={currentAppData.students} allReports={currentAppData.reports} templates={currentAppData.achievementTemplates} onSave={rep => saveAppData({ reports: [rep, ...currentAppData.reports] })} />}
+
+      {activeTab === 'informasi' && <Information role={profile.role} userEmail={profile.email} data={currentAppData} onUpdateData={(type, newData) => {
+         const update: any = {};
+         if (type === 'Siswa') update.students = newData;
+         if (type === 'Guru') update.teachers = newData;
+         if (type === 'Jadwal') update.schedules = newData;
+         saveAppData(update);
+      }} />}
+      
+      {activeTab === 'panel-kontrol' && <ControlPanel data={currentAppData} actions={{
+         deleteAttendance: id => saveAppData({ attendance: currentAppData.attendance.filter(a => a.id !== id) }),
+         deletePrayer: id => saveAppData({ prayerAttendance: currentAppData.prayerAttendance.filter(p => p.id !== id) }),
+         deleteReport: id => saveAppData({ reports: currentAppData.reports.filter(r => r.id !== id) })
+      }} />}
+
+      {activeTab === 'pengaturan' && <Settings userEmail={profile.email} academicConfig={currentAppData.academicConfig} onUpdateAcademic={c => saveAppData({ academicConfig: c })} availableClasses={[]} />}
     </Layout>
   );
 };
