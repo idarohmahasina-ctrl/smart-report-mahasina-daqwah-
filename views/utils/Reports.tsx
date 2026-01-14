@@ -29,13 +29,16 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
   const [points, setPoints] = useState(0);
   const [actionNote, setActionNote] = useState('');
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
 
-  // LOGIKA HAK AKSES
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const isAdminOrPengasuh = role === UserRole.IDAROH || role === UserRole.PENGASUH;
   const isGenderRestricted = role === UserRole.SANTRI_OFFICER_PUTRA || role === UserRole.SANTRI_OFFICER_PUTRI;
   const targetGender = role === UserRole.SANTRI_OFFICER_PUTRA ? 'Putra' : 'Putri';
   
-  // Ambil daftar kelas yang dikelola (untuk Guru, Musyrif, & Walas)
   const myManagedClasses = useMemo(() => {
     if (isAdminOrPengasuh || isGenderRestricted) return []; 
     return Array.from(new Set(
@@ -49,11 +52,8 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
 
   const filteredStudents = useMemo(() => 
     students.filter(s => {
-      // Filter Gender (Hanya untuk petugas santri)
       const matchGender = !isGenderRestricted || s.gender === targetGender;
-      // Filter Kelas (Untuk guru/musyrif/walas)
       const matchClass = !isClassRestricted || myManagedClasses.includes(s.formalClass);
-      
       const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || (s.nis && s.nis.includes(searchTerm));
       return matchGender && matchClass && matchSearch;
     })
@@ -62,23 +62,54 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
   const historyReports = useMemo(() => {
     return allReports.filter(r => {
       if (r.type !== type) return false;
-      
       const s = students.find(std => std.id === r.studentId);
       if (!s) return false;
-
-      // Idaroh & Pengasuh lihat semua
       if (isAdminOrPengasuh) return true;
-
-      // Petugas Santri lihat sesuai gender
       if (isGenderRestricted) return s.gender === targetGender;
-
-      // Guru, Musyrif & Walas lihat sesuai kelas binaan
       if (isClassRestricted) return myManagedClasses.includes(s.formalClass);
-
-      // Default: Hanya lihat laporan yang dibuat sendiri
       return r.reporter === currentUser;
     });
   }, [allReports, type, currentUser, students, isGenderRestricted, targetGender, isAdminOrPengasuh, isClassRestricted, myManagedClasses]);
+
+  const startCamera = async () => {
+    setShowCamera(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch (err) {
+      alert("Gagal mengakses kamera.");
+      setShowCamera(false);
+    }
+  };
+
+  const takePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext('2d');
+      if (context) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        context.drawImage(videoRef.current, 0, 0);
+        setCapturedPhoto(canvasRef.current.toDataURL('image/jpeg', 0.8));
+        stopCamera();
+      }
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+    }
+    setShowCamera(false);
+  };
+
+  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setCapturedPhoto(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +120,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
       studentId: selectedStudent.id,
       type,
       category,
-      description: selectedRule || incidentDescription,
+      description: selectedRule === 'lainnya' ? incidentDescription : selectedRule,
       points: points || (templates.find(t => t.label === selectedRule)?.points || 0),
       date: new Date().toLocaleDateString('id-ID'),
       time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
@@ -100,6 +131,9 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
     });
 
     alert("Laporan berhasil terkirim!");
+    setCapturedPhoto(null);
+    setSelectedStudent(null);
+    setSearchTerm('');
     setViewMode('history');
   };
 
@@ -114,11 +148,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
         <div className="bg-white p-12 rounded-[4rem] border shadow-sm space-y-12">
            <form onSubmit={handleSubmit} className="space-y-8">
               <div className="space-y-4">
-                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                   1. Cari Santri 
-                   {isGenderRestricted && ` (${targetGender})`}
-                   {isClassRestricted && ` (Kelas Binaan/Managed)`}
-                 </label>
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">1. Cari Santri</label>
                  <div className="relative">
                     <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={22}/>
                     <input type="text" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setSelectedStudent(null); }} placeholder="Ketik nama atau NIS..." className="w-full pl-16 pr-6 py-6 bg-slate-50 rounded-[2rem] outline-none font-black text-sm shadow-inner" />
@@ -167,16 +197,39 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                  )}
               </div>
 
+              <div className="space-y-4">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">3. Lampiran Foto (Opsional)</label>
+                 <div className="flex flex-wrap gap-4">
+                    {capturedPhoto ? (
+                       <div className="relative w-full md:w-48 aspect-video rounded-[2rem] overflow-hidden border-2 border-emerald-500 shadow-xl group">
+                          <img src={capturedPhoto} className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => setCapturedPhoto(null)} className="absolute top-3 right-3 p-2 bg-red-600 text-white rounded-xl shadow-lg hover:scale-110 transition-all"><X size={16}/></button>
+                       </div>
+                    ) : (
+                       <div className="flex gap-4 w-full">
+                          <button type="button" onClick={startCamera} className="flex-1 flex flex-col items-center justify-center gap-3 py-10 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200 text-slate-400 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-600 transition-all">
+                             <Camera size={32}/>
+                             <span className="text-[10px] font-black uppercase tracking-widest">Kamera</span>
+                          </button>
+                          <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 flex flex-col items-center justify-center gap-3 py-10 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200 text-slate-400 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition-all">
+                             <ImageIcon size={32}/>
+                             <span className="text-[10px] font-black uppercase tracking-widest">Galeri</span>
+                             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleGalleryUpload} />
+                          </button>
+                       </div>
+                    )}
+                 </div>
+              </div>
+
               <button type="submit" disabled={!selectedStudent} className="w-full py-7 bg-emerald-950 text-white rounded-[2.5rem] font-black uppercase text-[12px] shadow-2xl hover:bg-emerald-900 active:scale-95 transition-all disabled:opacity-30">Kirim Laporan</button>
            </form>
         </div>
       ) : (
         <div className="bg-white p-10 rounded-[4rem] border shadow-2xl space-y-8 min-h-[500px]">
            <div className="flex justify-between items-center px-4">
-              <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-3"><History size={20} className="text-emerald-700"/> {type === 'Violation' ? 'Riwayat Pelanggaran' : 'Riwayat Prestasi'}</h3>
+              <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-3"><History size={20} className="text-emerald-700"/> Riwayat {type === 'Violation' ? 'Pelanggaran' : 'Prestasi'}</h3>
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total: {historyReports.length} Laporan</p>
            </div>
-           
            <div className="space-y-4">
               {historyReports.map(r => (
                 <div key={r.id} className="p-8 bg-slate-50 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-6 group hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-slate-100">
@@ -204,9 +257,25 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
               {historyReports.length === 0 && (
                  <div className="py-32 text-center opacity-20 flex flex-col items-center gap-4">
                     <FileText size={64}/>
-                    <p className="text-[11px] font-black uppercase tracking-[0.3em]">Tidak Ada Laporan Ditemukan</p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.3em]">Tidak Ada Laporan</p>
                  </div>
               )}
+           </div>
+        </div>
+      )}
+
+      {showCamera && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/95 p-6 backdrop-blur-md">
+           <div className="bg-white rounded-[3.5rem] overflow-hidden w-full max-w-lg shadow-2xl space-y-8 p-10 animate-in zoom-in-95">
+              <div className="flex justify-between items-center">
+                 <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Kamera Bukti</h3>
+                 <button onClick={stopCamera} className="p-3 bg-slate-100 rounded-2xl text-slate-400 hover:bg-red-50 hover:text-red-600 transition-all"><X/></button>
+              </div>
+              <div className="relative aspect-[4/3] bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-inner">
+                 <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+              </div>
+              <button onClick={takePhoto} className="w-full py-6 bg-emerald-950 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-4 shadow-xl hover:bg-emerald-900 active:scale-95 transition-all"><Camera size={24}/> Ambil Foto</button>
+              <canvas ref={canvasRef} className="hidden" />
            </div>
         </div>
       )}

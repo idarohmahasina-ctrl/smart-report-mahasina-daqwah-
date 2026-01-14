@@ -1,12 +1,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  AppData, AttendanceStatus, Student, AttendanceRecord, 
-  PrayerRecord, ReportItem, PrayerStatus, UserRole 
+  AppData, AttendanceStatus, Student, UserRole 
 } from '../types.ts';
 import { 
-  Search, Download, Users, ClipboardCheck, Zap, 
-  ShieldAlert, Trophy, Filter, User, FileSpreadsheet
+  Search, Users, ClipboardCheck, ShieldAlert, Trophy, Filter, FileSpreadsheet
 } from 'lucide-react';
 import { downloadCSV } from './utils/csvExport.ts';
 import { isTeacherMatch } from './utils/nameMatchers.ts';
@@ -27,7 +25,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
   const students = data.students || [];
   const role = profile?.role;
 
-  // LOGIKA HAK AKSES GLOBAL
+  // LOGIKA HAK AKSES
   const isAdminOrPengasuh = role === UserRole.IDAROH || role === UserRole.PENGASUH;
   const isGenderRestricted = role === UserRole.SANTRI_OFFICER_PUTRA || role === UserRole.SANTRI_OFFICER_PUTRI;
   const targetGender = role === UserRole.SANTRI_OFFICER_PUTRA ? 'Putra' : 'Putri';
@@ -36,7 +34,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
     if (isAdminOrPengasuh || isGenderRestricted) return []; 
     return Array.from(new Set(
       data.schedules
-        .filter(s => isTeacherMatch(profile.fullName, s.teacherName, s.assistantTeacherName))
+        .filter(s => isTeacherMatch(profile.fullName, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName))
         .map(s => s.class)
     ));
   }, [data.schedules, profile, isAdminOrPengasuh, isGenderRestricted]);
@@ -49,18 +47,9 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
       if (isGenderRestricted && s.gender !== targetGender) return;
       if (isClassRestricted && !myManagedClasses.includes(s.formalClass)) return;
       if (s.formalClass) cls.add(s.formalClass);
-      Object.values(s.sessionClasses || {}).forEach(c => { if(c) cls.add(c as string); });
     });
     return Array.from(cls).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [students, isGenderRestricted, targetGender, isClassRestricted, myManagedClasses]);
-
-  const availableSessions = useMemo(() => {
-    const sess = new Set<string>(['Madrasah', 'Subuh', 'Dhuha', 'Dzuhur', 'Ashar', 'Maghrib', 'Isya', 'Lalaran Ahad Malam']);
-    students.forEach(s => {
-      Object.keys(s.sessionClasses || {}).forEach(k => sess.add(k));
-    });
-    return Array.from(sess).sort();
-  }, [students]);
 
   // DATA UNTUK REKAP ABSENSI
   const rekapAbsenData = useMemo(() => {
@@ -71,7 +60,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
         const matchRoleClass = !isClassRestricted || myManagedClasses.includes(s.formalClass);
         const matchLvl = levelFilter === 'Semua' || s.level === levelFilter;
         const matchGdr = genderFilter === 'Semua' || s.gender === genderFilter;
-        const isStudentInClass = s.formalClass === classFilter || Object.values(s.sessionClasses || {}).includes(classFilter);
+        const isStudentInClass = s.formalClass === classFilter;
         return matchRoleGender && matchRoleClass && matchLvl && matchGdr && isStudentInClass;
       })
       .map(s => {
@@ -96,15 +85,14 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
         return {
           "Nama Santri": s.name,
           "NIS": s.nis,
-          "Kelas": classFilter,
+          "Kelas": s.formalClass,
           "Gender": s.gender,
           "Hadir": counts.H,
           "Sakit": counts.S,
           "Izin": counts.I,
           "Terlambat": counts.T,
           "Alpha": counts.A,
-          "Total Sesi": totalSesi,
-          "Persentase": `${percentage}%`
+          "Persentase Hadir": `${percentage}%`
         };
       })
       .filter(row => row["Nama Santri"].toLowerCase().includes(searchTerm.toLowerCase()))
@@ -120,7 +108,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
         const matchRoleClass = !isClassRestricted || myManagedClasses.includes(s.formalClass);
         const matchLvl = levelFilter === 'Semua' || s.level === levelFilter;
         const matchGdr = genderFilter === 'Semua' || s.gender === genderFilter;
-        const isStudentInClass = s.formalClass === classFilter || Object.values(s.sessionClasses || {}).includes(classFilter);
+        const isStudentInClass = s.formalClass === classFilter;
         return matchRoleGender && matchRoleClass && matchLvl && matchGdr && isStudentInClass;
       })
       .map(s => {
@@ -131,12 +119,12 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
         return {
           "Nama Santri": s.name,
           "NIS": s.nis,
-          "Kelas": classFilter,
+          "Kelas": s.formalClass,
           "Gender": s.gender,
           "Total Pelanggaran": violations.length,
-          "Poin Pelanggaran (-)": violations.reduce((acc, curr) => acc + curr.points, 0),
+          "Poin Pelanggaran": violations.reduce((acc, curr) => acc + curr.points, 0),
           "Total Prestasi": achievements.length,
-          "Poin Prestasi (+)": achievements.reduce((acc, curr) => acc + curr.points, 0)
+          "Poin Prestasi": achievements.reduce((acc, curr) => acc + curr.points, 0)
         };
       })
       .filter(row => row["Nama Santri"].toLowerCase().includes(searchTerm.toLowerCase()))
@@ -144,26 +132,28 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
   }, [classFilter, levelFilter, genderFilter, searchTerm, students, data, isGenderRestricted, targetGender, isClassRestricted, myManagedClasses]);
 
   const handleDownload = () => {
-    const filename = activeMainTab === 'absen' ? `Rekap_Absensi_${classFilter}_${sessionFilter}` : `Rekap_Laporan_VP_${classFilter}`;
+    const filename = activeMainTab === 'absen' ? `Rekap_Absensi_${classFilter}` : `Rekap_VP_${classFilter}`;
     const csvData = activeMainTab === 'absen' ? rekapAbsenData : rekapVPData;
     downloadCSV(csvData, filename);
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      {/* Tab Switcher */}
       <div className="bg-white p-2 rounded-[2.5rem] shadow-sm flex gap-2 border border-slate-100 overflow-x-auto no-scrollbar">
         <button onClick={() => setActiveMainTab('absen')} className={`flex items-center gap-3 px-8 py-4 rounded-2xl whitespace-nowrap text-[10px] font-black uppercase tracking-widest transition-all ${activeMainTab === 'absen' ? 'bg-[#064e3b] text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`} >
           <ClipboardCheck size={18}/> Rekap Absensi
         </button>
         <button onClick={() => setActiveMainTab('vp')} className={`flex items-center gap-3 px-8 py-4 rounded-2xl whitespace-nowrap text-[10px] font-black uppercase tracking-widest transition-all ${activeMainTab === 'vp' ? 'bg-[#064e3b] text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`} >
-          <ShieldAlert size={18}/> Rekap VP & Poin
+          <ShieldAlert size={18}/> Rekap Pelanggaran & Prestasi
         </button>
       </div>
 
+      {/* Filter Panel Rekap */}
       <div className="bg-white p-10 rounded-[4rem] border border-slate-50 shadow-sm space-y-8">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
            <div className="space-y-2">
-              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Unit Kelas</label>
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Pilih Unit Kelas</label>
               <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner border-2 border-transparent focus:border-emerald-600 appearance-none cursor-pointer">
                  <option value="">-- PILIH KELAS --</option>
                  {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
@@ -174,7 +164,10 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
                 <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Sesi Absensi</label>
                 <select value={sessionFilter} onChange={e => setSessionFilter(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner appearance-none cursor-pointer">
                    <option value="Semua">Semua Sesi</option>
-                   {availableSessions.map(s => <option key={s} value={s}>{s}</option>)}
+                   <option value="Madrasah">Madrasah</option>
+                   <option value="Subuh">Subuh</option>
+                   <option value="Al-Quran">Al-Quran</option>
+                   <option value="Kitab Kuning">Kitab Kuning</option>
                 </select>
              </div>
            )}
@@ -195,7 +188,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
               </select>
            </div>
            <div className="space-y-2">
-              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Cari Nama</label>
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Cari Nama Santri</label>
               <div className="relative">
                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
                  <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Ketik nama..." className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl outline-none text-[10px] font-bold shadow-inner" />
@@ -212,11 +205,12 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
         )}
       </div>
 
+      {/* Tabel Data Rekap */}
       <div className="bg-white p-10 rounded-[4.5rem] border border-slate-50 shadow-xl overflow-hidden min-h-[400px]">
          {!classFilter ? (
            <div className="flex flex-col items-center justify-center py-32 space-y-4 opacity-20">
               <Users size={64}/>
-              <p className="text-[11px] font-black uppercase tracking-[0.3em]">Tentukan Unit Kelas Terlebih Dahulu</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.3em]">Silakan Pilih Kelas Terlebih Dahulu</p>
            </div>
          ) : (
            <div className="overflow-x-auto no-scrollbar">
@@ -235,11 +229,10 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
                          </>
                        ) : (
                          <>
-                           <th className="pb-6 text-[9px] font-black uppercase text-slate-400 tracking-widest">Gender</th>
-                           <th className="pb-6 text-center text-[9px] font-black uppercase text-red-400 tracking-widest">Pelanggaran</th>
-                           <th className="pb-6 text-center text-[9px] font-black uppercase text-red-600 tracking-widest">Poin (-)</th>
-                           <th className="pb-6 text-center text-[9px] font-black uppercase text-emerald-400 tracking-widest">Prestasi</th>
-                           <th className="pb-6 text-center text-[9px] font-black uppercase text-emerald-600 tracking-widest">Poin (+)</th>
+                           <th className="pb-6 text-center text-[9px] font-black uppercase text-red-500 tracking-widest">Pelanggaran</th>
+                           <th className="pb-6 text-center text-[9px] font-black uppercase text-red-700 tracking-widest">Poin (-)</th>
+                           <th className="pb-6 text-center text-[9px] font-black uppercase text-emerald-600 tracking-widest">Prestasi</th>
+                           <th className="pb-6 text-center text-[9px] font-black uppercase text-emerald-800 tracking-widest">Poin (+)</th>
                          </>
                        )}
                     </tr>
@@ -249,7 +242,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
                       <tr key={idx} className="group hover:bg-slate-50 transition-colors">
                          <td className="py-6">
                             <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{row["Nama Santri"]}</p>
-                            <p className="text-[8px] font-bold text-slate-400 uppercase mt-2">{row["NIS"]}</p>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase mt-2">{row["NIS"]} • {row["Gender"]}</p>
                          </td>
                          {activeMainTab === 'absen' ? (
                            <>
@@ -259,18 +252,17 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
                              <td className="py-6 text-center text-[10px] font-black text-orange-500">{row["Terlambat"]}</td>
                              <td className="py-6 text-center text-[10px] font-black text-red-500">{row["Alpha"]}</td>
                              <td className="py-6 text-center">
-                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black ${row["Persentase"] === '0%' ? 'bg-slate-100 text-slate-400' : 'bg-emerald-50 text-emerald-700'}`}>
-                                   {row["Persentase"]}
+                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black ${row["Persentase Hadir"] === '0%' ? 'bg-slate-100 text-slate-400' : 'bg-emerald-50 text-emerald-700'}`}>
+                                   {row["Persentase Hadir"]}
                                 </span>
                              </td>
                            </>
                          ) : (
                            <>
-                             <td className="py-6 text-[9px] font-black text-slate-400 uppercase">{row["Gender"]}</td>
-                             <td className="py-6 text-center text-[10px] font-black text-red-400">{row["Total Pelanggaran"]}</td>
-                             <td className="py-6 text-center text-[10px] font-black text-red-600">{row["Poin Pelanggaran (-)"]}</td>
-                             <td className="py-6 text-center text-[10px] font-black text-emerald-400">{row["Total Prestasi"]}</td>
-                             <td className="py-6 text-center text-[10px] font-black text-emerald-600">{row["Poin Prestasi (+)"]}</td>
+                             <td className="py-6 text-center text-[10px] font-black text-red-500">{row["Total Pelanggaran"]}</td>
+                             <td className="py-6 text-center text-[10px] font-black text-red-700">{row["Poin Pelanggaran"]}</td>
+                             <td className="py-6 text-center text-[10px] font-black text-emerald-600">{row["Total Prestasi"]}</td>
+                             <td className="py-6 text-center text-[10px] font-black text-emerald-800">{row["Poin Prestasi"]}</td>
                            </>
                          )}
                       </tr>

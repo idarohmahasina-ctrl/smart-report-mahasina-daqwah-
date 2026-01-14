@@ -42,6 +42,7 @@ export interface AcademicConfig {
   semester: 'I (Ganjil)' | 'II (Genap)';
   isHoliday: boolean;
   excludedClasses: Record<string, boolean>;
+  excludedSessions: Record<string, boolean>;
 }
 
 export interface UserProfile {
@@ -79,7 +80,7 @@ export interface Schedule {
   subject: string;
   teacherName: string;
   assistantTeacherName?: string; 
-  homeroomTeacherName?: string; // Menampung data Walas
+  homeroomTeacherName?: string;
   class: string;
   level: 'MTs' | 'MA';
   gender: 'Putra' | 'Putri';

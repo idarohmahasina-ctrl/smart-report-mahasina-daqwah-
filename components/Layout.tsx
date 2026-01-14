@@ -6,12 +6,11 @@ import {
   Settings as SettingsIcon, UserCheck, 
   ShieldAlert, Trophy, Info, LogOut, Menu, 
   Zap, LayoutDashboard, ShieldCheck,
-  BookOpen, ClipboardCheck, ChevronRight,
-  MonitorCheck, Users
+  ClipboardCheck, MonitorCheck
 } from 'lucide-react';
 
 interface LayoutProps {
-  children: React.ReactNode;
+  children: React.Node;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   role: UserRole;
@@ -28,12 +27,11 @@ const Layout: React.FC<LayoutProps> = ({
 
   const isAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
   
-  // Rule: Petugas idaroh, pengasuh, musyrif bisa melihat rekap
-  const canSeeRecap = isAdmin || role === UserRole.PENGASUH || role === UserRole.IDAROH || role === UserRole.MUSYRIF;
+  // Rule: Petugas idaroh, pengasuh, musyrif/ah, guru bisa melihat rekap
+  const canSeeRecap = isAdmin || role === UserRole.PENGASUH || role === UserRole.IDAROH || role === UserRole.MUSYRIF || role === UserRole.GURU;
   
-  // Fix: Check for specific santri officer roles because UserRole.SANTRI_OFFICER does not exist in the enum
-  // Rule: Petugas santri TIDAK bisa melihat absen guru
-  const canSeeTeacherAttendance = role !== UserRole.SANTRI_OFFICER_PUTRA && role !== UserRole.SANTRI_OFFICER_PUTRI;
+  // Rule: Menu Absen Guru untuk pengajar dan pengelola
+  const canSeeTeacherAttendance = role === UserRole.GURU || role === UserRole.MUSYRIF || role === UserRole.IDAROH || role === UserRole.PENGASUH;
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard Laporan', icon: <LayoutDashboard size={20} />, visible: true },
@@ -50,7 +48,6 @@ const Layout: React.FC<LayoutProps> = ({
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans select-none">
-      {/* Sidebar Drawer Mobile */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] lg:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
@@ -59,7 +56,7 @@ const Layout: React.FC<LayoutProps> = ({
         <div className="p-8 flex items-center gap-4 border-b border-white/5">
           <img src={APP_LOGO} alt="Logo" className="w-10 h-10 bg-white p-1 rounded-xl" />
           <div className="flex flex-col">
-            <h1 className="font-black text-sm uppercase tracking-tighter">Mahasina</h1>
+            <h1 className="font-black text-sm uppercase tracking-tighter text-white">Mahasina</h1>
             <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-widest">Smart Report</span>
           </div>
         </div>

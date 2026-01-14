@@ -106,7 +106,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
           schoolYear: '2024/2025', 
           semester: 'II (Genap)' as any, 
           isHoliday: false, 
-          excludedClasses: {} 
+          excludedClasses: {},
+          // Fix: Add missing excludedSessions property
+          excludedSessions: {} 
         }
       };
       await seedDemoData(demoPayload);
