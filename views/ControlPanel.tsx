@@ -2,12 +2,12 @@
 import React, { useState, useMemo } from 'react';
 import { 
   AttendanceRecord, PrayerRecord, TeacherAttendance, ReportItem, Student, 
-  AttendanceStatus, PrayerStatus, UserRole
+  UserRole
 } from '../types.ts';
 import { 
-  ShieldCheck, Lock, Trash2, Edit3, Search, Filter, Database, 
-  ChevronDown, X, Check, AlertTriangle, Download, FileText, UserCheck, Zap,
-  AlertCircle, RefreshCcw, ShieldAlert, Camera, Sparkles, User
+  ShieldCheck, Lock, Trash2, Search, Database, 
+  X, Check, AlertTriangle, Download, FileText, UserCheck, Zap,
+  AlertCircle, RefreshCcw, ShieldAlert, Sparkles, User, Key
 } from 'lucide-react';
 import { downloadCSV } from './utils/csvExport.ts';
 import { resetFirestoreData, getActiveSession, seedDemoData } from '../services/dataService.ts';
@@ -32,25 +32,39 @@ interface ControlPanelProps {
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
-  const [activeModul, setActiveModul] = useState<'absen-santri' | 'absen-sholat' | 'laporan'>('absen-santri');
+  const [activeModul, setActiveModul] = useState<'absen-santri' | 'absen-sholat' | 'pelanggaran' | 'prestasi'>('absen-santri');
   const [searchTerm, setSearchTerm] = useState('');
   const [isResetting, setIsResetting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [pin, setPin] = useState('');
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   const profile = getActiveSession();
   const isSuperAdmin = profile?.email.toLowerCase().trim() === 'idarohmahasina@gmail.com';
+
+  const handleVerifyPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pin === '7777') {
+      setIsAuthorized(true);
+    } else {
+      alert("PIN Salah! Akses ditolak.");
+      setPin('');
+    }
+  };
 
   const filteredData = useMemo(() => {
     let list: any[] = [];
     if (activeModul === 'absen-santri') list = data.attendance || [];
     else if (activeModul === 'absen-sholat') list = data.prayerAttendance || [];
-    else list = data.reports || [];
+    else if (activeModul === 'pelanggaran') list = (data.reports || []).filter(r => r.type === 'Violation');
+    else if (activeModul === 'prestasi') list = (data.reports || []).filter(r => r.type === 'Achievement');
 
     return list.filter(item => {
       const studentName = data.students?.find(s => s.id === item.studentId)?.name || '';
       const reporterName = (item.recordedBy || item.reporter || '').toLowerCase();
+      const desc = (item.description || '').toLowerCase();
       return studentName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-             (item.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+             desc.includes(searchTerm.toLowerCase()) ||
              reporterName.includes(searchTerm.toLowerCase());
     }).sort((a,b) => b.date.localeCompare(a.date));
   }, [activeModul, data, searchTerm]);
@@ -72,7 +86,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
 
   const handleLoadDemo = async () => {
     if (!confirm("Aplikasi akan memuat data sampel (Santri, Guru, Jadwal & Laporan) untuk demonstrasi. Lanjutkan?")) return;
-    
     setIsSeeding(true);
     try {
       const demoPayload = {
@@ -97,15 +110,42 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
         }
       };
       await seedDemoData(demoPayload);
-      alert("Data demo berhasil dimuat! Silakan cek dashboard dan menu lainnya.");
+      alert("Data demo berhasil dimuat!");
       window.location.reload();
     } catch (err) {
       alert("Gagal memuat data demo.");
     } finally { setIsSeeding(false); }
   };
 
-  // Hanya tampilkan kolom foto untuk modul Laporan
-  const showPhotoColumn = activeModul === 'laporan';
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center animate-in fade-in zoom-in-95 duration-500">
+        <div className="bg-white p-12 rounded-[4rem] shadow-2xl border border-slate-100 w-full max-w-md text-center space-y-8">
+           <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+              <Lock size={40} />
+           </div>
+           <div className="space-y-2">
+              <h2 className="text-xl font-black uppercase tracking-tight text-slate-800">Area Terbatas</h2>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Masukkan PIN Admin Idaroh</p>
+           </div>
+           <form onSubmit={handleVerifyPin} className="space-y-6">
+              <input 
+                type="password" 
+                maxLength={4} 
+                value={pin}
+                onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="****"
+                className="w-full text-center py-6 text-4xl font-black tracking-[0.5em] bg-slate-50 rounded-[2rem] border-2 border-transparent focus:border-emerald-600 outline-none transition-all shadow-inner"
+                autoFocus
+              />
+              <button type="submit" className="w-full py-5 bg-[#064e3b] text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-[11px] shadow-xl hover:bg-emerald-900 active:scale-95 transition-all flex items-center justify-center gap-3">
+                 <Key size={18}/> Buka Panel Kontrol
+              </button>
+           </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10 pb-32 animate-in fade-in duration-700 max-w-6xl mx-auto">
@@ -116,17 +156,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
               <div className="w-20 h-20 bg-white/10 rounded-3xl flex items-center justify-center text-emerald-400 border border-white/10 backdrop-blur-md shadow-2xl shrink-0"><Database size={32} /></div>
               <div>
                  <h2 className="text-3xl font-black uppercase tracking-tight leading-none">Panel Kontrol</h2>
-                 <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em] mt-4 flex items-center gap-2"><ShieldCheck size={12}/> Manajemen Data Terpusat</p>
+                 <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em] mt-4 flex items-center gap-2"><ShieldCheck size={12}/> Manajemen Transaksi Terpusat</p>
               </div>
            </div>
            
-           <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-sm shadow-inner shrink-0">
+           <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-sm shadow-inner shrink-0 overflow-x-auto no-scrollbar max-w-full">
               {[
                 { id: 'absen-santri', label: 'Absen Santri' },
                 { id: 'absen-sholat', label: 'Absen Sholat' },
-                { id: 'laporan', label: 'Laporan VP' }
+                { id: 'pelanggaran', label: 'Pelanggaran' },
+                { id: 'prestasi', label: 'Prestasi' }
               ].map(tab => (
-                <button key={tab.id} onClick={() => setActiveModul(tab.id as any)} className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeModul === tab.id ? 'bg-white text-emerald-950 shadow-xl' : 'text-white/60 hover:text-white'}`}>
+                <button key={tab.id} onClick={() => setActiveModul(tab.id as any)} className={`px-5 py-3 rounded-xl text-[8px] sm:text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeModul === tab.id ? 'bg-white text-emerald-950 shadow-xl' : 'text-white/60 hover:text-white'}`}>
                   {tab.label}
                 </button>
               ))}
@@ -138,9 +179,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="relative flex-1 w-full">
                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400"><Search size={22}/></span>
-               <input type="text" placeholder={`Cari nama, keterangan, atau petugas...`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-16 pr-6 py-5 bg-slate-50 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-sm shadow-inner transition-all" />
+               <input type="text" placeholder={`Cari data di log ${activeModul}...`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-16 pr-6 py-5 bg-slate-50 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-sm shadow-inner transition-all" />
             </div>
-            <button onClick={() => downloadCSV(filteredData, `Master_Export_${activeModul}`)} className="px-8 py-5 bg-emerald-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-lg flex items-center gap-3 hover:bg-emerald-800 transition-all active:scale-95"><Download size={18}/> Ekspor CSV</button>
+            <button onClick={() => downloadCSV(filteredData, `Master_Export_${activeModul}`)} className="px-8 py-5 bg-emerald-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-lg flex items-center gap-3 hover:bg-emerald-800 transition-all active:scale-95"><Download size={18}/> Ekspor Log CSV</button>
          </div>
 
          <div className="overflow-x-auto no-scrollbar">
@@ -148,9 +189,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                <thead>
                   <tr className="border-b-2 border-slate-50">
                      <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Santri / Unit</th>
-                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Sesi / Waktu</th>
+                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Kategori / Waktu</th>
                      <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Petugas</th>
-                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">{showPhotoColumn ? 'Status / Bukti' : 'Status'}</th>
+                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status / Detail</th>
                      <th className="pb-6 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Aksi</th>
                   </tr>
                </thead>
@@ -159,10 +200,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                     <tr key={item.id} className="group hover:bg-slate-50 transition-all">
                       <td className="py-6 pr-4">
                          <p className="text-[12px] font-black text-slate-800 uppercase leading-none">{data.students?.find(s => s.id === item.studentId)?.name || 'Data Dihapus'}</p>
-                         <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">UNIT: {item.class}</p>
+                         <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">KELAS: {item.class}</p>
                       </td>
                       <td className="py-6 pr-4">
-                         <p className="text-[10px] font-bold text-slate-700">{item.sessionType || item.prayerTime || item.type}</p>
+                         <p className="text-[10px] font-bold text-slate-700">{item.sessionType || item.prayerTime || item.category || item.type}</p>
                          <p className="text-[8px] font-black text-slate-400 mt-1.5 uppercase">{item.date} • {item.time || item.recordedTime || item.timestamp}</p>
                       </td>
                       <td className="py-6 pr-4">
@@ -173,9 +214,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                       </td>
                       <td className="py-6 pr-4">
                          <div className="flex items-center gap-3">
-                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${item.status === 'Hadir' || item.status === 'Berjama\'ah' || item.status === 'Ditindak' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{item.status || item.category || '-'}</span>
-                            {showPhotoColumn && item.photoUrl && (
-                               <div onClick={() => window.open(item.photoUrl)} className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 cursor-zoom-in hover:scale-110 transition-transform shadow-sm">
+                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${item.status === 'Hadir' || item.status === 'Berjama\'ah' || item.status === 'Ditindak' || activeModul === 'prestasi' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{item.status || (activeModul === 'pelanggaran' || activeModul === 'prestasi' ? `${item.points} PT` : '-')}</span>
+                            {(activeModul === 'pelanggaran' || activeModul === 'prestasi') && item.photoUrl && (
+                               <div onClick={() => window.open(item.photoUrl)} className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 cursor-zoom-in hover:scale-110 transition-transform shadow-sm shrink-0">
                                   <img src={item.photoUrl} className="w-full h-full object-cover" />
                                </div>
                             )}
@@ -191,49 +232,31 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                </tbody>
             </table>
             {filteredData.length === 0 && (
-               <div className="py-20 text-center text-slate-300 font-black uppercase italic tracking-widest">Belum Ada Data</div>
+               <div className="py-20 text-center text-slate-300 font-black uppercase italic tracking-widest">Belum Ada Data Log</div>
             )}
          </div>
       </div>
 
-      {/* Admin Action Zone */}
       {isSuperAdmin && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
-           {/* Load Demo Data */}
            <div className="bg-emerald-50 border-2 border-emerald-100 p-10 rounded-[4rem] space-y-6">
               <div className="flex items-center gap-4 text-emerald-700">
                  <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600"><Sparkles size={28}/></div>
-                 <h3 className="text-xl font-black uppercase tracking-tight">Eksplorasi Data Sampel</h3>
+                 <h3 className="text-xl font-black uppercase tracking-tight">Load Demo Data</h3>
               </div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase leading-relaxed">
-                 Klik tombol di bawah untuk mengisi sistem dengan data simulasi santri, guru, jadwal, dan laporan yang sudah terisi.
-              </p>
-              <button 
-                disabled={isSeeding}
-                onClick={handleLoadDemo}
-                className="w-full py-5 bg-emerald-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-emerald-700 shadow-xl shadow-emerald-200 transition-all active:scale-95 disabled:opacity-50"
-              >
-                {isSeeding ? <RefreshCcw size={18} className="animate-spin" /> : <Sparkles size={18}/>}
-                Muat Data Demo Pesantren
+              <p className="text-[10px] font-bold text-slate-500 uppercase leading-relaxed">Isi sistem dengan data simulasi santri dan laporan untuk percobaan.</p>
+              <button disabled={isSeeding} onClick={handleLoadDemo} className="w-full py-5 bg-emerald-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-emerald-700 shadow-xl shadow-emerald-200 transition-all active:scale-95 disabled:opacity-50">
+                {isSeeding ? <RefreshCcw size={18} className="animate-spin" /> : <Sparkles size={18}/>} Muat Data Demo
               </button>
            </div>
-
-           {/* Factory Reset */}
            <div className="bg-red-50/50 rounded-[4rem] border-2 border-red-100 p-10 space-y-6">
               <div className="flex items-center gap-4 text-red-700">
                  <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center text-red-600"><ShieldAlert size={28}/></div>
-                 <h3 className="text-xl font-black uppercase tracking-tight">Reset Master Cloud</h3>
+                 <h3 className="text-xl font-black uppercase tracking-tight">Factory Reset</h3>
               </div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase leading-relaxed">
-                Menghapus semua data Master dan Transaksi permanen. Gunakan saat awal tahun ajaran baru.
-              </p>
-              <button 
-                disabled={isResetting}
-                onClick={handleHardReset}
-                className="w-full py-5 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-red-700 shadow-xl shadow-red-200 transition-all active:scale-95 disabled:opacity-50"
-              >
-                {isResetting ? <RefreshCcw size={18} className="animate-spin" /> : <Trash2 size={18}/>}
-                Lakukan Factory Reset
+              <p className="text-[10px] font-bold text-slate-500 uppercase leading-relaxed">Menghapus semua data cloud permanen. Berhati-hatilah!</p>
+              <button disabled={isResetting} onClick={handleHardReset} className="w-full py-5 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-red-700 shadow-xl shadow-red-200 transition-all active:scale-95 disabled:opacity-50">
+                {isResetting ? <RefreshCcw size={18} className="animate-spin" /> : <Trash2 size={18}/>} Reset Database Cloud
               </button>
            </div>
         </div>

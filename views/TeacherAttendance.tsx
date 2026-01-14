@@ -5,7 +5,7 @@ import {
 } from '../types.ts';
 import { 
   Camera, CheckCircle, Clock, AlertTriangle, Sparkles, X, 
-  MonitorCheck, RefreshCw, Zap, Calendar, UserPlus
+  MonitorCheck, RefreshCw, Zap, Calendar, UserPlus, GraduationCap
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { isTeacherMatch } from './utils/nameMatchers.ts';
@@ -26,10 +26,10 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
   const todayDay = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date());
   const now = new Date();
 
-  // MENDUKUNG GURU UTAMA MAUPUN ASISTEN
+  // MENDUKUNG GURU UTAMA, ASISTEN, MAUPUN WALAS
   const mySchedules = useMemo(() => {
     return data.schedules.filter(s => 
-      s.day === todayDay && isTeacherMatch(profile.fullName, s.teacherName, s.assistantTeacherName)
+      s.day === todayDay && isTeacherMatch(profile.fullName, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName)
     ).sort((a, b) => a.time.localeCompare(b.time));
   }, [data.schedules, profile.fullName, todayDay]);
 
@@ -45,7 +45,7 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
         
         const prompt = `Anda adalah asisten cerdas Pesantren Mahasina. 
         Pengajar: ${profile.fullName}. Jadwal hari ini (${todayDay}): ${schedulesStr}. 
-        Sapa mereka dengan hangat dan sebutkan jadwalnya. Jika mereka adalah asisten di suatu kelas, beri semangat ekstra. Maks 3 kalimat.`;
+        Sapa mereka dengan hangat dan sebutkan jadwalnya. Jika mereka adalah asisten atau wali kelas di suatu kelas, beri semangat ekstra. Maks 3 kalimat.`;
 
         const response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
@@ -96,7 +96,12 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
     if (!capturedPhoto) { alert("Wajib lampirkan foto."); return; }
 
     const checkInTime = new Date();
-    const amIAssistant = isTeacherMatch(profile.fullName, sch.assistantTeacherName || "");
+    const isAssistant = isTeacherMatch(profile.fullName, sch.assistantTeacherName || "");
+    const isHomeroom = isTeacherMatch(profile.fullName, sch.homeroomTeacherName || "");
+    
+    let roleLabel = 'Guru Utama';
+    if (isAssistant) roleLabel = 'Asisten';
+    if (isHomeroom) roleLabel = 'Wali Kelas';
 
     const record: TeacherAttendance = {
       id: `ta-${Date.now()}`,
@@ -107,11 +112,11 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
       class: sch.class,
       startTime: checkInTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       photoUrl: capturedPhoto,
-      summary: `Hadir sebagai ${amIAssistant ? 'Asisten' : 'Guru Utama'} di kelas ${sch.class}`
+      summary: `Hadir sebagai ${roleLabel} di kelas ${sch.class}`
     };
 
     onSave(record);
-    alert(`Absen ${amIAssistant ? 'Asisten' : 'Guru'} Berhasil!`);
+    alert(`Absen ${roleLabel} Berhasil!`);
     setCapturedPhoto(null);
   };
 
@@ -144,21 +149,26 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
         {mySchedules.length > 0 ? mySchedules.map(sch => {
           const status = checkScheduleStatus(sch.time);
           const isDone = data.teacherAttendance.some(ta => ta.date === now.toLocaleDateString('id-ID') && ta.subject === sch.subject && ta.class === sch.class && ta.teacherName === profile.fullName);
-          const amIAssistant = isTeacherMatch(profile.fullName, sch.assistantTeacherName || "");
+          const isAssistant = isTeacherMatch(profile.fullName, sch.assistantTeacherName || "");
+          const isHomeroom = isTeacherMatch(profile.fullName, sch.homeroomTeacherName || "");
 
           return (
             <div key={sch.id} className={`bg-white p-8 rounded-[3rem] border shadow-sm flex flex-col md:flex-row justify-between items-center gap-8 ${isDone ? 'opacity-60' : ''}`}>
                <div className="flex items-center gap-6 flex-1 w-full">
-                  <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-inner ${amIAssistant ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                     {amIAssistant ? <UserPlus size={32}/> : <MonitorCheck size={32}/>}
+                  <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-inner ${isHomeroom ? 'bg-blue-50 text-blue-700' : isAssistant ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                     {isHomeroom ? <GraduationCap size={32}/> : isAssistant ? <UserPlus size={32}/> : <MonitorCheck size={32}/>}
                   </div>
                   <div>
                      <div className="flex items-center gap-3">
                         <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">{sch.subject}</h3>
-                        {amIAssistant && <span className="px-2 py-0.5 bg-indigo-100 text-[9px] font-black text-indigo-600 rounded uppercase">Asisten</span>}
+                        {isHomeroom && <span className="px-2 py-0.5 bg-blue-100 text-[9px] font-black text-blue-600 rounded uppercase">Walas</span>}
+                        {isAssistant && !isHomeroom && <span className="px-2 py-0.5 bg-indigo-100 text-[9px] font-black text-indigo-600 rounded uppercase">Asisten</span>}
                      </div>
                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">UNIT: {sch.class} • {sch.time}</p>
-                     {!amIAssistant && sch.assistantTeacherName && (
+                     {!isHomeroom && sch.homeroomTeacherName && (
+                        <p className="text-[8px] font-black text-blue-400 uppercase mt-1">Wali Kelas: {sch.homeroomTeacherName}</p>
+                     )}
+                     {!isAssistant && sch.assistantTeacherName && (
                         <p className="text-[8px] font-black text-indigo-400 uppercase mt-1">Asisten: {sch.assistantTeacherName}</p>
                      )}
                   </div>

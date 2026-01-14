@@ -79,6 +79,7 @@ export interface Schedule {
   subject: string;
   teacherName: string;
   assistantTeacherName?: string; 
+  homeroomTeacherName?: string; // Menampung data Walas
   class: string;
   level: 'MTs' | 'MA';
   gender: 'Putra' | 'Putri';

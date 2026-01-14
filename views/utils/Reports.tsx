@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { ReportItem, UserRole, ViolationCategory, Student, TemplateItem } from '../../types.ts';
+import { ReportItem, UserRole, ViolationCategory, Student, TemplateItem, Schedule } from '../../types.ts';
 import { 
   Search, ShieldAlert, Trophy, History, PlusCircle, Send, ChevronRight, Clock as ClockIcon, 
   AlertTriangle, User, FileText, CheckCircle, Filter, Edit, Award, ArrowLeft, UserCheck, X, Camera, Image as ImageIcon,
   ImagePlus, Loader2
 } from 'lucide-react';
+import { isTeacherMatch } from './nameMatchers.ts';
 
 interface ReportsProps {
   type: 'Violation' | 'Achievement';
@@ -15,7 +16,7 @@ interface ReportsProps {
   students: Student[];
   allReports: ReportItem[];
   templates: TemplateItem[];
-  schedules: any[]; // Tambahkan schedules untuk deteksi kelas binaan
+  schedules: Schedule[]; 
 }
 
 const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, students, allReports, templates, schedules }) => {
@@ -34,16 +35,12 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
   const isGenderRestricted = role === UserRole.SANTRI_OFFICER_PUTRA || role === UserRole.SANTRI_OFFICER_PUTRI;
   const targetGender = role === UserRole.SANTRI_OFFICER_PUTRA ? 'Putra' : 'Putri';
   
-  // Ambil daftar kelas yang dikelola (untuk Guru & Musyrif)
+  // Ambil daftar kelas yang dikelola (untuk Guru, Musyrif, & Walas)
   const myManagedClasses = useMemo(() => {
     if (isAdminOrPengasuh || isGenderRestricted) return []; 
-    // Menggunakan pembanding nama sederhana untuk mencari jadwal dimana user bertugas
     return Array.from(new Set(
       schedules
-        .filter(s => {
-          const u = currentUser.toLowerCase();
-          return s.teacherName.toLowerCase().includes(u) || (s.assistantTeacherName && s.assistantTeacherName.toLowerCase().includes(u));
-        })
+        .filter(s => isTeacherMatch(currentUser, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName))
         .map(s => s.class)
     ));
   }, [schedules, currentUser, isAdminOrPengasuh, isGenderRestricted]);
@@ -54,7 +51,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
     students.filter(s => {
       // Filter Gender (Hanya untuk petugas santri)
       const matchGender = !isGenderRestricted || s.gender === targetGender;
-      // Filter Kelas (Untuk guru/musyrif)
+      // Filter Kelas (Untuk guru/musyrif/walas)
       const matchClass = !isClassRestricted || myManagedClasses.includes(s.formalClass);
       
       const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || (s.nis && s.nis.includes(searchTerm));
@@ -75,7 +72,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
       // Petugas Santri lihat sesuai gender
       if (isGenderRestricted) return s.gender === targetGender;
 
-      // Guru & Musyrif lihat sesuai kelas binaan
+      // Guru, Musyrif & Walas lihat sesuai kelas binaan
       if (isClassRestricted) return myManagedClasses.includes(s.formalClass);
 
       // Default: Hanya lihat laporan yang dibuat sendiri
@@ -120,7 +117,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                    1. Cari Santri 
                    {isGenderRestricted && ` (${targetGender})`}
-                   {isClassRestricted && ` (Kelas Binaan)`}
+                   {isClassRestricted && ` (Kelas Binaan/Managed)`}
                  </label>
                  <div className="relative">
                     <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={22}/>

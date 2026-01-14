@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { UserRole, Student, Teacher, Schedule, OrganizationMember, TemplateItem, Announcement, ViolationCategory } from '../../types.ts';
 import { 
   Search, Download, Upload, FileText, Info as InfoIcon, Users, 
-  Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark, UserPlus
+  Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark, UserPlus, GraduationCap
 } from 'lucide-react';
 import { ExtraDataList } from '../../services/dataService.ts';
 
@@ -116,6 +116,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             subject: getVal(values, ['MAPEL', 'MATAPELAJARAN']),
             teacherName: getVal(values, ['GURU', 'USTADZ', 'USTADZAH', 'GURUUTAMA']),
             assistantTeacherName: getVal(values, ['ASISTEN', 'GURUASISTEN', 'ASISTENGURU', 'GURU2']),
+            homeroomTeacherName: getVal(values, ['WALAS', 'WALIKELAS', 'HOMEROOM', 'WALI']),
             class: getVal(values, ['UNIT', 'KELAS']),
             sessionType: getVal(values, ['SESI', 'JENISKEGIATAN']) || 'Madrasah',
             level: getVal(values, ['TINGKAT', 'JENJANG']) || 'MTs',
@@ -149,7 +150,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     let filename = `Template_${type}_Mahasina.csv`;
     if (type === 'Siswa') content = "NIS,Nama,Gender,Tingkat,Kelas Madrasah (Formal),Kelas Al-Quran,Kelas Kitab Kuning\n2024001,Ahmad Santri,Putra,MTs,7A,Yanbu'a 3,Safinatun Najah";
     else if (type === 'Guru') content = "Nama,Mapel,No HP,Email,Mengajar Di Kelas\nUstadz Zulkifli,Nahwu,081234,zulkifli@gmail.com,7A;7B;8A";
-    else if (type === 'Jadwal') content = "Hari,Waktu,Mapel,Guru Utama,Guru Asisten,Unit,Sesi,Tingkat,Gender\nSenin,07:30 - 09:00,Nahwu,Ustadz Zulkifli,Ustadz Ahmad,7A,Madrasah,MTs,Putra\nSelasa,09:15 - 10:45,Shorof,Ustadzah Aminah,,8B,Madrasah,MTs,Putri";
+    else if (type === 'Jadwal') content = "Hari,Waktu,Mapel,Guru Utama,Guru Asisten,Wali Kelas,Unit,Sesi,Tingkat,Gender\nSenin,07:30 - 09:00,Nahwu,Ustadz Zulkifli,Ustadz Ahmad,Ustadzah Sarah,7A,Madrasah,MTs,Putra\nSelasa,09:15 - 10:45,Shorof,Ustadzah Aminah,,,8B,Madrasah,MTs,Putri";
     
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
@@ -175,7 +176,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
            {[
              { id: 'Guru', label: 'Data Guru', desc: 'Identitas & Email Login', icon: <UserCheck2 size={28}/>, color: 'emerald' },
              { id: 'Siswa', label: 'Data Santri', desc: 'Multi-Sesi & Kelas Formal', icon: <Users size={28}/>, color: 'blue' },
-             { id: 'Jadwal', label: 'Jadwal KBM', desc: 'Guru Utama & Asisten', icon: <Calendar size={28}/>, color: 'indigo' },
+             { id: 'Jadwal', label: 'Jadwal KBM', desc: 'Guru Utama & Wali Kelas', icon: <Calendar size={28}/>, color: 'indigo' },
              { id: 'Peraturan', label: 'Katalog Poin', desc: 'Pelanggaran & Prestasi', icon: <Shield size={28}/>, color: 'red' },
            ].map(cat => (
              <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className="bg-white p-10 rounded-[3.5rem] shadow-sm border border-slate-50 text-left hover:border-emerald-600 hover:shadow-xl transition-all group flex flex-col gap-6 relative overflow-hidden">
@@ -265,8 +266,8 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                    <thead>
                       <tr className="border-b-2 border-slate-50">
                          <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Waktu</th>
-                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Guru Utama</th>
-                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Asisten</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Musyrif/Guru</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Asisten/Walas</th>
                          <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Mapel</th>
                          <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Unit</th>
                       </tr>
@@ -277,11 +278,19 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                            <td className="py-6 font-black uppercase text-[10px]">{sch.day} {sch.time}</td>
                            <td className="py-6 font-black text-emerald-800 text-[10px] uppercase">{sch.teacherName}</td>
                            <td className="py-6">
-                              {sch.assistantTeacherName ? (
-                                <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] uppercase">
-                                  <UserPlus size={14}/> {sch.assistantTeacherName}
-                                </div>
-                              ) : <span className="text-slate-300">-</span>}
+                              <div className="flex flex-col gap-1">
+                                {sch.assistantTeacherName && (
+                                  <div className="flex items-center gap-2 text-indigo-600 font-bold text-[9px] uppercase">
+                                    <UserPlus size={12}/> {sch.assistantTeacherName} (Asisten)
+                                  </div>
+                                )}
+                                {sch.homeroomTeacherName && (
+                                  <div className="flex items-center gap-2 text-blue-600 font-bold text-[9px] uppercase">
+                                    <GraduationCap size={12}/> {sch.homeroomTeacherName} (Walas)
+                                  </div>
+                                )}
+                                {!sch.assistantTeacherName && !sch.homeroomTeacherName && <span className="text-slate-300">-</span>}
+                              </div>
                            </td>
                            <td className="py-6 font-black text-slate-800 text-[10px] uppercase">{sch.subject}</td>
                            <td className="py-6 font-black text-slate-400 text-[10px] uppercase">{sch.class}</td>

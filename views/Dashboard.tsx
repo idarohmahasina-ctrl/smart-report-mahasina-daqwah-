@@ -57,12 +57,12 @@ const Dashboard: React.FC<AppData & { profile: any }> = (data) => {
   const isGenderRestricted = role === UserRole.SANTRI_OFFICER_PUTRA || role === UserRole.SANTRI_OFFICER_PUTRI;
   const targetGender = role === UserRole.SANTRI_OFFICER_PUTRA ? 'Putra' : 'Putri';
   
-  // Ambil daftar kelas yang dikelola (untuk Guru & Musyrif)
+  // Ambil daftar kelas yang dikelola (untuk Guru, Musyrif, & Walas)
   const myManagedClasses = useMemo(() => {
-    if (isAdminOrPengasuh || isGenderRestricted) return []; // Idaroh/Petugas Santri tidak dibatasi kelas
+    if (isAdminOrPengasuh || isGenderRestricted) return []; 
     return Array.from(new Set(
       data.schedules
-        .filter(s => isTeacherMatch(profile.fullName, s.teacherName, s.assistantTeacherName))
+        .filter(s => isTeacherMatch(profile.fullName, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName))
         .map(s => s.class)
     ));
   }, [data.schedules, profile, isAdminOrPengasuh, isGenderRestricted]);

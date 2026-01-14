@@ -18,14 +18,16 @@ export const normalizeName = (name: string): string => {
 };
 
 /**
- * Mengecek apakah nama user cocok dengan nama pengajar di jadwal (baik Guru Utama maupun Asisten)
+ * Mengecek apakah nama user cocok dengan nama pengajar di jadwal 
+ * Mendukung: Guru Utama, Asisten, dan Wali Kelas (Walas)
  */
-export const isTeacherMatch = (userName: string, scheduleTeacher: string, scheduleAssistant?: string): boolean => {
+export const isTeacherMatch = (userName: string, scheduleTeacher: string, scheduleAssistant?: string, homeroomTeacher?: string): boolean => {
   const normalizedUser = normalizeName(userName);
   if (normalizedUser.length < 3) return false;
 
   const matchPrimary = normalizeName(scheduleTeacher).includes(normalizedUser) || normalizedUser.includes(normalizeName(scheduleTeacher));
   const matchAssistant = scheduleAssistant ? (normalizeName(scheduleAssistant).includes(normalizedUser) || normalizedUser.includes(normalizeName(scheduleAssistant))) : false;
+  const matchHomeroom = homeroomTeacher ? (normalizeName(homeroomTeacher).includes(normalizedUser) || normalizedUser.includes(normalizeName(homeroomTeacher))) : false;
 
-  return matchPrimary || matchAssistant;
+  return matchPrimary || matchAssistant || matchHomeroom;
 };

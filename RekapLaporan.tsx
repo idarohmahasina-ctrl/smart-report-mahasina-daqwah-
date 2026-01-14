@@ -3,13 +3,13 @@ import React, { useState, useMemo } from 'react';
 import { 
   AppData, AttendanceStatus, Student, AttendanceRecord, 
   PrayerRecord, ReportItem, PrayerStatus, UserRole 
-} from '../types.ts';
+} from './types.ts';
 import { 
   Search, Download, Users, ClipboardCheck, Zap, 
   ShieldAlert, Trophy, Filter, User, FileSpreadsheet
 } from 'lucide-react';
-import { downloadCSV } from './utils/csvExport.ts';
-import { isTeacherMatch } from './utils/nameMatchers.ts';
+import { downloadCSV } from './views/utils/csvExport.ts';
+import { isTeacherMatch } from './views/utils/nameMatchers.ts';
 
 interface RekapLaporanProps {
   data: AppData;
@@ -36,7 +36,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
     if (isAdminOrPengasuh || isGenderRestricted) return []; 
     return Array.from(new Set(
       data.schedules
-        .filter(s => isTeacherMatch(profile.fullName, s.teacherName, s.assistantTeacherName))
+        .filter(s => isTeacherMatch(profile.fullName, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName))
         .map(s => s.class)
     ));
   }, [data.schedules, profile, isAdminOrPengasuh, isGenderRestricted]);
