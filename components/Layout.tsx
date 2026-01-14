@@ -27,7 +27,6 @@ const Layout: React.FC<LayoutProps> = ({
 
   const isAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
   
-  // Rule: Menu Rekap Laporan hanya untuk Idaroh, Pengasuh, Musyrif, dan Guru (Walas)
   const canSeeRecap = isAdmin || 
                      role === UserRole.PENGASUH || 
                      role === UserRole.IDAROH || 
@@ -39,7 +38,7 @@ const Layout: React.FC<LayoutProps> = ({
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard Laporan', icon: <LayoutDashboard size={20} />, visible: true },
     { id: 'absen-guru', label: 'Absen Guru', icon: <MonitorCheck size={20} />, visible: canSeeTeacherAttendance },
-    { id: 'absen-santri', label: 'Absen Santri', icon: <UserCheck size={20} />, visible: true },
+    { id: 'absen-kbm', label: 'Absen KBM', icon: <UserCheck size={20} />, visible: true },
     { id: 'absen-sholat', label: 'Absen Pondok', icon: <Zap size={20} />, visible: true },
     { id: 'input-pelanggaran', label: 'Lapor Pelanggaran', icon: <ShieldAlert size={20} />, visible: true },
     { id: 'input-prestasi', label: 'Lapor Prestasi', icon: <Trophy size={20} />, visible: true },

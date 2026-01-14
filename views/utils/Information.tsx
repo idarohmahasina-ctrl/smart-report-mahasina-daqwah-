@@ -37,9 +37,13 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
   const [orgLevelFilter, setOrgLevelFilter] = useState<'Semua' | 'MTs' | 'MA'>('Semua');
   const [orgClassFilter, setOrgClassFilter] = useState('Semua');
 
+  // States for Schedule Filters
+  const [schDayFilter, setSchDayFilter] = useState('Semua');
+  const [schSessionFilter, setSchSessionFilter] = useState('Semua');
+  const [schClassFilter, setSchClassFilter] = useState('Semua');
+
   const isSuperAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
   
-  // Proteksi Gender untuk Petugas Santri
   const isGenderRestricted = role === UserRole.SANTRI_OFFICER_PUTRA || role === UserRole.SANTRI_OFFICER_PUTRI;
   const targetGender = role === UserRole.SANTRI_OFFICER_PUTRA ? 'Putra' : 'Putri';
 
@@ -60,6 +64,16 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     });
     return Array.from(cls).sort();
   }, [data.students]);
+
+  const filteredSchedules = useMemo(() => {
+    return data.schedules.filter(s => {
+      const matchDay = schDayFilter === 'Semua' || s.day === schDayFilter;
+      const matchSess = schSessionFilter === 'Semua' || s.sessionType === schSessionFilter;
+      const matchCls = schClassFilter === 'Semua' || s.class === schClassFilter;
+      const matchSearch = s.teacherName.toLowerCase().includes(searchTerm.toLowerCase()) || s.subject.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchDay && matchSess && matchCls && matchSearch;
+    });
+  }, [data.schedules, schDayFilter, schSessionFilter, schClassFilter, searchTerm]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
     const file = e.target.files?.[0];
@@ -196,7 +210,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
 
   const handleExportCurrentView = () => {
     if (!selectedCategory) return;
-    
     let exportData: any[] = [];
     let filename = `Data_${selectedCategory}_Export`;
 
@@ -217,7 +230,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     } else if (selectedCategory === 'Guru') {
       exportData = data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
     } else if (selectedCategory === 'Jadwal') {
-      exportData = data.schedules;
+      exportData = filteredSchedules;
     } else if (selectedCategory === 'Peraturan') {
       exportData = [...data.violationTemplates, ...data.achievementTemplates];
     }
@@ -226,7 +239,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
       alert("Tidak ada data untuk diekspor.");
       return;
     }
-
     downloadCSV(exportData, filename);
   };
 
@@ -261,12 +273,10 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Master Data Terpusat</p>
                  </div>
               </div>
-              
               <div className="flex flex-wrap gap-3 w-full md:w-auto">
                  <button onClick={handleExportCurrentView} className="px-6 py-4 bg-blue-50 text-blue-700 border border-blue-100 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-100 transition-all shadow-sm">
                     <FileDown size={16}/> Ekspor Data
                  </button>
-                 
                  {isSuperAdmin && (
                    <>
                      <button onClick={() => downloadTemplate(selectedCategory)} className="px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2">
@@ -281,7 +291,67 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
               </div>
            </div>
 
-           {(selectedCategory === 'ORSAM' || selectedCategory === 'ORKLAS') && (
+           {selectedCategory === 'Jadwal' && (
+             <div className="bg-white p-10 rounded-[4rem] border shadow-sm space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                   <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Hari</label>
+                      <select value={schDayFilter} onChange={e => setSchDayFilter(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner">
+                         <option value="Semua">Semua Hari</option>
+                         {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'].map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                   </div>
+                   <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Sesi</label>
+                      <select value={schSessionFilter} onChange={e => setSchSessionFilter(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner">
+                         <option value="Semua">Semua Sesi</option>
+                         {dynamicSessions.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                   </div>
+                   <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Unit Kelas</label>
+                      <select value={schClassFilter} onChange={e => setSchClassFilter(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner">
+                         <option value="Semua">Semua Kelas</option>
+                         {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                   </div>
+                   <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Cari Guru/Mapel</label>
+                      <div className="relative">
+                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14}/>
+                         <input type="text" placeholder="Ketik nama..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-xl text-[10px] font-bold outline-none shadow-inner" />
+                      </div>
+                   </div>
+                </div>
+                <div className="overflow-x-auto no-scrollbar">
+                   <table className="w-full text-left">
+                      <thead>
+                         <tr className="border-b-2 border-slate-50">
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Waktu</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Musyrif/Guru</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Mapel</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Unit</th>
+                         </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                         {filteredSchedules.map(sch => (
+                           <tr key={sch.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="py-6 font-black uppercase text-[10px]">{sch.day} {sch.time}</td>
+                              <td className="py-6 font-black text-emerald-800 text-[10px] uppercase">{sch.teacherName}</td>
+                              <td className="py-6 font-black text-slate-800 text-[10px] uppercase">{sch.subject}</td>
+                              <td className="py-6 font-black text-slate-400 text-[10px] uppercase">{sch.class}</td>
+                           </tr>
+                         ))}
+                      </tbody>
+                   </table>
+                   {filteredSchedules.length === 0 && (
+                     <div className="py-20 text-center text-slate-300 font-black uppercase italic tracking-widest text-[10px]">Tidak ada jadwal yang sesuai filter</div>
+                   )}
+                </div>
+             </div>
+           )}
+
+           {selectedCategory === 'ORSAM' || selectedCategory === 'ORKLAS' && (
              <div className="bg-white p-10 rounded-[4rem] border shadow-sm space-y-10">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                    <div className="space-y-1">
@@ -319,7 +389,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                       </div>
                    </div>
                 </div>
-
                 <div className="overflow-x-auto no-scrollbar">
                    <table className="w-full text-left">
                       <thead>
@@ -351,9 +420,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                          ))}
                       </tbody>
                    </table>
-                   {filteredOrgs.length === 0 && (
-                     <div className="py-20 text-center text-slate-300 font-black uppercase italic tracking-widest text-[10px]">Data tidak ditemukan</div>
-                   )}
                 </div>
              </div>
            )}
@@ -409,32 +475,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
              </div>
            )}
 
-           {selectedCategory === 'Jadwal' && (
-             <div className="bg-white p-10 rounded-[4rem] border shadow-sm overflow-x-auto no-scrollbar">
-                <table className="w-full text-left">
-                   <thead>
-                      <tr className="border-b-2 border-slate-50">
-                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Waktu</th>
-                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Musyrif/Guru</th>
-                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Mapel</th>
-                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Unit</th>
-                      </tr>
-                   </thead>
-                   <tbody className="divide-y divide-slate-50">
-                      {data.schedules.map(sch => (
-                        <tr key={sch.id} className="hover:bg-slate-50 transition-colors">
-                           <td className="py-6 font-black uppercase text-[10px]">{sch.day} {sch.time}</td>
-                           <td className="py-6 font-black text-emerald-800 text-[10px] uppercase">{sch.teacherName}</td>
-                           <td className="py-6 font-black text-slate-800 text-[10px] uppercase">{sch.subject}</td>
-                           <td className="py-6 font-black text-slate-400 text-[10px] uppercase">{sch.class}</td>
-                        </tr>
-                      ))}
-                   </tbody>
-                </table>
-             </div>
-           )}
-
-           { (selectedCategory === 'Guru' || selectedCategory === 'Peraturan') && (
+           {(selectedCategory === 'Guru' || selectedCategory === 'Peraturan') && (
               <div className="bg-white p-10 rounded-[4rem] border shadow-sm overflow-x-auto no-scrollbar">
                 <table className="w-full text-left">
                    <tbody className="divide-y divide-slate-50">

@@ -17,7 +17,6 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
 
   const mySchedules = useMemo(() => {
     return schedules.filter(s => {
-      // Check if user is Primary Teacher, Assistant, or Wali Kelas
       const matchTeacher = isTeacherMatch(data.currentUser, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName);
       const matchGender = !isGenderRestricted || s.gender === targetGender;
       return matchTeacher && matchGender;
@@ -50,7 +49,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
       sessionType: selectedSchedule?.sessionType || 'Madrasah'
     }));
     data.onSave(records);
-    alert("Absensi Berhasil Disimpan!");
+    alert("Absensi KBM Berhasil Disimpan!");
     setSelectedSchedule(null);
     setTempRecords({});
   };
@@ -60,9 +59,9 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
       {!selectedSchedule ? (
         <div className="space-y-6">
           <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
-             <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Jadwal Absensi Santri</h3>
+             <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Jadwal Absensi KBM</h3>
              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-1">
-               {isGenderRestricted ? `Hanya Menampilkan Jadwal Santri ${targetGender}` : 'Menampilkan Jadwal Anda (Termasuk Walas)'}
+               {isGenderRestricted ? `Hanya Menampilkan Jadwal Santri ${targetGender}` : 'Menampilkan Jadwal Anda (Termasuk Walas/Asisten)'}
              </p>
           </div>
 
@@ -118,7 +117,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
            </div>
 
            <div className="p-10 border-t">
-              <button onClick={handleSave} className="w-full py-6 bg-[#064e3b] text-white rounded-3xl font-black uppercase text-[12px] shadow-xl">Simpan Absensi</button>
+              <button onClick={handleSave} className="w-full py-6 bg-[#064e3b] text-white rounded-3xl font-black uppercase text-[12px] shadow-xl">Simpan Absensi KBM</button>
            </div>
         </div>
       )}

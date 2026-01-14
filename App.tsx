@@ -110,7 +110,7 @@ const App: React.FC = () => {
         />
       )}
 
-      {activeTab === 'absen-santri' && <Attendance {...currentAppData} role={profile.role} currentUser={profile.fullName} onSave={(recs:any) => saveAppData({ attendance: [...currentAppData.attendance, ...recs] })} />}
+      {activeTab === 'absen-kbm' && <Attendance {...currentAppData} role={profile.role} currentUser={profile.fullName} onSave={(recs:any) => saveAppData({ attendance: [...currentAppData.attendance, ...recs] })} />}
       
       {activeTab === 'absen-sholat' && (
         <PrayerAttendance 
@@ -162,7 +162,8 @@ const App: React.FC = () => {
       {activeTab === 'panel-kontrol' && <ControlPanel data={currentAppData} actions={{
          deleteAttendance: id => saveAppData({ attendance: currentAppData.attendance.filter(a => a.id !== id) }),
          deletePrayer: id => saveAppData({ prayerAttendance: currentAppData.prayerAttendance.filter(p => p.id !== id) }),
-         deleteReport: id => saveAppData({ reports: currentAppData.reports.filter(r => r.id !== id) })
+         deleteReport: id => saveAppData({ reports: currentAppData.reports.filter(r => r.id !== id) }),
+         deleteTeacherAttendance: id => saveAppData({ teacherAttendance: currentAppData.teacherAttendance.filter(ta => ta.id !== id) })
       }} />}
 
       {activeTab === 'pengaturan' && <Settings userEmail={profile.email} academicConfig={currentAppData.academicConfig} onUpdateAcademic={c => saveAppData({ academicConfig: c })} availableClasses={[]} students={currentAppData.students} />}

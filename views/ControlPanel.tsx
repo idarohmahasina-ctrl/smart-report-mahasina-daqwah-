@@ -2,15 +2,15 @@
 import React, { useState, useMemo } from 'react';
 import { 
   AttendanceRecord, PrayerRecord, TeacherAttendance, ReportItem, Student, 
-  UserRole
+  UserRole, AppData
 } from '../types.ts';
 import { 
   ShieldCheck, Lock, Trash2, Search, Database, 
   X, Check, AlertTriangle, Download, FileText, UserCheck, Zap,
-  AlertCircle, RefreshCcw, ShieldAlert, Sparkles, User, Key
+  AlertCircle, RefreshCcw, ShieldAlert, Sparkles, User, Key, GraduationCap, CheckCircle
 } from 'lucide-react';
 import { downloadCSV } from './utils/csvExport.ts';
-import { resetFirestoreData, getActiveSession, seedDemoData } from '../services/dataService.ts';
+import { resetFirestoreData, getActiveSession, seedDemoData, saveAppData } from '../services/dataService.ts';
 import { 
   DEMO_STUDENTS, DEMO_TEACHERS, DEMO_SCHEDULES, DEMO_ATTENDANCE, 
   DEMO_REPORTS, DEMO_TEACHER_ATTENDANCE, DEMO_PRAYER 
@@ -28,18 +28,18 @@ interface ControlPanelProps {
     deleteAttendance: (id: string) => void;
     deletePrayer: (id: string) => void;
     deleteReport: (id: string) => void;
+    deleteTeacherAttendance: (id: string) => void;
   };
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
-  const [activeModul, setActiveModul] = useState<'absen-santri' | 'absen-pondok' | 'pelanggaran' | 'prestasi'>('absen-santri');
+  const [activeModul, setActiveModul] = useState<'absen-kbm' | 'absen-pondok' | 'absen-guru' | 'pelanggaran' | 'prestasi'>('absen-kbm');
   const [searchTerm, setSearchTerm] = useState('');
   const [pin, setPin] = useState('');
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   const profile = getActiveSession();
-  const isSuperAdmin = profile?.email.toLowerCase().trim() === 'idarohmahasina@gmail.com';
-
+  
   const handleVerifyPin = (e: React.FormEvent) => {
     e.preventDefault();
     if (pin === '7777') {
@@ -50,18 +50,38 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
     }
   };
 
+  const handleSeedSamples = async () => {
+    if (confirm("Gunakan data sampel untuk simulasi aplikasi? Ini akan menambahkan santri, jadwal, dan laporan demo.")) {
+       const demoData: Partial<AppData> = {
+          students: DEMO_STUDENTS,
+          teachers: DEMO_TEACHERS,
+          schedules: DEMO_SCHEDULES,
+          attendance: DEMO_ATTENDANCE,
+          reports: DEMO_REPORTS,
+          teacherAttendance: DEMO_TEACHER_ATTENDANCE,
+          prayerAttendance: DEMO_PRAYER
+       };
+       await saveAppData(demoData);
+       alert("Data Sampel Berhasil Dimasukkan!");
+       window.location.reload();
+    }
+  };
+
   const filteredData = useMemo(() => {
     let list: any[] = [];
-    if (activeModul === 'absen-santri') list = data.attendance || [];
+    if (activeModul === 'absen-kbm') list = data.attendance || [];
     else if (activeModul === 'absen-pondok') list = data.prayerAttendance || [];
+    else if (activeModul === 'absen-guru') list = data.teacherAttendance || [];
     else if (activeModul === 'pelanggaran') list = (data.reports || []).filter(r => r.type === 'Violation');
     else if (activeModul === 'prestasi') list = (data.reports || []).filter(r => r.type === 'Achievement');
 
     return list.filter(item => {
       const studentName = data.students?.find(s => s.id === item.studentId)?.name || '';
+      const teacherName = (item.teacherName || '').toLowerCase();
       const reporterName = (item.recordedBy || item.reporter || '').toLowerCase();
-      const desc = (item.description || '').toLowerCase();
+      const desc = (item.description || item.summary || '').toLowerCase();
       return studentName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+             teacherName.includes(searchTerm.toLowerCase()) ||
              desc.includes(searchTerm.toLowerCase()) ||
              reporterName.includes(searchTerm.toLowerCase());
     }).sort((a,b) => b.date.localeCompare(a.date));
@@ -112,8 +132,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
            
            <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-sm shadow-inner shrink-0 overflow-x-auto no-scrollbar max-w-full">
               {[
-                { id: 'absen-santri', label: 'Absen Santri' },
+                { id: 'absen-kbm', label: 'Absen KBM' },
                 { id: 'absen-pondok', label: 'Absen Pondok' },
+                { id: 'absen-guru', label: 'Absen Guru' },
                 { id: 'pelanggaran', label: 'Pelanggaran' },
                 { id: 'prestasi', label: 'Prestasi' }
               ].map(tab => (
@@ -131,16 +152,21 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400"><Search size={22}/></span>
                <input type="text" placeholder={`Cari data di log ${activeModul}...`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-16 pr-6 py-5 bg-slate-50 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-sm shadow-inner transition-all" />
             </div>
-            <button onClick={() => downloadCSV(filteredData, `Master_Export_${activeModul}`)} className="px-8 py-5 bg-emerald-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-lg flex items-center gap-3 hover:bg-emerald-800 transition-all active:scale-95"><Download size={18}/> Ekspor Log CSV</button>
+            <div className="flex gap-3">
+              <button onClick={handleSeedSamples} className="px-6 py-5 bg-blue-50 text-blue-700 border border-blue-100 rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-sm flex items-center gap-3 hover:bg-blue-100 transition-all">
+                 <Sparkles size={18}/> Isi Data Sampel
+              </button>
+              <button onClick={() => downloadCSV(filteredData, `Master_Export_${activeModul}`)} className="px-8 py-5 bg-emerald-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-lg flex items-center gap-3 hover:bg-emerald-800 transition-all active:scale-95"><Download size={18}/> Ekspor Log CSV</button>
+            </div>
          </div>
 
          <div className="overflow-x-auto no-scrollbar">
             <table className="w-full text-left">
                <thead>
                   <tr className="border-b-2 border-slate-50">
-                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Santri / Unit</th>
+                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">{activeModul === 'absen-guru' ? 'Pengajar' : 'Santri / Unit'}</th>
                      <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Aktivitas / Waktu</th>
-                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Petugas</th>
+                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">{activeModul === 'absen-guru' ? 'Status' : 'Petugas'}</th>
                      <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status / Detail</th>
                      <th className="pb-6 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Aksi</th>
                   </tr>
@@ -149,23 +175,23 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                   {filteredData.map((item) => (
                     <tr key={item.id} className="group hover:bg-slate-50 transition-all">
                       <td className="py-6 pr-4">
-                         <p className="text-[12px] font-black text-slate-800 uppercase leading-none">{data.students?.find(s => s.id === item.studentId)?.name || 'Data Dihapus'}</p>
+                         <p className="text-[12px] font-black text-slate-800 uppercase leading-none">{item.teacherName || data.students?.find(s => s.id === item.studentId)?.name || 'Data Dihapus'}</p>
                          <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">KELAS: {item.class}</p>
                       </td>
                       <td className="py-6 pr-4">
-                         <p className="text-[10px] font-bold text-slate-700">{item.sessionType || item.prayerTime || item.category || item.type}</p>
-                         <p className="text-[8px] font-black text-slate-400 mt-1.5 uppercase">{item.date} • {item.time || item.recordedTime || item.timestamp}</p>
+                         <p className="text-[10px] font-bold text-slate-700">{item.sessionType || item.prayerTime || item.category || item.subject || item.type}</p>
+                         <p className="text-[8px] font-black text-slate-400 mt-1.5 uppercase">{item.date} • {item.startTime || item.time || item.recordedTime || item.timestamp}</p>
                       </td>
                       <td className="py-6 pr-4">
                          <div className="flex items-center gap-2 text-emerald-700">
-                            <User size={14} className="opacity-40" />
-                            <p className="text-[10px] font-black uppercase tracking-tight truncate max-w-[120px]">{item.recordedBy || item.reporter || 'Sistem'}</p>
+                            {activeModul === 'absen-guru' ? <CheckCircle size={14} className="opacity-40" /> : <User size={14} className="opacity-40" />}
+                            <p className="text-[10px] font-black uppercase tracking-tight truncate max-w-[120px]">{activeModul === 'absen-guru' ? 'Hadir' : (item.recordedBy || item.reporter || 'Sistem')}</p>
                          </div>
                       </td>
                       <td className="py-6 pr-4">
                          <div className="flex items-center gap-3">
-                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${item.status === 'Hadir' || item.status === 'Berjama\'ah' || item.status === 'Ditindak' || activeModul === 'prestasi' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{item.status || (activeModul === 'pelanggaran' || activeModul === 'prestasi' ? `${item.points} PT` : '-')}</span>
-                            {(activeModul === 'pelanggaran' || activeModul === 'prestasi') && item.photoUrl && (
+                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${item.status === 'Hadir' || item.status === 'Berjama\'ah' || item.status === 'Ditindak' || activeModul === 'prestasi' || activeModul === 'absen-guru' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{item.status || (activeModul === 'pelanggaran' || activeModul === 'prestasi' ? `${item.points} PT` : (activeModul === 'absen-guru' ? 'HADIR' : '-'))}</span>
+                            {(activeModul === 'pelanggaran' || activeModul === 'prestasi' || activeModul === 'absen-guru') && item.photoUrl && (
                                <div onClick={() => window.open(item.photoUrl)} className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 cursor-zoom-in hover:scale-110 transition-transform shadow-sm shrink-0">
                                   <img src={item.photoUrl} className="w-full h-full object-cover" />
                                </div>
@@ -174,7 +200,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                       </td>
                       <td className="py-6">
                          <div className="flex justify-center gap-3">
-                            <button onClick={() => { if(confirm("Hapus data ini?")) { if(activeModul === 'absen-santri') actions.deleteAttendance(item.id); else if(activeModul === 'absen-pondok') actions.deletePrayer(item.id); else actions.deleteReport(item.id); } }} className="p-3 bg-red-50 text-red-600 rounded-xl border border-red-100 hover:bg-red-600 hover:text-white transition-all shadow-sm"><Trash2 size={16}/></button>
+                            <button onClick={() => { if(confirm("Hapus data ini?")) { if(activeModul === 'absen-kbm') actions.deleteAttendance(item.id); else if(activeModul === 'absen-pondok') actions.deletePrayer(item.id); else if(activeModul === 'absen-guru') actions.deleteTeacherAttendance(item.id); else actions.deleteReport(item.id); } }} className="p-3 bg-red-50 text-red-600 rounded-xl border border-red-100 hover:bg-red-600 hover:text-white transition-all shadow-sm"><Trash2 size={16}/></button>
                          </div>
                     </td>
                     </tr>

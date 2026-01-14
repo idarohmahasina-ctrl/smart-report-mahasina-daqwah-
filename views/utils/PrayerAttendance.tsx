@@ -117,6 +117,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
     if (reportPrayer !== 'Semua') list = list.filter(r => r.prayerTime === reportPrayer);
     if (reportClass !== 'Semua') list = list.filter(r => r.class === reportClass);
     
+    // Fix: reportGender was incorrectly called genderFilter (line 124)
     return list.filter(r => {
       const s = students.find(std => std.id === r.studentId);
       if (!s) return false;
@@ -361,10 +362,20 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
               <div className="bg-white p-8 rounded-[3.5rem] border shadow-sm space-y-8">
                  <div className="flex justify-between items-center">
                     <h3 className="text-[11px] font-black uppercase tracking-widest">Ranking Ketidakhadiran</h3>
-                    <div className="flex bg-slate-50 p-1 rounded-xl">
-                       {[PrayerStatus.ALPHA, PrayerStatus.TERLAMBAT, PrayerStatus.UDZUR].map(st => (
-                          <button key={st} onClick={() => setReportRankStatus(st)} className={`px-3 py-1.5 rounded-lg text-[9px] font-black ${reportRankStatus === st ? 'bg-red-600 text-white shadow-md' : 'text-slate-400'}`}>
-                             {st[0]}
+                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                       {[
+                         { s: PrayerStatus.ALPHA, l: 'A' }, 
+                         { s: PrayerStatus.TERLAMBAT, l: 'T' }, 
+                         { s: PrayerStatus.IZIN, l: 'I' }, 
+                         { s: PrayerStatus.SAKIT, l: 'S' },
+                         { s: PrayerStatus.UDZUR, l: 'U' }
+                       ].map(opt => (
+                          <button 
+                            key={opt.s} 
+                            onClick={() => setReportRankStatus(opt.s)} 
+                            className={`w-8 h-8 rounded-lg text-[10px] font-black flex items-center justify-center transition-all ${reportRankStatus === opt.s ? 'bg-red-600 text-white shadow-md' : 'text-slate-400'}`}
+                          >
+                             {opt.l}
                           </button>
                        ))}
                     </div>
