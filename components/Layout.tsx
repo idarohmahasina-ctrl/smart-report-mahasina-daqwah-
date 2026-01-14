@@ -97,7 +97,9 @@ const Layout: React.FC<LayoutProps> = ({
           <div className="flex items-center gap-4">
              <div className="hidden sm:flex flex-col text-right">
                 <h3 className="text-[11px] font-black text-slate-800 uppercase leading-none tracking-tight">Pesantren Mahasina</h3>
-                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Semester {academicConfig.semester} • {academicConfig.schoolYear}</p>
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                  Semester {academicConfig?.semester || '-'} • {academicConfig?.schoolYear || '-'}
+                </p>
              </div>
              <img src={APP_LOGO} className="w-10 h-10 p-1 border rounded-xl" alt="Institution" />
           </div>

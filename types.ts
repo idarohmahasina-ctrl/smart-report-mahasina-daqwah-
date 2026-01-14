@@ -25,7 +25,6 @@ export enum PrayerTime {
   LALARAN = 'Lalaran Ahad Malam'
 }
 
-// Added SessionType definition
 export type SessionType = string;
 
 export enum ViolationCategory {
@@ -58,7 +57,7 @@ export interface Student {
   nis: string;
   name: string;
   formalClass: string; 
-  sessionClasses: Record<string, string>; // Sesi -> Nama Kelas
+  sessionClasses: Record<string, string>;
   level: 'MTs' | 'MA';
   gender: 'Putra' | 'Putri';
 }
@@ -69,7 +68,6 @@ export interface Teacher {
   subject: string;
   email: string;
   teachingClasses: string[];
-  // Added phone property to match usage
   phone: string;
 }
 
@@ -79,6 +77,7 @@ export interface Schedule {
   time: string;
   subject: string;
   teacherName: string;
+  assistantTeacherName?: string; // Menampung nama guru asisten
   class: string;
   level: 'MTs' | 'MA';
   gender: 'Putra' | 'Putri';
@@ -108,7 +107,6 @@ export interface AttendanceRecord {
   sessionType: string;
 }
 
-// Renamed from TeacherAttendanceRecord to TeacherAttendance to match imports in other files
 export interface TeacherAttendance {
   id: string;
   date: string;
@@ -118,7 +116,7 @@ export interface TeacherAttendance {
   class: string;
   startTime: string;
   endTime?: string;
-  photoUrl: string; // Base64
+  photoUrl: string;
   summary?: string;
 }
 
@@ -137,7 +135,6 @@ export interface ReportItem {
   photoUrl?: string;
 }
 
-// Added PrayerStatus enum missing in types.ts
 export enum PrayerStatus {
   JAMAAH = "Berjama'ah",
   UDZUR = 'Udzur',
@@ -147,7 +144,6 @@ export enum PrayerStatus {
   ALPHA = 'Alpha'
 }
 
-// Added PrayerRecord interface missing in types.ts
 export interface PrayerRecord {
   id: string;
   date: string;
@@ -160,14 +156,12 @@ export interface PrayerRecord {
   note?: string;
 }
 
-// Added TemplateItem interface missing in types.ts
 export interface TemplateItem {
   label: string;
   points: number;
   category: ViolationCategory;
 }
 
-// Added Announcement interface missing in types.ts
 export interface Announcement {
   id: string;
   title: string;
@@ -175,7 +169,6 @@ export interface Announcement {
   date: string;
 }
 
-// Added AppData interface missing parts (extraDataLists, announcements, etc.)
 export interface AppData {
   students: Student[];
   teachers: Teacher[];
@@ -189,6 +182,6 @@ export interface AppData {
   violationTemplates: TemplateItem[];
   achievementTemplates: TemplateItem[];
   academicConfig: AcademicConfig;
-  extraDataLists: any[]; // Used in Information.tsx
+  extraDataLists: any[];
   announcements: Announcement[];
 }

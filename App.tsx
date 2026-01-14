@@ -9,7 +9,7 @@ import Reports from './views/utils/Reports.tsx';
 import Information from './views/utils/Information.tsx';
 import Settings from './views/Settings.tsx';
 import ControlPanel from './views/ControlPanel.tsx';
-import { UserProfile, AppData, UserRole, TeacherAttendance } from './types.ts';
+import { UserProfile, AppData, UserRole, TeacherAttendance, AcademicConfig } from './types.ts';
 import { 
   saveAppData, getActiveSession, subscribeToAppData, setActiveSession 
 } from './services/dataService.ts';
@@ -21,7 +21,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Timeout as fallback for infinite loading during slow sync
+    // Fallback timeout jika sinkronisasi sangat lambat
     const timer = setTimeout(() => {
       if (loading) setLoading(false);
     }, 5000);
@@ -43,21 +43,29 @@ const App: React.FC = () => {
     window.location.reload();
   };
 
-  const currentAppData: AppData = appData || {
-    students: [],
-    teachers: [],
-    schedules: [],
-    attendance: [],
-    teacherAttendance: [],
-    reports: [],
-    prayerAttendance: [],
-    orsam: [],
-    orklas: [],
-    violationTemplates: [],
-    achievementTemplates: [],
-    extraDataLists: [],
-    announcements: [],
-    academicConfig: { schoolYear: '2024/2025', semester: 'II (Genap)', isHoliday: false, excludedClasses: {} }
+  // Pastikan academicConfig selalu ada meskipun data dari cloud belum lengkap
+  const defaultAcademicConfig: AcademicConfig = { 
+    schoolYear: '2024/2025', 
+    semester: 'II (Genap)', 
+    isHoliday: false, 
+    excludedClasses: {} 
+  };
+
+  const currentAppData: AppData = {
+    students: appData?.students || [],
+    teachers: appData?.teachers || [],
+    schedules: appData?.schedules || [],
+    attendance: appData?.attendance || [],
+    teacherAttendance: appData?.teacherAttendance || [],
+    reports: appData?.reports || [],
+    prayerAttendance: appData?.prayerAttendance || [],
+    orsam: appData?.orsam || [],
+    orklas: appData?.orklas || [],
+    violationTemplates: appData?.violationTemplates || [],
+    achievementTemplates: appData?.achievementTemplates || [],
+    extraDataLists: appData?.extraDataLists || [],
+    announcements: appData?.announcements || [],
+    academicConfig: appData?.academicConfig || defaultAcademicConfig
   };
 
   if (loading && !appData) return (
