@@ -44,7 +44,7 @@ const Layout: React.FC<LayoutProps> = ({
     { id: 'input-pelanggaran', label: 'Lapor Pelanggaran', icon: <ShieldAlert size={20} />, visible: true },
     { id: 'input-prestasi', label: 'Lapor Prestasi', icon: <Trophy size={20} />, visible: true },
     { id: 'rekap-laporan', label: 'Rekap Laporan', icon: <ClipboardCheck size={20} />, visible: canSeeRecap },
-    { id: 'informasi', label: 'Informasi', icon: <Info size={20} />, visible: isAdmin },
+    { id: 'informasi', label: 'Informasi', icon: <Info size={20} />, visible: true },
     { id: 'panel-kontrol', label: 'Panel Kontrol', icon: <ShieldCheck size={20} />, visible: isAdmin },
     { id: 'pengaturan', label: 'Pengaturan', icon: <SettingsIcon size={20} />, visible: true },
   ];

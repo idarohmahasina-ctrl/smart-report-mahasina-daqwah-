@@ -3,9 +3,10 @@ import React, { useState, useMemo } from 'react';
 import { UserRole, Student, Teacher, Schedule, OrganizationMember, TemplateItem, Announcement, ViolationCategory } from '../../types.ts';
 import { 
   Search, Download, Upload, FileText, Info as InfoIcon, Users, 
-  Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark, UserPlus, GraduationCap, LayoutGrid, Award
+  Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark, UserPlus, GraduationCap, LayoutGrid, Award, FileDown
 } from 'lucide-react';
 import { ExtraDataList } from '../../services/dataService.ts';
+import { downloadCSV } from './csvExport.ts';
 
 interface InformationProps {
   role: UserRole;
@@ -87,7 +88,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
       };
 
       const newData = lines.slice(1).map((line, idx) => {
-        const values = line.split(delimiter).map(v => v.replace(/^"|"$/g, '').trim());
+        const values = line.split(delimiter).map(v => v.replace(/^"|$/g, '').trim());
         
         if (type === 'ORSAM' || type === 'ORKLAS') {
           return {
@@ -193,6 +194,42 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     });
   }, [selectedCategory, data, searchTerm, orgGenderFilter, orgLevelFilter, orgClassFilter, isGenderRestricted, targetGender]);
 
+  const handleExportCurrentView = () => {
+    if (!selectedCategory) return;
+    
+    let exportData: any[] = [];
+    let filename = `Data_${selectedCategory}_Export`;
+
+    if (selectedCategory === 'ORSAM' || selectedCategory === 'ORKLAS') {
+      exportData = filteredOrgs;
+    } else if (selectedCategory === 'Siswa') {
+      exportData = data.students.filter(s => 
+        (isGenderRestricted ? s.gender === targetGender : true) && 
+        s.name.toLowerCase().includes(searchTerm.toLowerCase())
+      ).map(s => ({
+        NIS: s.nis,
+        Nama: s.name,
+        Gender: s.gender,
+        Tingkat: s.level,
+        "Unit Formal": s.formalClass,
+        [`Sesi ${studentSessionFilter}`]: studentSessionFilter === 'Madrasah' ? s.formalClass : s.sessionClasses?.[studentSessionFilter] || '-'
+      }));
+    } else if (selectedCategory === 'Guru') {
+      exportData = data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    } else if (selectedCategory === 'Jadwal') {
+      exportData = data.schedules;
+    } else if (selectedCategory === 'Peraturan') {
+      exportData = [...data.violationTemplates, ...data.achievementTemplates];
+    }
+
+    if (exportData.length === 0) {
+      alert("Tidak ada data untuk diekspor.");
+      return;
+    }
+
+    downloadCSV(exportData, filename);
+  };
+
   return (
     <div className="space-y-10 pb-20 max-w-6xl mx-auto animate-in fade-in duration-700">
       {!selectedCategory ? (
@@ -224,17 +261,24 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Master Data Terpusat</p>
                  </div>
               </div>
-              {isSuperAdmin && (
-                <div className="flex gap-3 w-full md:w-auto">
-                   <button onClick={() => downloadTemplate(selectedCategory)} className="px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2">
-                      <Download size={16}/> Template
-                   </button>
-                   <label className="px-6 py-4 bg-emerald-950 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 cursor-pointer shadow-lg">
-                      <Upload size={16}/> Impor CSV
-                      <input type="file" accept=".csv" className="hidden" onChange={(e) => handleFileUpload(e, selectedCategory)} />
-                   </label>
-                </div>
-              )}
+              
+              <div className="flex flex-wrap gap-3 w-full md:w-auto">
+                 <button onClick={handleExportCurrentView} className="px-6 py-4 bg-blue-50 text-blue-700 border border-blue-100 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-100 transition-all shadow-sm">
+                    <FileDown size={16}/> Ekspor Data
+                 </button>
+                 
+                 {isSuperAdmin && (
+                   <>
+                     <button onClick={() => downloadTemplate(selectedCategory)} className="px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2">
+                        <Download size={16}/> Template
+                     </button>
+                     <label className="px-6 py-4 bg-emerald-950 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 cursor-pointer shadow-lg">
+                        <Upload size={16}/> Impor CSV
+                        <input type="file" accept=".csv" className="hidden" onChange={(e) => handleFileUpload(e, selectedCategory)} />
+                     </label>
+                   </>
+                 )}
+              </div>
            </div>
 
            {(selectedCategory === 'ORSAM' || selectedCategory === 'ORKLAS') && (
