@@ -54,7 +54,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
         <div className="space-y-6">
           <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
              <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Jadwal Khidmah Anda</h3>
-             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-1">Sistem mendeteksi peran Anda sebagai Guru Utama / Asisten</p>
+             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-1">Absensi santri dilakukan per kelas jadwal KBM (Tanpa Foto)</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -149,7 +149,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
            </div>
 
            <div className="p-10 border-t bg-slate-50/50">
-              <button onClick={handleSave} className="w-full py-6 bg-[#064e3b] text-white rounded-3xl font-black uppercase tracking-[0.3em] text-[12px] shadow-xl hover:bg-emerald-900 active:scale-95 transition-all">Simpan Absensi</button>
+              <button onClick={handleSave} className="w-full py-6 bg-[#064e3b] text-white rounded-3xl font-black uppercase tracking-[0.3em] text-[12px] shadow-xl hover:bg-emerald-900 active:scale-95 transition-all">Simpan Absensi (Tanpa Foto)</button>
            </div>
         </div>
       )}

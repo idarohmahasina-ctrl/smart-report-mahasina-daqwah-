@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { PrayerTime, PrayerStatus, Student, PrayerRecord, SessionType } from '../../types.ts';
 import { 
   PlusCircle, History, Zap, Search, Users, ChevronRight, Save, Clock, Filter,
-  Activity, CheckCircle, FileText, Download, Award, AlertTriangle
+  Activity, CheckCircle, FileText, Download, Award, AlertTriangle, User
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend 
@@ -356,7 +356,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                  </div>
                  <div className="space-y-1">
                     <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Gender</label>
-                    <select value={reportGender} onChange={e => setReportGender(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none">
+                    <select value={reportGender} onChange={e => setReportGender(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border-none appearance-none" >
                        <option value="Semua">SEMUA GENDER</option>
                        <option value="Putra">PUTRA</option>
                        <option value="Putri">PUTRI</option>
@@ -456,8 +456,8 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                        <tr className="border-b-2 border-slate-50">
                           <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Santri / Unit</th>
                           <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Status Sholat</th>
+                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Petugas</th>
                           <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Waktu Input</th>
-                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Catatan</th>
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -473,12 +473,18 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                                   r.status === PrayerStatus.ALPHA ? 'bg-red-100 text-red-800' : 
                                   r.status === PrayerStatus.TERLAMBAT ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
                                 }`}>{r.status}</span>
+                                {r.note && <p className="text-[8px] font-medium text-slate-400 mt-1 italic">{r.note}</p>}
+                             </td>
+                             <td className="py-6 pr-4">
+                                <div className="flex items-center gap-2 text-emerald-700">
+                                   <User size={12} className="opacity-40" />
+                                   <p className="text-[10px] font-black uppercase tracking-tight">{r.recordedBy || 'Sistem'}</p>
+                                </div>
                              </td>
                              <td className="py-6 pr-4">
                                 <p className="text-[11px] font-black text-emerald-800 uppercase leading-none">{r.prayerTime} ({r.recordedTime})</p>
                                 <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase">{r.date}</p>
                              </td>
-                             <td className="py-6 pr-4 text-[10px] font-medium text-slate-500 italic">{r.note || '-'}</td>
                           </tr>
                        ))}
                     </tbody>

@@ -1,7 +1,7 @@
 
 import { db } from './firebase.ts';
 import { 
-  doc, setDoc, onSnapshot, getDoc
+  doc, setDoc, onSnapshot, getDoc, collection, getDocs, deleteDoc
 } from "firebase/firestore";
 import { 
   UserProfile, AppData
@@ -23,9 +23,19 @@ export const getUserByEmail = async (email: string): Promise<UserProfile | null>
   return null;
 };
 
+export const getAllUsers = async (): Promise<UserProfile[]> => {
+  const querySnapshot = await getDocs(collection(db, "users"));
+  return querySnapshot.docs.map(doc => doc.data() as UserProfile);
+};
+
 export const registerUser = async (profile: UserProfile) => {
   const cleanEmail = profile.email.toLowerCase().trim();
   await setDoc(doc(db, "users", cleanEmail), profile);
+};
+
+export const deleteUser = async (email: string) => {
+  const cleanEmail = email.toLowerCase().trim();
+  await deleteDoc(doc(db, "users", cleanEmail));
 };
 
 export const subscribeToAppData = (callback: (data: AppData) => void) => {
@@ -66,6 +76,12 @@ export const resetFirestoreData = async () => {
   await setDoc(docRef, emptyData);
 };
 
+// Fungsi Seed Demo Data
+export const seedDemoData = async (demoData: AppData) => {
+  const docRef = doc(db, "settings", "master_data");
+  await setDoc(docRef, demoData);
+};
+
 export const setActiveSession = (u: UserProfile | null) => {
   if (u) localStorage.setItem(SESSION_KEY, JSON.stringify(u));
   else localStorage.removeItem(SESSION_KEY);
@@ -80,13 +96,4 @@ export const clearAppData = () => localStorage.removeItem(SESSION_KEY);
 
 export const getSyncStatus = () => {
   return { isNewLocal: false };
-};
-
-export const pullFromGDrive = async (token: string) => {
-  console.log("Pulling from GDrive with token:", token);
-  return false;
-};
-
-export const getTeamDatabaseId = () => {
-  return localStorage.getItem('mahasina_team_db_id');
 };

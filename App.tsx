@@ -13,6 +13,8 @@ import { UserProfile, AppData, UserRole, TeacherAttendance, AcademicConfig } fro
 import { 
   saveAppData, getActiveSession, subscribeToAppData, setActiveSession 
 } from './services/dataService.ts';
+// Added ShieldAlert import from lucide-react
+import { ShieldAlert } from 'lucide-react';
 
 const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(getActiveSession());
@@ -77,6 +79,16 @@ const App: React.FC = () => {
 
   if (!profile) return <Registration onComplete={(p) => setProfile(p)} />;
 
+  // Jika user diblokir oleh admin
+  if (profile.isBlocked) return (
+    <div className="h-screen bg-red-950 flex flex-col items-center justify-center text-white p-10 text-center space-y-6">
+       <ShieldAlert size={80} className="text-red-500 animate-bounce" />
+       <h1 className="text-2xl font-black uppercase tracking-tight">Akses Anda Diblokir</h1>
+       <p className="text-sm font-medium opacity-60 max-w-md">Akun Anda telah dinonaktifkan oleh Admin Idaroh Mahasina. Silakan hubungi bagian administrasi jika ini adalah kesalahan.</p>
+       <button onClick={handleLogout} className="px-8 py-4 bg-white text-red-950 rounded-2xl font-black text-xs uppercase tracking-widest">Logout</button>
+    </div>
+  );
+
   return (
     <Layout
       activeTab={activeTab}
@@ -119,7 +131,7 @@ const App: React.FC = () => {
          deleteReport: id => saveAppData({ reports: currentAppData.reports.filter(r => r.id !== id) })
       }} />}
 
-      {activeTab === 'pengaturan' && <Settings userEmail={profile.email} academicConfig={currentAppData.academicConfig} onUpdateAcademic={c => saveAppData({ academicConfig: c })} availableClasses={[]} />}
+      {activeTab === 'pengaturan' && <Settings userEmail={profile.email} academicConfig={currentAppData.academicConfig} onUpdateAcademic={c => saveAppData({ academicConfig: c })} availableClasses={[]} students={currentAppData.students} />}
     </Layout>
   );
 };
