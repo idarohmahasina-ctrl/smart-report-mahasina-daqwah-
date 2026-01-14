@@ -29,11 +29,9 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
     try {
       const existingUser = await getUserByEmail(email);
       if (existingUser) {
-        // User sudah ada, langsung masuk
         setActiveSession(existingUser);
         onComplete(existingUser);
       } else {
-        // User belum ada, lanjut isi detail
         setStep('details');
         setLoading(false);
       }
@@ -103,7 +101,6 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
                      placeholder="nama@gmail.com" 
                    />
                 </div>
-                <p className="text-[8px] text-slate-400 italic ml-2">*Gunakan email yang sama untuk masuk di perangkat lain.</p>
              </div>
 
              <button 
@@ -121,11 +118,6 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
                 <ArrowLeft size={16} />
                 <span className="text-[9px] font-black uppercase tracking-widest">Ganti Email</span>
              </button>
-
-             <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 mb-4">
-                <p className="text-[8px] font-black text-emerald-800 uppercase tracking-widest opacity-60">Email Terdeteksi Baru:</p>
-                <p className="text-[10px] font-bold text-emerald-900 truncate">{email}</p>
-             </div>
 
              <div className="space-y-1">
                 <label className="text-[9px] font-black text-slate-400 uppercase ml-2">Nama Lengkap</label>
@@ -160,11 +152,6 @@ const Registration: React.FC<RegistrationProps> = ({ onComplete }) => {
              </button>
           </form>
         )}
-
-        <div className="flex items-center justify-center gap-2 text-slate-300 pt-4 border-t border-slate-50">
-           <ShieldCheck size={14} />
-           <p className="text-[8px] font-bold uppercase tracking-widest">Data Terenkripsi & Cloud Mahasina</p>
-        </div>
       </div>
     </div>
   );

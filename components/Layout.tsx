@@ -31,8 +31,9 @@ const Layout: React.FC<LayoutProps> = ({
   // Rule: Petugas idaroh, pengasuh, musyrif bisa melihat rekap
   const canSeeRecap = isAdmin || role === UserRole.PENGASUH || role === UserRole.IDAROH || role === UserRole.MUSYRIF;
   
+  // Fix: Check for specific santri officer roles because UserRole.SANTRI_OFFICER does not exist in the enum
   // Rule: Petugas santri TIDAK bisa melihat absen guru
-  const canSeeTeacherAttendance = role !== UserRole.SANTRI_OFFICER;
+  const canSeeTeacherAttendance = role !== UserRole.SANTRI_OFFICER_PUTRA && role !== UserRole.SANTRI_OFFICER_PUTRI;
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard Laporan', icon: <LayoutDashboard size={20} />, visible: true },

@@ -9,12 +9,13 @@ import Reports from './views/utils/Reports.tsx';
 import Information from './views/utils/Information.tsx';
 import Settings from './views/Settings.tsx';
 import ControlPanel from './views/ControlPanel.tsx';
+import RekapLaporan from './views/RekapLaporan.tsx';
+import PrayerAttendance from './views/utils/PrayerAttendance.tsx';
 import { UserProfile, AppData, UserRole, TeacherAttendance, AcademicConfig } from './types.ts';
 import { 
   saveAppData, getActiveSession, subscribeToAppData, setActiveSession 
 } from './services/dataService.ts';
-// Added ShieldAlert import from lucide-react
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, UserCheck } from 'lucide-react';
 
 const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(getActiveSession());
@@ -23,7 +24,6 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fallback timeout jika sinkronisasi sangat lambat
     const timer = setTimeout(() => {
       if (loading) setLoading(false);
     }, 5000);
@@ -45,7 +45,6 @@ const App: React.FC = () => {
     window.location.reload();
   };
 
-  // Pastikan academicConfig selalu ada meskipun data dari cloud belum lengkap
   const defaultAcademicConfig: AcademicConfig = { 
     schoolYear: '2024/2025', 
     semester: 'II (Genap)', 
@@ -79,7 +78,6 @@ const App: React.FC = () => {
 
   if (!profile) return <Registration onComplete={(p) => setProfile(p)} />;
 
-  // Jika user diblokir oleh admin
   if (profile.isBlocked) return (
     <div className="h-screen bg-red-950 flex flex-col items-center justify-center text-white p-10 text-center space-y-6">
        <ShieldAlert size={80} className="text-red-500 animate-bounce" />
@@ -113,9 +111,42 @@ const App: React.FC = () => {
 
       {activeTab === 'absen-santri' && <Attendance {...currentAppData} role={profile.role} currentUser={profile.fullName} onSave={(recs:any) => saveAppData({ attendance: [...currentAppData.attendance, ...recs] })} />}
       
-      {activeTab === 'input-pelanggaran' && <Reports type="Violation" role={profile.role} currentUser={profile.fullName} students={currentAppData.students} allReports={currentAppData.reports} templates={currentAppData.violationTemplates} onSave={rep => saveAppData({ reports: [rep, ...currentAppData.reports] })} />}
+      {activeTab === 'absen-sholat' && (
+        <PrayerAttendance 
+          students={currentAppData.students} 
+          allPrayerRecords={currentAppData.prayerAttendance} 
+          currentUser={profile.fullName} 
+          onSave={recs => saveAppData({ prayerAttendance: [...currentAppData.prayerAttendance, ...recs] })} 
+        />
+      )}
+
+      {activeTab === 'input-pelanggaran' && (
+        <Reports 
+          type="Violation" 
+          role={profile.role} 
+          currentUser={profile.fullName} 
+          students={currentAppData.students} 
+          allReports={currentAppData.reports} 
+          templates={currentAppData.violationTemplates} 
+          schedules={currentAppData.schedules}
+          onSave={rep => saveAppData({ reports: [rep, ...currentAppData.reports] })} 
+        />
+      )}
       
-      {activeTab === 'input-prestasi' && <Reports type="Achievement" role={profile.role} currentUser={profile.fullName} students={currentAppData.students} allReports={currentAppData.reports} templates={currentAppData.achievementTemplates} onSave={rep => saveAppData({ reports: [rep, ...currentAppData.reports] })} />}
+      {activeTab === 'input-prestasi' && (
+        <Reports 
+          type="Achievement" 
+          role={profile.role} 
+          currentUser={profile.fullName} 
+          students={currentAppData.students} 
+          allReports={currentAppData.reports} 
+          templates={currentAppData.achievementTemplates} 
+          schedules={currentAppData.schedules}
+          onSave={rep => saveAppData({ reports: [rep, ...currentAppData.reports] })} 
+        />
+      )}
+
+      {activeTab === 'rekap-laporan' && <RekapLaporan data={currentAppData} profile={profile} />}
 
       {activeTab === 'informasi' && <Information role={profile.role} userEmail={profile.email} data={currentAppData} onUpdateData={(type, newData) => {
          const update: any = {};

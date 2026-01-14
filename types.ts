@@ -3,7 +3,8 @@ export enum UserRole {
   GURU = 'Guru',
   MUSYRIF = 'Musyrif/ah',
   IDAROH = 'Petugas Idaroh',
-  SANTRI_OFFICER = 'Petugas Santri',
+  SANTRI_OFFICER_PUTRA = 'Petugas Santri Putra',
+  SANTRI_OFFICER_PUTRI = 'Petugas Santri Putri',
   PENGASUH = 'Pengasuh'
 }
 
@@ -77,7 +78,7 @@ export interface Schedule {
   time: string;
   subject: string;
   teacherName: string;
-  assistantTeacherName?: string; // Menampung nama guru asisten
+  assistantTeacherName?: string; 
   class: string;
   level: 'MTs' | 'MA';
   gender: 'Putra' | 'Putri';
