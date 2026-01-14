@@ -32,10 +32,8 @@ interface ControlPanelProps {
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
-  const [activeModul, setActiveModul] = useState<'absen-santri' | 'absen-sholat' | 'pelanggaran' | 'prestasi'>('absen-santri');
+  const [activeModul, setActiveModul] = useState<'absen-santri' | 'absen-pondok' | 'pelanggaran' | 'prestasi'>('absen-santri');
   const [searchTerm, setSearchTerm] = useState('');
-  const [isResetting, setIsResetting] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
   const [pin, setPin] = useState('');
   const [isAuthorized, setIsAuthorized] = useState(false);
 
@@ -55,7 +53,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
   const filteredData = useMemo(() => {
     let list: any[] = [];
     if (activeModul === 'absen-santri') list = data.attendance || [];
-    else if (activeModul === 'absen-sholat') list = data.prayerAttendance || [];
+    else if (activeModul === 'absen-pondok') list = data.prayerAttendance || [];
     else if (activeModul === 'pelanggaran') list = (data.reports || []).filter(r => r.type === 'Violation');
     else if (activeModul === 'prestasi') list = (data.reports || []).filter(r => r.type === 'Achievement');
 
@@ -68,56 +66,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
              reporterName.includes(searchTerm.toLowerCase());
     }).sort((a,b) => b.date.localeCompare(a.date));
   }, [activeModul, data, searchTerm]);
-
-  const handleHardReset = async () => {
-    if (!confirm("🚨 PERINGATAN KRITIS: Anda akan menghapus SELURUH database Mahasina di Cloud. Lanjutkan?")) return;
-    const code = prompt("Ketik kata 'HAPUS' untuk mengkonfirmasi:");
-    if (code !== 'HAPUS') return;
-
-    setIsResetting(true);
-    try {
-      await resetFirestoreData();
-      alert("Sistem berhasil di-reset.");
-      window.location.reload();
-    } catch (err) {
-      alert("Gagal melakukan reset.");
-    } finally { setIsResetting(false); }
-  };
-
-  const handleLoadDemo = async () => {
-    if (!confirm("Aplikasi akan memuat data sampel (Santri, Guru, Jadwal & Laporan) untuk demonstrasi. Lanjutkan?")) return;
-    setIsSeeding(true);
-    try {
-      const demoPayload = {
-        students: DEMO_STUDENTS,
-        teachers: DEMO_TEACHERS,
-        schedules: DEMO_SCHEDULES,
-        attendance: DEMO_ATTENDANCE,
-        teacherAttendance: DEMO_TEACHER_ATTENDANCE,
-        reports: DEMO_REPORTS,
-        prayerAttendance: DEMO_PRAYER,
-        orsam: [],
-        orklas: [],
-        violationTemplates: [],
-        achievementTemplates: [],
-        extraDataLists: [],
-        announcements: [],
-        academicConfig: { 
-          schoolYear: '2024/2025', 
-          semester: 'II (Genap)' as any, 
-          isHoliday: false, 
-          excludedClasses: {},
-          // Fix: Add missing excludedSessions property
-          excludedSessions: {} 
-        }
-      };
-      await seedDemoData(demoPayload);
-      alert("Data demo berhasil dimuat!");
-      window.location.reload();
-    } catch (err) {
-      alert("Gagal memuat data demo.");
-    } finally { setIsSeeding(false); }
-  };
 
   if (!isAuthorized) {
     return (
@@ -158,14 +106,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
               <div className="w-20 h-20 bg-white/10 rounded-3xl flex items-center justify-center text-emerald-400 border border-white/10 backdrop-blur-md shadow-2xl shrink-0"><Database size={32} /></div>
               <div>
                  <h2 className="text-3xl font-black uppercase tracking-tight leading-none">Panel Kontrol</h2>
-                 <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em] mt-4 flex items-center gap-2"><ShieldCheck size={12}/> Manajemen Transaksi Terpusat</p>
+                 <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em] mt-4 flex items-center gap-2"><ShieldCheck size={12}/> Manajemen Log Mahasina Cloud</p>
               </div>
            </div>
            
            <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-sm shadow-inner shrink-0 overflow-x-auto no-scrollbar max-w-full">
               {[
                 { id: 'absen-santri', label: 'Absen Santri' },
-                { id: 'absen-sholat', label: 'Absen Sholat' },
+                { id: 'absen-pondok', label: 'Absen Pondok' },
                 { id: 'pelanggaran', label: 'Pelanggaran' },
                 { id: 'prestasi', label: 'Prestasi' }
               ].map(tab => (
@@ -191,7 +139,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                <thead>
                   <tr className="border-b-2 border-slate-50">
                      <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Santri / Unit</th>
-                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Kategori / Waktu</th>
+                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Aktivitas / Waktu</th>
                      <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Petugas</th>
                      <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status / Detail</th>
                      <th className="pb-6 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Aksi</th>
@@ -226,7 +174,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
                       </td>
                       <td className="py-6">
                          <div className="flex justify-center gap-3">
-                            <button onClick={() => { if(confirm("Hapus data ini?")) { if(activeModul === 'absen-santri') actions.deleteAttendance(item.id); else if(activeModul === 'absen-sholat') actions.deletePrayer(item.id); else actions.deleteReport(item.id); } }} className="p-3 bg-red-50 text-red-600 rounded-xl border border-red-100 hover:bg-red-600 hover:text-white transition-all shadow-sm"><Trash2 size={16}/></button>
+                            <button onClick={() => { if(confirm("Hapus data ini?")) { if(activeModul === 'absen-santri') actions.deleteAttendance(item.id); else if(activeModul === 'absen-pondok') actions.deletePrayer(item.id); else actions.deleteReport(item.id); } }} className="p-3 bg-red-50 text-red-600 rounded-xl border border-red-100 hover:bg-red-600 hover:text-white transition-all shadow-sm"><Trash2 size={16}/></button>
                          </div>
                     </td>
                     </tr>
@@ -238,31 +186,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ data, actions }) => {
             )}
          </div>
       </div>
-
-      {isSuperAdmin && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
-           <div className="bg-emerald-50 border-2 border-emerald-100 p-10 rounded-[4rem] space-y-6">
-              <div className="flex items-center gap-4 text-emerald-700">
-                 <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600"><Sparkles size={28}/></div>
-                 <h3 className="text-xl font-black uppercase tracking-tight">Load Demo Data</h3>
-              </div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase leading-relaxed">Isi sistem dengan data simulasi santri dan laporan untuk percobaan.</p>
-              <button disabled={isSeeding} onClick={handleLoadDemo} className="w-full py-5 bg-emerald-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-emerald-700 shadow-xl shadow-emerald-200 transition-all active:scale-95 disabled:opacity-50">
-                {isSeeding ? <RefreshCcw size={18} className="animate-spin" /> : <Sparkles size={18}/>} Muat Data Demo
-              </button>
-           </div>
-           <div className="bg-red-50/50 rounded-[4rem] border-2 border-red-100 p-10 space-y-6">
-              <div className="flex items-center gap-4 text-red-700">
-                 <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center text-red-600"><ShieldAlert size={28}/></div>
-                 <h3 className="text-xl font-black uppercase tracking-tight">Factory Reset</h3>
-              </div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase leading-relaxed">Menghapus semua data cloud permanen. Berhati-hatilah!</p>
-              <button disabled={isResetting} onClick={handleHardReset} className="w-full py-5 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-red-700 shadow-xl shadow-red-200 transition-all active:scale-95 disabled:opacity-50">
-                {isResetting ? <RefreshCcw size={18} className="animate-spin" /> : <Trash2 size={18}/>} Reset Database Cloud
-              </button>
-           </div>
-        </div>
-      )}
     </div>
   );
 };

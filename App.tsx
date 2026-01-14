@@ -50,7 +50,6 @@ const App: React.FC = () => {
     semester: 'II (Genap)', 
     isHoliday: false, 
     excludedClasses: {},
-    // Fix: Add missing excludedSessions property
     excludedSessions: {} 
   };
 
@@ -84,7 +83,7 @@ const App: React.FC = () => {
     <div className="h-screen bg-red-950 flex flex-col items-center justify-center text-white p-10 text-center space-y-6">
        <ShieldAlert size={80} className="text-red-500 animate-bounce" />
        <h1 className="text-2xl font-black uppercase tracking-tight">Akses Anda Diblokir</h1>
-       <p className="text-sm font-medium opacity-60 max-w-md">Akun Anda telah dinonaktifkan oleh Admin Idaroh Mahasina. Silakan hubungi bagian administrasi jika ini adalah kesalahan.</p>
+       <p className="text-sm font-medium opacity-60 max-w-md">Akun Anda telah dinonaktifkan oleh Admin Idaroh Mahasina.</p>
        <button onClick={handleLogout} className="px-8 py-4 bg-white text-red-950 rounded-2xl font-black text-xs uppercase tracking-widest">Logout</button>
     </div>
   );
@@ -155,6 +154,8 @@ const App: React.FC = () => {
          if (type === 'Siswa') update.students = newData;
          if (type === 'Guru') update.teachers = newData;
          if (type === 'Jadwal') update.schedules = newData;
+         if (type === 'ORSAM') update.orsam = newData;
+         if (type === 'ORKLAS') update.orklas = newData;
          saveAppData(update);
       }} />}
       

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 interface LayoutProps {
-  children: React.Node;
+  children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   role: UserRole;
@@ -27,10 +27,13 @@ const Layout: React.FC<LayoutProps> = ({
 
   const isAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
   
-  // Rule: Petugas idaroh, pengasuh, musyrif/ah, guru bisa melihat rekap
-  const canSeeRecap = isAdmin || role === UserRole.PENGASUH || role === UserRole.IDAROH || role === UserRole.MUSYRIF || role === UserRole.GURU;
+  // Rule: Menu Rekap Laporan hanya untuk Idaroh, Pengasuh, Musyrif, dan Guru (Walas)
+  const canSeeRecap = isAdmin || 
+                     role === UserRole.PENGASUH || 
+                     role === UserRole.IDAROH || 
+                     role === UserRole.MUSYRIF || 
+                     role === UserRole.GURU;
   
-  // Rule: Menu Absen Guru untuk pengajar dan pengelola
   const canSeeTeacherAttendance = role === UserRole.GURU || role === UserRole.MUSYRIF || role === UserRole.IDAROH || role === UserRole.PENGASUH;
 
   const menuItems = [

@@ -23,7 +23,9 @@ export enum PrayerTime {
   ASHAR = 'Ashar',
   MAGHRIB = 'Maghrib',
   ISYA = 'Isya',
-  LALARAN = 'Lalaran Ahad Malam'
+  LALARAN = 'Lalaran Ahad Malam',
+  KHATAMAN = 'Khataman Al-Quran',
+  SENAM = 'Senam Pagi'
 }
 
 export type SessionType = string;
@@ -96,6 +98,7 @@ export interface OrganizationMember {
   division: string;
   orgType: 'ORSAM' | 'ORKLAS';
   gender: 'Putra' | 'Putri';
+  level?: 'MTs' | 'MA';
 }
 
 export interface AttendanceRecord {
