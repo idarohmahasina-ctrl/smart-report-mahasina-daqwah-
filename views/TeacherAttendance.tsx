@@ -5,7 +5,7 @@ import {
 } from '../types.ts';
 import { 
   Camera, CheckCircle, Clock, AlertTriangle, Sparkles, X, 
-  MonitorCheck, RefreshCw, Zap, Calendar, UserPlus, GraduationCap
+  MonitorCheck, RefreshCw, Zap, Calendar, UserPlus, GraduationCap, Loader2
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { isTeacherMatch } from './utils/nameMatchers.ts';
@@ -20,6 +20,7 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
   const [aiGreeting, setAiGreeting] = useState<string>("Sedang menyiapkan asisten jadwal...");
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [isCameraLoading, setIsCameraLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -61,12 +62,28 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
 
   const startCamera = async () => {
     setShowCamera(true);
+    setIsCameraLoading(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      const constraints = { 
+        video: { 
+          facingMode: 'user', // Kamera depan untuk selfie absen guru
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(console.error);
+          setIsCameraLoading(false);
+        };
+      }
     } catch (err) {
-      alert("Gagal mengakses kamera.");
+      console.error("Camera error:", err);
+      alert("Gagal mengakses kamera. Mohon berikan izin kamera.");
       setShowCamera(false);
+      setIsCameraLoading(false);
     }
   };
 
@@ -74,9 +91,11 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
     if (videoRef.current && canvasRef.current) {
       const context = canvasRef.current.getContext('2d');
       if (context) {
-        canvasRef.current.width = videoRef.current.videoWidth;
-        canvasRef.current.height = videoRef.current.videoHeight;
-        context.drawImage(videoRef.current, 0, 0);
+        const width = videoRef.current.videoWidth;
+        const height = videoRef.current.videoHeight;
+        canvasRef.current.width = width;
+        canvasRef.current.height = height;
+        context.drawImage(videoRef.current, 0, 0, width, height);
         const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.8);
         setCapturedPhoto(dataUrl);
         stopCamera();
@@ -88,6 +107,7 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
     }
     setShowCamera(false);
   };
@@ -203,15 +223,16 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
 
       {showCamera && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
-           <div className="bg-white rounded-[3rem] overflow-hidden w-full max-w-lg space-y-6 p-8">
+           <div className="bg-white rounded-[3rem] overflow-hidden w-full max-w-lg space-y-6 p-8 shadow-2xl">
               <div className="flex justify-between items-center">
                  <h3 className="text-sm font-black uppercase tracking-widest">Absen Pengajar</h3>
-                 <button onClick={stopCamera} className="p-2 bg-slate-100 rounded-xl text-slate-400"><X/></button>
+                 <button onClick={stopCamera} className="p-2 bg-slate-100 rounded-xl text-slate-400 hover:text-red-600 transition-all"><X/></button>
               </div>
-              <div className="relative aspect-[4/3] bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl">
-                 <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+              <div className="relative aspect-[4/3] bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl flex items-center justify-center">
+                 {isCameraLoading && <div className="flex flex-col items-center gap-4 text-emerald-400 font-black uppercase text-[10px] tracking-widest"><Loader2 className="animate-spin" size={32}/> Menyiapkan Kamera...</div>}
+                 <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${isCameraLoading ? 'hidden' : 'block'}`} />
               </div>
-              <button onClick={takePhoto} className="w-full py-5 bg-emerald-800 text-white rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3"><Camera size={20}/> Ambil Foto</button>
+              <button onClick={takePhoto} disabled={isCameraLoading} className="w-full py-5 bg-emerald-800 text-white rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl disabled:opacity-50"><Camera size={20}/> Ambil Foto</button>
               <canvas ref={canvasRef} className="hidden" />
            </div>
         </div>
