@@ -3,10 +3,11 @@ import React, { useState, useMemo } from 'react';
 import { UserRole, Student, Teacher, Schedule, OrganizationMember, TemplateItem, Announcement, ViolationCategory } from '../../types.ts';
 import { 
   Search, Download, Upload, FileText, Info as InfoIcon, Users, 
-  Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark, UserPlus, GraduationCap, LayoutGrid, Award, FileDown, BookOpen
+  Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark, UserPlus, GraduationCap, LayoutGrid, Award, FileDown, BookOpen, Phone, Mail
 } from 'lucide-react';
 import { ExtraDataList } from '../../services/dataService.ts';
 import { downloadCSV } from './csvExport.ts';
+import { isTeacherMatch } from './nameMatchers.ts';
 
 interface InformationProps {
   role: UserRole;
@@ -73,8 +74,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
       const matchCls = schClassFilter === 'Semua' || s.class === schClassFilter;
       const matchSearch = s.teacherName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           s.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (s.assistantTeacherName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (s.homeroomTeacherName || "").toLowerCase().includes(searchTerm.toLowerCase());
+                          (s.assistantTeacherName || "").toLowerCase().includes(searchTerm.toLowerCase());
       return matchDay && matchSess && matchCls && matchSearch;
     });
   }, [data.schedules, schDayFilter, schSessionFilter, schClassFilter, searchTerm]);
@@ -150,7 +150,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
              subject: getVal(values, ['MAPEL', 'MATAPELAJARAN']),
              phone: getVal(values, ['NOHP', 'WHATSAPP']),
              email: getVal(values, ['EMAIL']),
-             teachingClasses: (getVal(values, ['MENGAJARDIKELAS', 'KELAS']) || '').split(';').map(s => s.trim())
+             teachingClasses: []
            };
         }
 
@@ -161,8 +161,8 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             time: getVal(values, ['WAKTU', 'JAM']),
             subject: getVal(values, ['MAPEL', 'MATAPELAJARAN']),
             teacherName: getVal(values, ['GURU', 'USTADZ', 'USTADZAH', 'GURUUTAMA']),
-            assistantTeacherName: getVal(values, ['ASISTEN', 'GURUASISTEN', 'ASISTENGURU', 'GURU2', 'MUSYRIF', 'MUSYRIFAH']),
-            homeroomTeacherName: getVal(values, ['WALAS', 'WALIKELAS', 'HOMEROOM', 'WALI']),
+            assistantTeacherName: getVal(values, ['ASISTEN', 'GURUASISTEN', 'ASISTENGURU', 'GURU2']),
+            homeroomTeacherName: getVal(values, ['WALAS', 'WALIKELAS', 'HOMEROOM', 'WALI', 'MUSYRIF', 'MUSYRIFAH']),
             class: getVal(values, ['UNIT', 'KELAS']),
             sessionType: getVal(values, ['SESI', 'JENISKEGIATAN']) || 'Madrasah',
             level: getVal(values, ['TINGKAT', 'JENJANG']) || 'MTs',
@@ -197,14 +197,12 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
   const downloadTemplate = (type: string) => {
     let content = "";
     if (type === 'Siswa') content = "NIS,Nama,Gender,Tingkat,Kelas Madrasah (Formal),Kelas Al-Quran,Kelas Kitab Kuning\n2024001,Ahmad Santri,Putra,MTs,7A,Yanbu'a 3,Safinatun Najah";
-    else if (type === 'Guru') content = "Nama,Mapel,No HP,Email,Mengajar Di Kelas\nUstadz Zulkifli,Nahwu,081234,zulkifli@gmail.com,7A;7B;8A";
+    else if (type === 'Guru') content = "Nama,No HP,Email,Mapel Utama\nUstadz Zulkifli,081234,zulkifli@gmail.com,Nahwu Shorof";
     else if (type === 'Jadwal') {
-      content = "Hari,Waktu,Mapel,Guru Utama,Musyrif,Wali Kelas,Unit,Sesi,Tingkat,Gender\n";
-      // Contoh Skenario: Walikelas 7A (Guru E), Walikelas 7B (Guru C), Musyrif 7A&7B (Guru D)
-      content += "Senin,07:30 - 09:00,Nahwu,Ustadz A,Guru D,Guru E,7A,Madrasah,MTs,Putri\n";
-      content += "Senin,07:30 - 09:00,Shorof,Ustadzah B,Guru D,Guru C,7B,Madrasah,MTs,Putri\n";
-      content += "Senin,09:15 - 10:45,Bahasa Arab,Ustadz X,Guru D,Guru E,7A,Madrasah,MTs,Putri\n";
-      content += "Senin,13:00 - 14:30,Alfiyah J2,Ustadz Y,Guru D,Guru E,10A,Hadis,MA,Putri";
+      content = "Hari,Waktu,Mapel,Guru Utama,Guru Asisten,Wali Kelas,Unit,Sesi,Tingkat,Gender\n";
+      content += "Senin,07:30 - 09:00,Nahwu,Guru A,Guru B,Guru E,7A,Madrasah,MTs,Putra\n";
+      content += "Senin,07:30 - 09:00,Shorof,Guru B,,Guru C,7B,Madrasah,MTs,Putra\n";
+      content += "Senin,13:00 - 14:30,Alfiyah J2,Guru X,Guru D,Guru E,10A,Hadis,MA,Putra";
     }
     else if (type === 'ORSAM' || type === 'ORKLAS') content = "Nama,NIS,Jabatan,Divisi,Kelas,Gender,Tingkat\nZaid Al-Khair,2024002,Ketua,Pusat,10-IPA,Putra,MA";
     else if (type === 'Peraturan') content = "Deskripsi Peraturan,Poin,Kategori,Tipe\nTerlambat Masuk Kelas,10,Kedisiplinan,Pelanggaran\nMenjuarai Lomba Pidato,50,Akademik,Prestasi";
@@ -217,31 +215,15 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     a.click();
   };
 
-  const filteredOrgs = useMemo(() => {
-    const list = selectedCategory === 'ORSAM' ? data.orsam : data.orklas;
-    return list.filter(item => {
-      const matchSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchGender = (isGenderRestricted ? item.gender === targetGender : (orgGenderFilter === 'Semua' || item.gender === orgGenderFilter));
-      const matchLvl = orgLevelFilter === 'Semua' || item.level === orgLevelFilter;
-      const matchCls = orgClassFilter === 'Semua' || item.class === orgClassFilter;
-      
-      if (selectedCategory === 'ORSAM') return matchSearch && matchGender;
-      return matchSearch && matchGender && matchLvl && matchCls;
-    });
-  }, [selectedCategory, data, searchTerm, orgGenderFilter, orgLevelFilter, orgClassFilter, isGenderRestricted, targetGender]);
-
   const handleExportCurrentView = () => {
     if (!selectedCategory) return;
     let exportData: any[] = [];
     let filename = `Data_${selectedCategory}_Export`;
 
     if (selectedCategory === 'ORSAM' || selectedCategory === 'ORKLAS') {
-      exportData = filteredOrgs;
+      exportData = selectedCategory === 'ORSAM' ? data.orsam : data.orklas;
     } else if (selectedCategory === 'Siswa') {
-      exportData = data.students.filter(s => 
-        (isGenderRestricted ? s.gender === targetGender : true) && 
-        s.name.toLowerCase().includes(searchTerm.toLowerCase())
-      ).map(s => ({
+      exportData = data.students.map(s => ({
         NIS: s.nis,
         Nama: s.name,
         Gender: s.gender,
@@ -250,10 +232,19 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
         [`Sesi ${studentSessionFilter}`]: studentSessionFilter === 'Madrasah' ? s.formalClass : s.sessionClasses?.[studentSessionFilter] || '-'
       }));
     } else if (selectedCategory === 'Guru') {
-      exportData = data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    } else if (selectedCategory === 'Peraturan') {
-      exportData = rulesTab === 'pelanggaran' ? data.violationTemplates : data.achievementTemplates;
-      filename = `Katalog_${rulesTab.toUpperCase()}`;
+      exportData = data.teachers.map(t => {
+        const assignments = data.schedules.filter(s => isTeacherMatch(t.name, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName));
+        const walas = assignments.filter(s => s.homeroomTeacherName === t.name).map(s => s.class);
+        const musyrif = assignments.filter(s => s.assistantTeacherName === t.name).map(s => s.class);
+        return {
+          "Nama Guru": t.name,
+          "No HP": t.phone,
+          "Email": t.email,
+          "Mapel Utama": t.subject,
+          "Wali Kelas": walas.join(', ') || '-',
+          "Musyrif/ah": musyrif.join(', ') || '-'
+        };
+      });
     } else if (selectedCategory === 'Jadwal') {
       exportData = filteredSchedules;
     }
@@ -270,9 +261,9 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
       {!selectedCategory ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
            {[
-             { id: 'Guru', label: 'Data Guru', desc: 'Identitas & Email Login', icon: <UserCheck2 size={28}/>, color: 'emerald' },
+             { id: 'Guru', label: 'Data Guru', desc: 'Kontak & Tugas Walas/Musyrif', icon: <UserCheck2 size={28}/>, color: 'emerald' },
              { id: 'Siswa', label: 'Data Santri', desc: 'Multi-Sesi & Kelas Formal', icon: <Users size={28}/>, color: 'blue' },
-             { id: 'Jadwal', label: 'Jadwal KBM', desc: 'Guru Utama & Wali Kelas', icon: <Calendar size={28}/>, color: 'indigo' },
+             { id: 'Jadwal', label: 'Jadwal KBM', desc: 'Guru Utama & Asisten', icon: <Calendar size={28}/>, color: 'indigo' },
              { id: 'ORSAM', label: 'Data ORSAM', desc: 'Organisasi Santri Mahasina', icon: <Shield size={28}/>, color: 'orange' },
              { id: 'ORKLAS', label: 'Data ORKLAS', desc: 'Pengurus Kelas Santri', icon: <LayoutGrid size={28}/>, color: 'cyan' },
              { id: 'Peraturan', label: 'Katalog Poin', desc: 'Pelanggaran & Prestasi', icon: <Award size={28}/>, color: 'red' },
@@ -350,10 +341,11 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                    <table className="w-full text-left">
                       <thead>
                          <tr className="border-b-2 border-slate-50">
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Waktu / Sesi</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Waktu & Sesi</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Mata Pelajaran</th>
                             <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Guru Utama</th>
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Walas / Musyrif</th>
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Mapel / Unit</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Guru Asisten</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400 text-center">Unit / Target</th>
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
@@ -364,15 +356,22 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                                 <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{sch.sessionType}</p>
                               </td>
                               <td className="py-6">
+                                <p className="font-black text-slate-800 text-[10px] uppercase">{sch.subject}</p>
+                              </td>
+                              <td className="py-6">
                                 <p className="font-black text-emerald-800 text-[10px] uppercase">{sch.teacherName}</p>
                               </td>
                               <td className="py-6">
-                                <p className="text-[10px] font-black uppercase text-slate-600">W: {sch.homeroomTeacherName || '-'}</p>
-                                <p className="text-[10px] font-black uppercase text-slate-400">M: {sch.assistantTeacherName || '-'}</p>
+                                <p className="text-[10px] font-black uppercase text-slate-400">{sch.assistantTeacherName || '-'}</p>
                               </td>
-                              <td className="py-6">
-                                <p className="font-black text-slate-800 text-[10px] uppercase">{sch.subject}</p>
-                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">UNIT: {sch.class}</p>
+                              <td className="py-6 text-center">
+                                <div className="flex flex-col gap-1 items-center">
+                                  <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-black uppercase">{sch.class}</span>
+                                  <div className="flex gap-1">
+                                    <span className="text-[7px] font-bold text-slate-400 uppercase">{sch.level}</span>
+                                    <span className={`text-[7px] font-bold uppercase ${sch.gender === 'Putra' ? 'text-blue-400' : 'text-pink-400'}`}>{sch.gender}</span>
+                                  </div>
+                                </div>
                               </td>
                            </tr>
                          ))}
@@ -385,77 +384,75 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
              </div>
            )}
 
-           {selectedCategory === 'ORSAM' || selectedCategory === 'ORKLAS' && (
-             <div className="bg-white p-10 rounded-[4rem] border shadow-sm space-y-10">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                   <div className="space-y-1">
-                      <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Gender</label>
-                      <select disabled={isGenderRestricted} value={isGenderRestricted ? targetGender : orgGenderFilter} onChange={e => setOrgGenderFilter(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner disabled:opacity-50">
-                         <option value="Semua">Semua</option>
-                         <option value="Putra">Putra</option>
-                         <option value="Putri">Putri</option>
-                      </select>
-                   </div>
-                   {selectedCategory === 'ORKLAS' && (
-                     <>
-                       <div className="space-y-1">
-                          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Tingkatan</label>
-                          <select value={orgLevelFilter} onChange={e => setOrgLevelFilter(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner">
-                             <option value="Semua">Semua</option>
-                             <option value="MTs">MTs</option>
-                             <option value="MA">MA</option>
-                          </select>
-                       </div>
-                       <div className="space-y-1">
-                          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Unit Kelas</label>
-                          <select value={orgClassFilter} onChange={e => setOrgClassFilter(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner">
-                             <option value="Semua">Semua Kelas</option>
-                             {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                       </div>
-                     </>
-                   )}
-                   <div className="space-y-1 col-span-2 md:col-span-1">
-                      <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Cari Pengurus</label>
-                      <div className="relative">
-                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14}/>
-                         <input type="text" placeholder="Ketik nama..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-xl text-[10px] font-bold outline-none shadow-inner" />
-                      </div>
-                   </div>
-                </div>
-                <div className="overflow-x-auto no-scrollbar">
-                   <table className="w-full text-left">
-                      <thead>
-                         <tr className="border-b-2 border-slate-50">
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Pengurus</th>
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Jabatan</th>
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Bidang / Kelas</th>
-                            <th className="pb-6 text-center text-[10px] font-black uppercase text-slate-400">Gender</th>
-                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                         {filteredOrgs.map((item, idx) => (
-                           <tr key={idx} className="hover:bg-slate-50 transition-colors">
+           {selectedCategory === 'Guru' && (
+              <div className="bg-white p-10 rounded-[4rem] border shadow-sm overflow-x-auto no-scrollbar">
+                <table className="w-full text-left">
+                   <thead>
+                      <tr className="border-b-2 border-slate-50">
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Nama Ustadz/ah</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Mengajar Di</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Tugas Khusus</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Kontak & Email</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-50">
+                      {data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).map((item, idx) => {
+                        const assignments = data.schedules.filter(s => isTeacherMatch(item.name, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName));
+                        
+                        const teachingDetails = Array.from(new Set(assignments.filter(s => s.teacherName === item.name).map(a => `${a.subject} (${a.class})`))).join(' • ');
+                        const walasClasses = Array.from(new Set(assignments.filter(s => s.homeroomTeacherName === item.name).map(a => a.class)));
+                        const musyrifClasses = Array.from(new Set(assignments.filter(s => s.assistantTeacherName === item.name).map(a => a.class)));
+                        
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50 transition-all">
                              <td className="py-6">
-                                 <p className="text-sm font-black uppercase text-slate-800">{item.name}</p>
-                                 <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{item.nis}</p>
+                                <div className="flex items-center gap-4">
+                                   <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-black text-[10px] shadow-inner">{item.name[0]}</div>
+                                   <div>
+                                      <p className="font-black uppercase text-xs text-slate-800">{item.name}</p>
+                                      <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{item.subject || 'Mapel Umum'}</p>
+                                   </div>
+                                </div>
+                             </td>
+                             <td className="py-6 max-w-[200px]">
+                                <div className="flex items-center gap-2 text-slate-600">
+                                   <BookOpen size={14} className="shrink-0 text-emerald-600"/>
+                                   <p className="text-[9px] font-bold uppercase leading-relaxed line-clamp-2">{teachingDetails || 'Belum Ada Jadwal KBM'}</p>
+                                </div>
                              </td>
                              <td className="py-6">
-                                 <span className="px-3 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-[10px] font-black uppercase">{item.position}</span>
+                                <div className="space-y-1">
+                                   {walasClasses.length > 0 && (
+                                     <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[8px] font-black uppercase">Walas: {walasClasses.join(', ')}</span>
+                                     </div>
+                                   )}
+                                   {musyrifClasses.length > 0 && (
+                                     <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[8px] font-black uppercase">Musyrif/ah: {musyrifClasses.join(', ')}</span>
+                                     </div>
+                                   )}
+                                   {walasClasses.length === 0 && musyrifClasses.length === 0 && <span className="text-[8px] font-black text-slate-300 uppercase italic">Tidak Ada Tugas Khusus</span>}
+                                </div>
                              </td>
                              <td className="py-6">
-                                 <p className="text-[11px] font-black text-slate-700 uppercase">{item.division || item.class}</p>
-                                 {selectedCategory === 'ORKLAS' && <p className="text-[8px] font-bold text-slate-400 uppercase">{item.level}</p>}
+                                <div className="space-y-1">
+                                   <div className="flex items-center gap-2 text-slate-400 hover:text-emerald-600 cursor-pointer">
+                                      <Phone size={12}/>
+                                      <p className="text-[9px] font-black uppercase">{item.phone || '-'}</p>
+                                   </div>
+                                   <div className="flex items-center gap-2 text-slate-400">
+                                      <Mail size={12}/>
+                                      <p className="text-[9px] font-bold lowercase truncate max-w-[120px]">{item.email || '-'}</p>
+                                   </div>
+                                </div>
                              </td>
-                             <td className="py-6 text-center">
-                                 <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${item.gender === 'Putra' ? 'bg-blue-50 text-blue-600' : 'bg-pink-50 text-pink-600'}`}>{item.gender}</span>
-                             </td>
-                           </tr>
-                         ))}
-                      </tbody>
-                   </table>
-                </div>
-             </div>
+                          </tr>
+                        );
+                      })}
+                   </tbody>
+                </table>
+              </div>
            )}
 
            {selectedCategory === 'Siswa' && (
@@ -509,51 +506,83 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
              </div>
            )}
 
-           {selectedCategory === 'Guru' && (
-              <div className="bg-white p-10 rounded-[4rem] border shadow-sm overflow-x-auto no-scrollbar">
-                <table className="w-full text-left">
-                   <thead>
-                      <tr className="border-b-2 border-slate-50">
-                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Nama Ustadz/ah</th>
-                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Mapel Utama</th>
-                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Detail Penugasan (Sesi, Mapel & Kelas)</th>
-                      </tr>
-                   </thead>
-                   <tbody className="divide-y divide-slate-50">
-                      {data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).map((item, idx) => {
-                        const assignments = data.schedules.filter(s => s.teacherName === item.name || s.assistantTeacherName === item.name || s.homeroomTeacherName === item.name);
-                        const assignmentSummary = Array.from(new Set(assignments.map(a => {
-                          const isAss = a.assistantTeacherName === item.name;
-                          const isWal = a.homeroomTeacherName === item.name;
-                          let roleSuffix = "";
-                          if (isWal) roleSuffix = " (Walas)";
-                          else if (isAss) roleSuffix = " (Musyrif)";
-                          return `${a.sessionType}: ${a.subject} (${a.class})${roleSuffix}`;
-                        }))).join(' • ');
-                        
-                        return (
-                          <tr key={idx} className="hover:bg-slate-50 transition-all">
+           {selectedCategory === 'ORSAM' || selectedCategory === 'ORKLAS' && (
+             <div className="bg-white p-10 rounded-[4rem] border shadow-sm space-y-10">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                   <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Gender</label>
+                      <select disabled={isGenderRestricted} value={isGenderRestricted ? targetGender : orgGenderFilter} onChange={e => setOrgGenderFilter(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner disabled:opacity-50">
+                         <option value="Semua">Semua</option>
+                         <option value="Putra">Putra</option>
+                         <option value="Putri">Putri</option>
+                      </select>
+                   </div>
+                   {selectedCategory === 'ORKLAS' && (
+                     <>
+                       <div className="space-y-1">
+                          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Tingkatan</label>
+                          <select value={orgLevelFilter} onChange={e => setOrgLevelFilter(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner">
+                             <option value="Semua">Semua</option>
+                             <option value="MTs">MTs</option>
+                             <option value="MA">MA</option>
+                          </select>
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Unit Kelas</label>
+                          <select value={orgClassFilter} onChange={e => setOrgClassFilter(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner">
+                             <option value="Semua">Semua Kelas</option>
+                             {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                       </div>
+                     </>
+                   )}
+                   <div className="space-y-1 col-span-2 md:col-span-1">
+                      <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Cari Pengurus</label>
+                      <div className="relative">
+                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14}/>
+                         <input type="text" placeholder="Ketik nama..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-xl text-[10px] font-bold outline-none shadow-inner" />
+                      </div>
+                   </div>
+                </div>
+                <div className="overflow-x-auto no-scrollbar">
+                   <table className="w-full text-left">
+                      <thead>
+                         <tr className="border-b-2 border-slate-50">
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Pengurus</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Jabatan</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Bidang / Kelas</th>
+                            <th className="pb-6 text-center text-[10px] font-black uppercase text-slate-400">Gender</th>
+                         </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                         { (selectedCategory === 'ORSAM' ? data.orsam : data.orklas).filter(item => {
+                             const matchSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+                             const matchGender = (isGenderRestricted ? item.gender === targetGender : (orgGenderFilter === 'Semua' || item.gender === orgGenderFilter));
+                             const matchLvl = orgLevelFilter === 'Semua' || item.level === orgLevelFilter;
+                             const matchCls = orgClassFilter === 'Semua' || item.class === orgClassFilter;
+                             return matchSearch && matchGender && (selectedCategory === 'ORSAM' ? true : matchLvl && matchCls);
+                         }).map((item, idx) => (
+                           <tr key={idx} className="hover:bg-slate-50 transition-colors">
                              <td className="py-6">
-                                <div className="flex items-center gap-4">
-                                   <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-black text-[10px] shadow-inner">{item.name[0]}</div>
-                                   <p className="font-black uppercase text-xs text-slate-800">{item.name}</p>
-                                </div>
+                                 <p className="text-sm font-black uppercase text-slate-800">{item.name}</p>
+                                 <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{item.nis}</p>
                              </td>
                              <td className="py-6">
-                                <span className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-black uppercase">{item.subject || '-'}</span>
+                                 <span className="px-3 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-[10px] font-black uppercase">{item.position}</span>
                              </td>
-                             <td className="py-6 max-w-md">
-                                <div className="flex items-center gap-2 text-slate-400">
-                                   <BookOpen size={14} className="shrink-0"/>
-                                   <p className="text-[9px] font-bold uppercase leading-relaxed line-clamp-2">{assignmentSummary || 'Belum Terdaftar di Jadwal KBM'}</p>
-                                </div>
+                             <td className="py-6">
+                                 <p className="text-[11px] font-black text-slate-700 uppercase">{item.division || item.class}</p>
+                                 {selectedCategory === 'ORKLAS' && <p className="text-[8px] font-bold text-slate-400 uppercase">{item.level}</p>}
                              </td>
-                          </tr>
-                        );
-                      })}
-                   </tbody>
-                </table>
-              </div>
+                             <td className="py-6 text-center">
+                                 <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${item.gender === 'Putra' ? 'bg-blue-50 text-blue-600' : 'bg-pink-50 text-pink-600'}`}>{item.gender}</span>
+                             </td>
+                           </tr>
+                         ))}
+                      </tbody>
+                   </table>
+                </div>
+             </div>
            )}
 
            {selectedCategory === 'Peraturan' && (
@@ -600,12 +629,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                           ))}
                        </tbody>
                     </table>
-                    {(rulesTab === 'pelanggaran' ? data.violationTemplates : data.achievementTemplates).length === 0 && (
-                       <div className="py-20 text-center opacity-20">
-                          <Award size={64} className="mx-auto mb-4"/>
-                          <p className="text-[12px] font-black uppercase tracking-[0.3em]">Belum Ada Data Katalog</p>
-                       </div>
-                    )}
                  </div>
               </div>
            )}
