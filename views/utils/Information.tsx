@@ -169,7 +169,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
 
         if (type === 'Peraturan') {
           return {
-            label: getVal(values, ['DESKRIPSI', 'LABEL', 'PERATURAN']),
+            label: getVal(values, ['DESKRIPSI', 'LABEL', 'PERATURAN', 'DESKRIPSIPERATURAN']),
             points: Number(getVal(values, ['POIN', 'POINT', 'SKOR'])) || 0,
             category: getVal(values, ['KATEGORI', 'BIDANG']) as ViolationCategory,
             type: getVal(values, ['TIPE', 'JENIS']) || 'Pelanggaran'
@@ -195,7 +195,14 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     let content = "";
     if (type === 'Siswa') content = "NIS,Nama,Gender,Tingkat,Kelas Madrasah (Formal),Kelas Al-Quran,Kelas Kitab Kuning\n2024001,Ahmad Santri,Putra,MTs,7A,Yanbu'a 3,Safinatun Najah";
     else if (type === 'Guru') content = "Nama,Mapel,No HP,Email,Mengajar Di Kelas\nUstadz Zulkifli,Nahwu,081234,zulkifli@gmail.com,7A;7B;8A";
-    else if (type === 'Jadwal') content = "Hari,Waktu,Mapel,Guru Utama,Guru Asisten,Wali Kelas,Unit,Sesi,Tingkat,Gender\nSenin,07:30 - 09:00,Nahwu,Ustadz Zulkifli,Ustadz Ahmad,Ustadzah Sarah,7A,Madrasah,MTs,Putra";
+    else if (type === 'Jadwal') {
+      content = "Hari,Waktu,Mapel,Guru Utama,Guru Asisten,Wali Kelas,Unit,Sesi,Tingkat,Gender\n";
+      content += "Senin,07:30 - 09:00,Nahwu,Bu Fatimah,Ustadz Ahmad,Ustadzah Sarah,7A,Madrasah,MTs,Putri\n";
+      content += "Senin,09:15 - 10:45,Nahwu,Bu Fatimah,,,7B,Madrasah,MTs,Putri\n";
+      content += "Selasa,07:30 - 09:00,Bahasa Arab,Bu Fatimah,,,8E,Madrasah,MTs,Putri\n";
+      content += "Rabu,13:00 - 14:30,Bulughul Maram,Bu Fatimah,,,10A,Kitab Kuning,MA,Putri\n";
+      content += "Kamis,13:00 - 14:30,Bulughul Maram,Bu Fatimah,,,10F,Kitab Kuning,MA,Putri";
+    }
     else if (type === 'ORSAM' || type === 'ORKLAS') content = "Nama,NIS,Jabatan,Divisi,Kelas,Gender,Tingkat\nZaid Al-Khair,2024002,Ketua,Pusat,10-IPA,Putra,MA";
     else if (type === 'Peraturan') content = "Deskripsi Peraturan,Poin,Kategori,Tipe\nTerlambat Masuk Kelas,10,Kedisiplinan,Pelanggaran\nMenjuarai Lomba Pidato,50,Akademik,Prestasi";
     
@@ -449,7 +456,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                    <div className="space-y-2">
                       <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Cari Santri</label>
                       <div className="relative">
-                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
                          <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-5 bg-slate-50 rounded-2xl outline-none font-bold text-[11px]" placeholder="Ketik nama..." />
                       </div>
                    </div>
@@ -495,13 +502,13 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                       <tr className="border-b-2 border-slate-50">
                          <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Nama Ustadz/ah</th>
                          <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Mapel Utama</th>
-                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Detail Penugasan (Sesi & Kelas)</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Detail Penugasan (Sesi, Mapel & Kelas)</th>
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-50">
                       {data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).map((item, idx) => {
                         const assignments = data.schedules.filter(s => s.teacherName === item.name || s.assistantTeacherName === item.name || s.homeroomTeacherName === item.name);
-                        const assignmentSummary = Array.from(new Set(assignments.map(a => `${a.sessionType}: ${a.class}`))).join(' • ');
+                        const assignmentSummary = Array.from(new Set(assignments.map(a => `${a.sessionType}: ${a.subject} (${a.class})`))).join(' • ');
                         
                         return (
                           <tr key={idx} className="hover:bg-slate-50 transition-all">
