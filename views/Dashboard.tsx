@@ -48,7 +48,7 @@ const isWithinTimeRange = (dateStr: string, range: string, customDate?: string) 
 };
 
 const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) => {
-  const [activeTab, setActiveTab] = useState<'kbm' | 'pondok' | 'guru' | 'pelanggaran' | 'prestasi'>('kbm');
+  const [activeTab, setActiveTab] = useState<'kbm' | 'guru' | 'pelanggaran' | 'prestasi'>('kbm');
   
   // Universal Filters
   const [timeRange, setTimeRange] = useState('Hari Ini');
@@ -65,7 +65,6 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
 
   const students = data.students || [];
   const attendance = data.attendance || [];
-  const prayerAttendance = data.prayerAttendance || [];
   const teacherAttendance = data.teacherAttendance || [];
   const reports = data.reports || [];
   const schedules = data.schedules || [];
@@ -100,19 +99,6 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
     });
   }, [attendance, students, timeRange, customDate, sessionFilter, levelFilter, genderFilter, classFilter, config]);
 
-  const filteredPondok = useMemo(() => {
-    return prayerAttendance.filter(p => {
-      const s = students.find(std => std.id === p.studentId);
-      if (!s) return false;
-      const matchTime = isWithinTimeRange(p.date, timeRange, customDate);
-      const matchLvl = levelFilter === 'Semua' || s.level === levelFilter;
-      const matchGdr = genderFilter === 'Semua' || s.gender === genderFilter;
-      const matchCls = classFilter === 'Semua' || p.class === classFilter;
-      if (p.status === PrayerStatus.ALPHA && isHoliday(p.class, p.prayerTime)) return false;
-      return matchTime && matchLvl && matchGdr && matchCls;
-    });
-  }, [prayerAttendance, students, timeRange, customDate, levelFilter, genderFilter, classFilter, config]);
-
   const filteredGuru = useMemo(() => {
     return teacherAttendance.filter(ta => {
       const matchTime = isWithinTimeRange(ta.date, timeRange, customDate);
@@ -146,15 +132,6 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
         T: filteredKBM.filter(a => a.status === AttendanceStatus.T).length,
         A: filteredKBM.filter(a => a.status === AttendanceStatus.A).length,
       };
-    } else if (activeTab === 'pondok') {
-      return {
-        J: filteredPondok.filter(p => p.status === PrayerStatus.JAMAAH).length,
-        U: filteredPondok.filter(p => p.status === PrayerStatus.UDZUR).length,
-        S: filteredPondok.filter(p => p.status === PrayerStatus.SAKIT).length,
-        I: filteredPondok.filter(p => p.status === PrayerStatus.IZIN).length,
-        T: filteredPondok.filter(p => p.status === PrayerStatus.TERLAMBAT).length,
-        A: filteredPondok.filter(p => p.status === PrayerStatus.ALPHA).length,
-      };
     } else if (activeTab === 'guru') {
       const todayDay = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date());
       const totalSchedules = schedules.filter(s => s.day === todayDay && !isHoliday(s.class, s.sessionType)).length;
@@ -172,7 +149,7 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
         unhandled: filteredReports.filter(r => r.status === 'Belum Ditindak').length,
       };
     }
-  }, [activeTab, filteredKBM, filteredPondok, filteredGuru, filteredReports, schedules, config]);
+  }, [activeTab, filteredKBM, filteredGuru, filteredReports, schedules, config]);
 
   // Rankings
   const rankings = useMemo(() => {
@@ -182,8 +159,6 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
 
     if (activeTab === 'kbm') {
       targetData = filteredKBM.filter(a => a.status.includes(rankStatus));
-    } else if (activeTab === 'pondok') {
-      targetData = filteredPondok.filter(p => p.status.includes(rankStatus));
     } else if (activeTab === 'pelanggaran' || activeTab === 'prestasi') {
       targetData = filteredReports;
       if (rankStatus && rankStatus !== 'Semua') {
@@ -204,20 +179,12 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
       students: Array.from(stdMap.entries()).map(([name, count]) => ({ name, count })).sort(sortFn),
       classes: Array.from(clsMap.entries()).map(([name, count]) => ({ name, count })).sort(sortFn)
     };
-  }, [activeTab, filteredKBM, filteredPondok, filteredReports, students, rankStatus]);
+  }, [activeTab, filteredKBM, filteredReports, students, rankStatus]);
 
   // Charts
   const chartData = useMemo(() => {
     if (activeTab === 'kbm') {
       return [
-        { name: 'Sakit', value: stats.S },
-        { name: 'Izin', value: stats.I },
-        { name: 'Terlambat', value: stats.T },
-        { name: 'Alpha', value: stats.A },
-      ].filter(d => d.value > 0);
-    } else if (activeTab === 'pondok') {
-      return [
-        { name: 'Udzur', value: stats.U },
         { name: 'Sakit', value: stats.S },
         { name: 'Izin', value: stats.I },
         { name: 'Terlambat', value: stats.T },
@@ -245,14 +212,6 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
         "Kelas": a.class,
         "Status": a.status,
         "Keterangan": a.note || '-'
-      }));
-    } else if (activeTab === 'pondok') {
-      csvData = filteredPondok.map(p => ({
-        "Nama Santri": students.find(s=>s.id===p.studentId)?.name || 'N/A',
-        "Tanggal": p.date,
-        "Kelas": p.class,
-        "Status": p.status,
-        "Keterangan": p.note || '-'
       }));
     } else if (activeTab === 'guru') {
       csvData = filteredGuru.map(ta => ({
@@ -287,14 +246,13 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
       <div className="bg-white p-2 rounded-[2.5rem] shadow-sm flex overflow-x-auto no-scrollbar gap-2 border border-slate-100">
         {[
           { id: 'kbm', label: 'Absen KBM', icon: <UserCheck size={18}/> },
-          { id: 'pondok', label: 'Absen Pondok', icon: <Zap size={18}/> },
           { id: 'guru', label: 'Absen Guru', icon: <GraduationCap size={18}/> },
           { id: 'pelanggaran', label: 'Pelanggaran', icon: <ShieldAlert size={18}/> },
           { id: 'prestasi', label: 'Prestasi', icon: <Trophy size={18}/> },
         ].map(tab => (
           <button 
             key={tab.id} 
-            onClick={() => { setActiveTab(tab.id as any); setRankStatus(tab.id === 'kbm' || tab.id === 'pondok' ? 'Alpha' : ''); }} 
+            onClick={() => { setActiveTab(tab.id as any); setRankStatus(tab.id === 'kbm' ? 'Alpha' : ''); }} 
             className={`flex items-center gap-3 px-8 py-4 rounded-2xl whitespace-nowrap text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? `bg-[#064e3b] text-white shadow-lg` : 'text-slate-400 hover:bg-slate-50'}`}
           >
             {tab.icon} {tab.label}
@@ -362,23 +320,12 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
       </div>
 
       {/* Summary Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {activeTab === 'kbm' && (
           <>
             <StatCard label="Hadir" val={stats.H} color="emerald" />
             <StatCard label="Sakit" val={stats.S} color="blue" />
             <StatCard label="Izin" val={stats.I} color="amber" />
-            <StatCard label="Terlambat" val={stats.T} color="orange" />
-            <StatCard label="Alpha" val={stats.A} color="red" />
-          </>
-        )}
-        {activeTab === 'pondok' && (
-          <>
-            <StatCard label="Hadir" val={stats.J} color="emerald" />
-            <StatCard label="Udzur" val={stats.U} color="blue" />
-            <StatCard label="Sakit" val={stats.S} color="indigo" />
-            <StatCard label="Izin" val={stats.I} color="amber" />
-            <StatCard label="Terlambat" val={stats.T} color="orange" />
             <StatCard label="Alpha" val={stats.A} color="red" />
           </>
         )}
@@ -429,11 +376,11 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
               <RankingList 
                 title="Ranking Santri" 
                 data={rankings.students} 
-                type={activeTab === 'kbm' || activeTab === 'pondok' ? 'Kali' : 'Laporan'} 
+                type={activeTab === 'kbm' ? 'Kali' : 'Laporan'} 
                 color={activeTab === 'pelanggaran' ? 'red' : 'emerald'} 
-                subFilter={(activeTab === 'kbm' || activeTab === 'pondok') ? (
+                subFilter={activeTab === 'kbm' ? (
                    <div className="flex bg-slate-100 p-1 rounded-xl">
-                      {(activeTab === 'kbm' ? ['Alpha', 'Terlambat', 'Izin', 'Sakit'] : ['Alpha', 'Terlambat', 'Izin', 'Sakit', 'Udzur']).map(opt => (
+                      {['Alpha', 'Terlambat', 'Izin', 'Sakit'].map(opt => (
                          <button key={opt} onClick={() => setRankStatus(opt)} className={`px-3 py-1 rounded-lg text-[9px] font-black flex items-center justify-center transition-all ${rankStatus === opt ? 'bg-[#064e3b] text-white shadow-md' : 'text-slate-400'}`}>{opt[0]}</button>
                       ))}
                    </div>
@@ -500,25 +447,6 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
                         <td className="py-6 pr-4 text-[9px] font-black text-slate-400 uppercase truncate max-w-[100px]">{a.recordedBy}</td>
                      </tr>
                   ))}
-                  {activeTab === 'pondok' && filteredPondok.map(p => (
-                     <tr key={p.id} className="group hover:bg-slate-50 transition-all">
-                        <td className="py-6 pr-4">
-                           <p className="text-[12px] font-black text-slate-800 uppercase leading-none">{students.find(s=>s.id===p.studentId)?.name || 'N/A'}</p>
-                        </td>
-                        <td className="py-6 pr-4">
-                           <p className="text-[11px] font-black text-slate-700">{p.date}</p>
-                        </td>
-                        <td className="py-6 pr-4">
-                           <p className="font-black uppercase text-[10px] text-slate-500">{p.prayerTime}</p>
-                           <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">Unit: {p.class}</p>
-                        </td>
-                        <td className="py-6 pr-4">
-                           <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${p.status === PrayerStatus.JAMAAH ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>{p.status}</span>
-                           <p className="text-[8px] italic text-slate-400 mt-1.5 line-clamp-1">"{p.note || '-'}"</p>
-                        </td>
-                        <td className="py-6 pr-4 text-[9px] font-black text-slate-400 uppercase truncate max-w-[100px]">{p.recordedBy}</td>
-                     </tr>
-                  ))}
                   {activeTab === 'guru' && filteredGuru.map(ta => (
                      <tr key={ta.id} className="group hover:bg-slate-50 transition-all">
                         <td className="py-6 pr-4">
@@ -568,7 +496,7 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
                   ))}
                </tbody>
             </table>
-            {(activeTab === 'kbm' ? filteredKBM : activeTab === 'pondok' ? filteredPondok : activeTab === 'guru' ? filteredGuru : filteredReports).length === 0 && (
+            {(activeTab === 'kbm' ? filteredKBM : activeTab === 'guru' ? filteredGuru : filteredReports).length === 0 && (
                <div className="py-32 text-center text-slate-200 font-black uppercase italic tracking-[0.3em] text-[12px]">Data tidak tersedia untuk filter terpilih</div>
             )}
          </div>

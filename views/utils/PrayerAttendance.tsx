@@ -117,7 +117,6 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
     if (reportPrayer !== 'Semua') list = list.filter(r => r.prayerTime === reportPrayer);
     if (reportClass !== 'Semua') list = list.filter(r => r.class === reportClass);
     
-    // Fix: reportGender was incorrectly called genderFilter (line 124)
     return list.filter(r => {
       const s = students.find(std => std.id === r.studentId);
       if (!s) return false;
@@ -167,6 +166,19 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
     onSave(records);
     alert(`Absensi ${selectedPrayer} berhasil disimpan.`);
     setTempRecords({});
+  };
+
+  const handleExportLog = () => {
+    const csvData = filteredRecords.map(r => ({
+      "Nama Santri": students.find(s => s.id === r.studentId)?.name || 'N/A',
+      "Tanggal": r.date,
+      "Kegiatan": r.prayerTime,
+      "Kelas": r.class,
+      "Status": r.status,
+      "Keterangan": r.note || '-',
+      "Petugas": r.recordedBy
+    }));
+    downloadCSV(csvData, `Log_Absen_Pondok`);
   };
 
   return (
@@ -409,6 +421,63 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                        </PieChart>
                     </ResponsiveContainer>
                  </div>
+              </div>
+           </div>
+
+           {/* Log Detail Detail Aktivitas Absen Pondok */}
+           <div className="bg-white p-12 rounded-[4rem] border shadow-sm space-y-10">
+              <div className="flex justify-between items-center border-b pb-8">
+                 <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center"><History size={24}/></div>
+                    <div>
+                       <h3 className="text-xl font-black uppercase tracking-tight text-slate-800">Detail Log Aktivitas</h3>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Histori lengkap laporan absen pondok berdasarkan filter</p>
+                    </div>
+                 </div>
+                 <button onClick={handleExportLog} className="px-8 py-4 bg-emerald-950 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-xl flex items-center gap-3 hover:bg-emerald-900 transition-all active:scale-95">
+                    <Download size={18}/> Unduh Detail CSV
+                 </button>
+              </div>
+
+              <div className="overflow-x-auto no-scrollbar">
+                 <table className="w-full text-left">
+                    <thead>
+                       <tr className="border-b-2 border-slate-50">
+                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Santri / Unit</th>
+                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Waktu / Tanggal</th>
+                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Kegiatan</th>
+                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status / Keterangan</th>
+                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Petugas</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                       {filteredRecords.map(r => (
+                          <tr key={r.id} className="group hover:bg-slate-50 transition-all">
+                             <td className="py-6 pr-4">
+                                <p className="text-[12px] font-black text-slate-800 uppercase leading-none">{students.find(s=>s.id===r.studentId)?.name || 'N/A'}</p>
+                                <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase">Unit: {r.class}</p>
+                             </td>
+                             <td className="py-6 pr-4">
+                                <p className="text-[11px] font-black text-slate-700">{r.date}</p>
+                                <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">{r.recordedTime}</p>
+                             </td>
+                             <td className="py-6 pr-4">
+                                <p className="font-black uppercase text-[10px] text-slate-500">{r.prayerTime}</p>
+                             </td>
+                             <td className="py-6 pr-4">
+                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${r.status === PrayerStatus.JAMAAH ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>{r.status}</span>
+                                <p className="text-[8px] italic text-slate-400 mt-1.5 line-clamp-1">"{r.note || '-'}"</p>
+                             </td>
+                             <td className="py-6 pr-4 text-[9px] font-black text-slate-400 uppercase truncate max-w-[100px]">{r.recordedBy}</td>
+                          </tr>
+                       ))}
+                       {filteredRecords.length === 0 && (
+                          <tr>
+                             <td colSpan={5} className="py-20 text-center text-slate-300 font-black uppercase italic tracking-widest text-[10px]">Data tidak tersedia</td>
+                          </tr>
+                       )}
+                    </tbody>
+                 </table>
               </div>
            </div>
         </div>
