@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { UserRole, Student, Teacher, Schedule, OrganizationMember, TemplateItem, Announcement, ViolationCategory } from '../../types.ts';
 import { 
   Search, Download, Upload, FileText, Info as InfoIcon, Users, 
-  Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark, UserPlus, GraduationCap, LayoutGrid, Award, FileDown
+  Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark, UserPlus, GraduationCap, LayoutGrid, Award, FileDown, BookOpen
 } from 'lucide-react';
 import { ExtraDataList } from '../../services/dataService.ts';
 import { downloadCSV } from './csvExport.ts';
@@ -167,9 +167,19 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
           };
         }
 
+        if (type === 'Peraturan') {
+          return {
+            label: getVal(values, ['DESKRIPSI', 'LABEL', 'PERATURAN']),
+            points: Number(getVal(values, ['POIN', 'POINT', 'SKOR'])) || 0,
+            category: getVal(values, ['KATEGORI', 'BIDANG']) as ViolationCategory,
+            type: getVal(values, ['TIPE', 'JENIS']) || 'Pelanggaran'
+          };
+        }
+
         return values;
       }).filter(item => {
         if (typeof item === 'object' && 'name' in item) return !!item.name;
+        if (type === 'Peraturan' && typeof item === 'object') return !!(item as any).label;
         return true;
       });
 
@@ -187,6 +197,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     else if (type === 'Guru') content = "Nama,Mapel,No HP,Email,Mengajar Di Kelas\nUstadz Zulkifli,Nahwu,081234,zulkifli@gmail.com,7A;7B;8A";
     else if (type === 'Jadwal') content = "Hari,Waktu,Mapel,Guru Utama,Guru Asisten,Wali Kelas,Unit,Sesi,Tingkat,Gender\nSenin,07:30 - 09:00,Nahwu,Ustadz Zulkifli,Ustadz Ahmad,Ustadzah Sarah,7A,Madrasah,MTs,Putra";
     else if (type === 'ORSAM' || type === 'ORKLAS') content = "Nama,NIS,Jabatan,Divisi,Kelas,Gender,Tingkat\nZaid Al-Khair,2024002,Ketua,Pusat,10-IPA,Putra,MA";
+    else if (type === 'Peraturan') content = "Deskripsi Peraturan,Poin,Kategori,Tipe\nTerlambat Masuk Kelas,10,Kedisiplinan,Pelanggaran\nMenjuarai Lomba Pidato,50,Akademik,Prestasi";
     
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
@@ -305,7 +316,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                    </div>
                    <div className="space-y-1">
                       <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Sesi</label>
-                      {/* FIX: Use setSchSessionFilter instead of setSessionFilter */}
                       <select value={schSessionFilter} onChange={e => setSchSessionFilter(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner">
                          <option value="Semua">Semua Sesi</option>
                          {dynamicSessions.map(s => <option key={s} value={s}>{s}</option>)}
@@ -481,13 +491,38 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
            {selectedCategory === 'Guru' && (
               <div className="bg-white p-10 rounded-[4rem] border shadow-sm overflow-x-auto no-scrollbar">
                 <table className="w-full text-left">
+                   <thead>
+                      <tr className="border-b-2 border-slate-50">
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Nama Ustadz/ah</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Mapel Utama</th>
+                         <th className="pb-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Detail Penugasan (Sesi & Kelas)</th>
+                      </tr>
+                   </thead>
                    <tbody className="divide-y divide-slate-50">
-                      {data.teachers.map((item: any, idx) => (
-                        <tr key={idx}>
-                           <td className="py-6 font-black uppercase text-xs">{item.name}</td>
-                           <td className="py-6 text-[10px] text-slate-400 uppercase font-bold">{item.subject}</td>
-                        </tr>
-                      ))}
+                      {data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).map((item, idx) => {
+                        const assignments = data.schedules.filter(s => s.teacherName === item.name || s.assistantTeacherName === item.name || s.homeroomTeacherName === item.name);
+                        const assignmentSummary = Array.from(new Set(assignments.map(a => `${a.sessionType}: ${a.class}`))).join(' • ');
+                        
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50 transition-all">
+                             <td className="py-6">
+                                <div className="flex items-center gap-4">
+                                   <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-black text-[10px] shadow-inner">{item.name[0]}</div>
+                                   <p className="font-black uppercase text-xs text-slate-800">{item.name}</p>
+                                </div>
+                             </td>
+                             <td className="py-6">
+                                <span className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-black uppercase">{item.subject || '-'}</span>
+                             </td>
+                             <td className="py-6 max-w-md">
+                                <div className="flex items-center gap-2 text-slate-400">
+                                   <BookOpen size={14} className="shrink-0"/>
+                                   <p className="text-[9px] font-bold uppercase leading-relaxed line-clamp-2">{assignmentSummary || 'Belum Terdaftar di Jadwal KBM'}</p>
+                                </div>
+                             </td>
+                          </tr>
+                        );
+                      })}
                    </tbody>
                 </table>
               </div>

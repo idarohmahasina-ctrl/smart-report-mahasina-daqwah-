@@ -11,7 +11,7 @@ import Settings from './views/Settings.tsx';
 import ControlPanel from './views/ControlPanel.tsx';
 import RekapLaporan from './views/RekapLaporan.tsx';
 import PrayerAttendance from './views/utils/PrayerAttendance.tsx';
-import { UserProfile, AppData, UserRole, TeacherAttendance, AcademicConfig } from './types.ts';
+import { UserProfile, AppData, UserRole, TeacherAttendance, AcademicConfig, TemplateItem } from './types.ts';
 import { 
   saveAppData, getActiveSession, subscribeToAppData, setActiveSession 
 } from './services/dataService.ts';
@@ -117,7 +117,7 @@ const App: React.FC = () => {
           students={currentAppData.students} 
           allPrayerRecords={currentAppData.prayerAttendance} 
           currentUser={profile.fullName} 
-          onSave={recs => saveAppData({ prayerAttendance: [...currentAppData.prayerAttendance, ...recs] })} 
+          onSave={recs => saveAppData({ prayerAttendance: [...(currentAppData.prayerAttendance || []), ...recs] })} 
         />
       )}
 
@@ -130,7 +130,7 @@ const App: React.FC = () => {
           allReports={currentAppData.reports} 
           templates={currentAppData.violationTemplates} 
           schedules={currentAppData.schedules}
-          onSave={rep => saveAppData({ reports: [rep, ...currentAppData.reports] })} 
+          onSave={rep => saveAppData({ reports: [rep, ...(currentAppData.reports || [])] })} 
         />
       )}
       
@@ -143,7 +143,7 @@ const App: React.FC = () => {
           allReports={currentAppData.reports} 
           templates={currentAppData.achievementTemplates} 
           schedules={currentAppData.schedules}
-          onSave={rep => saveAppData({ reports: [rep, ...currentAppData.reports] })} 
+          onSave={rep => saveAppData({ reports: [rep, ...(currentAppData.reports || [])] })} 
         />
       )}
 
@@ -156,6 +156,10 @@ const App: React.FC = () => {
          if (type === 'Jadwal') update.schedules = newData;
          if (type === 'ORSAM') update.orsam = newData;
          if (type === 'ORKLAS') update.orklas = newData;
+         if (type === 'Peraturan') {
+            update.violationTemplates = newData.filter((n: any) => n.type === 'Pelanggaran').map(({type, ...rest}) => rest);
+            update.achievementTemplates = newData.filter((n: any) => n.type === 'Prestasi').map(({type, ...rest}) => rest);
+         }
          saveAppData(update);
       }} />}
       
@@ -166,7 +170,7 @@ const App: React.FC = () => {
          deleteTeacherAttendance: id => saveAppData({ teacherAttendance: currentAppData.teacherAttendance.filter(ta => ta.id !== id) })
       }} />}
 
-      {activeTab === 'pengaturan' && <Settings userEmail={profile.email} academicConfig={currentAppData.academicConfig} onUpdateAcademic={c => saveAppData({ academicConfig: c })} availableClasses={[]} students={currentAppData.students} />}
+      {activeTab === 'pengaturan' && <Settings userEmail={profile.email} academicConfig={currentAppData.academicConfig} onUpdateAcademic={c => saveAppData({ academicConfig: c })} students={currentAppData.students} availableClasses={[]} />}
     </Layout>
   );
 };
