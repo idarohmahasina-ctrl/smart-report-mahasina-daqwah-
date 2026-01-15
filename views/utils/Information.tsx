@@ -71,7 +71,10 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
       const matchDay = schDayFilter === 'Semua' || s.day === schDayFilter;
       const matchSess = schSessionFilter === 'Semua' || s.sessionType === schSessionFilter;
       const matchCls = schClassFilter === 'Semua' || s.class === schClassFilter;
-      const matchSearch = s.teacherName.toLowerCase().includes(searchTerm.toLowerCase()) || s.subject.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchSearch = s.teacherName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          s.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (s.assistantTeacherName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (s.homeroomTeacherName || "").toLowerCase().includes(searchTerm.toLowerCase());
       return matchDay && matchSess && matchCls && matchSearch;
     });
   }, [data.schedules, schDayFilter, schSessionFilter, schClassFilter, searchTerm]);
@@ -158,7 +161,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             time: getVal(values, ['WAKTU', 'JAM']),
             subject: getVal(values, ['MAPEL', 'MATAPELAJARAN']),
             teacherName: getVal(values, ['GURU', 'USTADZ', 'USTADZAH', 'GURUUTAMA']),
-            assistantTeacherName: getVal(values, ['ASISTEN', 'GURUASISTEN', 'ASISTENGURU', 'GURU2']),
+            assistantTeacherName: getVal(values, ['ASISTEN', 'GURUASISTEN', 'ASISTENGURU', 'GURU2', 'MUSYRIF', 'MUSYRIFAH']),
             homeroomTeacherName: getVal(values, ['WALAS', 'WALIKELAS', 'HOMEROOM', 'WALI']),
             class: getVal(values, ['UNIT', 'KELAS']),
             sessionType: getVal(values, ['SESI', 'JENISKEGIATAN']) || 'Madrasah',
@@ -196,12 +199,12 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     if (type === 'Siswa') content = "NIS,Nama,Gender,Tingkat,Kelas Madrasah (Formal),Kelas Al-Quran,Kelas Kitab Kuning\n2024001,Ahmad Santri,Putra,MTs,7A,Yanbu'a 3,Safinatun Najah";
     else if (type === 'Guru') content = "Nama,Mapel,No HP,Email,Mengajar Di Kelas\nUstadz Zulkifli,Nahwu,081234,zulkifli@gmail.com,7A;7B;8A";
     else if (type === 'Jadwal') {
-      content = "Hari,Waktu,Mapel,Guru Utama,Guru Asisten,Wali Kelas,Unit,Sesi,Tingkat,Gender\n";
-      content += "Senin,07:30 - 09:00,Nahwu,Bu Fatimah,Ustadz Ahmad,Ustadzah Sarah,7A,Madrasah,MTs,Putri\n";
-      content += "Senin,09:15 - 10:45,Nahwu,Bu Fatimah,,,7B,Madrasah,MTs,Putri\n";
-      content += "Selasa,07:30 - 09:00,Bahasa Arab,Bu Fatimah,,,8E,Madrasah,MTs,Putri\n";
-      content += "Rabu,13:00 - 14:30,Bulughul Maram,Bu Fatimah,,,10A,Kitab Kuning,MA,Putri\n";
-      content += "Kamis,13:00 - 14:30,Bulughul Maram,Bu Fatimah,,,10F,Kitab Kuning,MA,Putri";
+      content = "Hari,Waktu,Mapel,Guru Utama,Musyrif,Wali Kelas,Unit,Sesi,Tingkat,Gender\n";
+      // Contoh Skenario: Walikelas 7A (Guru E), Walikelas 7B (Guru C), Musyrif 7A&7B (Guru D)
+      content += "Senin,07:30 - 09:00,Nahwu,Ustadz A,Guru D,Guru E,7A,Madrasah,MTs,Putri\n";
+      content += "Senin,07:30 - 09:00,Shorof,Ustadzah B,Guru D,Guru C,7B,Madrasah,MTs,Putri\n";
+      content += "Senin,09:15 - 10:45,Bahasa Arab,Ustadz X,Guru D,Guru E,7A,Madrasah,MTs,Putri\n";
+      content += "Senin,13:00 - 14:30,Alfiyah J2,Ustadz Y,Guru D,Guru E,10A,Hadis,MA,Putri";
     }
     else if (type === 'ORSAM' || type === 'ORKLAS') content = "Nama,NIS,Jabatan,Divisi,Kelas,Gender,Tingkat\nZaid Al-Khair,2024002,Ketua,Pusat,10-IPA,Putra,MA";
     else if (type === 'Peraturan') content = "Deskripsi Peraturan,Poin,Kategori,Tipe\nTerlambat Masuk Kelas,10,Kedisiplinan,Pelanggaran\nMenjuarai Lomba Pidato,50,Akademik,Prestasi";
@@ -347,19 +350,30 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                    <table className="w-full text-left">
                       <thead>
                          <tr className="border-b-2 border-slate-50">
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Waktu</th>
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Musyrif/Guru</th>
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Mapel</th>
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Unit</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Waktu / Sesi</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Guru Utama</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Walas / Musyrif</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Mapel / Unit</th>
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                          {filteredSchedules.map(sch => (
                            <tr key={sch.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="py-6 font-black uppercase text-[10px]">{sch.day} {sch.time}</td>
-                              <td className="py-6 font-black text-emerald-800 text-[10px] uppercase">{sch.teacherName}</td>
-                              <td className="py-6 font-black text-slate-800 text-[10px] uppercase">{sch.subject}</td>
-                              <td className="py-6 font-black text-slate-400 text-[10px] uppercase">{sch.class}</td>
+                              <td className="py-6">
+                                <p className="font-black uppercase text-[10px] text-slate-800">{sch.day} {sch.time}</p>
+                                <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{sch.sessionType}</p>
+                              </td>
+                              <td className="py-6">
+                                <p className="font-black text-emerald-800 text-[10px] uppercase">{sch.teacherName}</p>
+                              </td>
+                              <td className="py-6">
+                                <p className="text-[10px] font-black uppercase text-slate-600">W: {sch.homeroomTeacherName || '-'}</p>
+                                <p className="text-[10px] font-black uppercase text-slate-400">M: {sch.assistantTeacherName || '-'}</p>
+                              </td>
+                              <td className="py-6">
+                                <p className="font-black text-slate-800 text-[10px] uppercase">{sch.subject}</p>
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">UNIT: {sch.class}</p>
+                              </td>
                            </tr>
                          ))}
                       </tbody>
@@ -508,7 +522,14 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                    <tbody className="divide-y divide-slate-50">
                       {data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).map((item, idx) => {
                         const assignments = data.schedules.filter(s => s.teacherName === item.name || s.assistantTeacherName === item.name || s.homeroomTeacherName === item.name);
-                        const assignmentSummary = Array.from(new Set(assignments.map(a => `${a.sessionType}: ${a.subject} (${a.class})`))).join(' • ');
+                        const assignmentSummary = Array.from(new Set(assignments.map(a => {
+                          const isAss = a.assistantTeacherName === item.name;
+                          const isWal = a.homeroomTeacherName === item.name;
+                          let roleSuffix = "";
+                          if (isWal) roleSuffix = " (Walas)";
+                          else if (isAss) roleSuffix = " (Musyrif)";
+                          return `${a.sessionType}: ${a.subject} (${a.class})${roleSuffix}`;
+                        }))).join(' • ');
                         
                         return (
                           <tr key={idx} className="hover:bg-slate-50 transition-all">
