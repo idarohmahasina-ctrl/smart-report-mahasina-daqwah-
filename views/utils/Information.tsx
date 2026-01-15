@@ -31,6 +31,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
   const [searchTerm, setSearchTerm] = useState('');
   
   const [studentSessionFilter, setStudentSessionFilter] = useState<string>('Madrasah');
+  const [rulesTab, setRulesTab] = useState<'pelanggaran' | 'prestasi'>('pelanggaran');
   
   // States for ORSAM/ORKLAS Filters
   const [orgGenderFilter, setOrgGenderFilter] = useState<'Semua' | 'Putra' | 'Putri'>('Semua');
@@ -229,10 +230,11 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
       }));
     } else if (selectedCategory === 'Guru') {
       exportData = data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    } else if (selectedCategory === 'Peraturan') {
+      exportData = rulesTab === 'pelanggaran' ? data.violationTemplates : data.achievementTemplates;
+      filename = `Katalog_${rulesTab.toUpperCase()}`;
     } else if (selectedCategory === 'Jadwal') {
       exportData = filteredSchedules;
-    } else if (selectedCategory === 'Peraturan') {
-      exportData = [...data.violationTemplates, ...data.achievementTemplates];
     }
 
     if (exportData.length === 0) {
@@ -303,6 +305,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                    </div>
                    <div className="space-y-1">
                       <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Sesi</label>
+                      {/* FIX: Use setSchSessionFilter instead of setSessionFilter */}
                       <select value={schSessionFilter} onChange={e => setSchSessionFilter(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner">
                          <option value="Semua">Semua Sesi</option>
                          {dynamicSessions.map(s => <option key={s} value={s}>{s}</option>)}
@@ -475,18 +478,72 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
              </div>
            )}
 
-           {(selectedCategory === 'Guru' || selectedCategory === 'Peraturan') && (
+           {selectedCategory === 'Guru' && (
               <div className="bg-white p-10 rounded-[4rem] border shadow-sm overflow-x-auto no-scrollbar">
                 <table className="w-full text-left">
                    <tbody className="divide-y divide-slate-50">
-                      {(selectedCategory === 'Guru' ? data.teachers : [...data.violationTemplates, ...data.achievementTemplates]).map((item: any, idx) => (
+                      {data.teachers.map((item: any, idx) => (
                         <tr key={idx}>
-                           <td className="py-6 font-black uppercase text-xs">{item.name || item.label}</td>
-                           <td className="py-6 text-[10px] text-slate-400 uppercase font-bold">{item.subject || item.category}</td>
+                           <td className="py-6 font-black uppercase text-xs">{item.name}</td>
+                           <td className="py-6 text-[10px] text-slate-400 uppercase font-bold">{item.subject}</td>
                         </tr>
                       ))}
                    </tbody>
                 </table>
+              </div>
+           )}
+
+           {selectedCategory === 'Peraturan' && (
+              <div className="space-y-6">
+                 <div className="flex bg-slate-100 p-1.5 rounded-[2rem] w-fit shadow-inner">
+                    <button 
+                      onClick={() => setRulesTab('pelanggaran')} 
+                      className={`px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase transition-all ${rulesTab === 'pelanggaran' ? 'bg-white text-emerald-950 shadow-lg scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      Pelanggaran
+                    </button>
+                    <button 
+                      onClick={() => setRulesTab('prestasi')} 
+                      className={`px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase transition-all ${rulesTab === 'prestasi' ? 'bg-white text-emerald-950 shadow-lg scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      Prestasi
+                    </button>
+                 </div>
+
+                 <div className="bg-white p-10 rounded-[4rem] border shadow-sm overflow-x-auto no-scrollbar">
+                    <table className="w-full text-left">
+                       <thead>
+                          <tr className="border-b-2 border-slate-50">
+                             <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Deskripsi Peraturan</th>
+                             <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Kategori</th>
+                             <th className="pb-6 text-right text-[10px] font-black uppercase text-slate-400">Poin</th>
+                          </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-50">
+                          {(rulesTab === 'pelanggaran' ? data.violationTemplates : data.achievementTemplates).map((item, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                               <td className="py-6">
+                                  <p className="text-sm font-black uppercase text-slate-800 leading-tight">{item.label}</p>
+                               </td>
+                               <td className="py-6">
+                                  <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">{item.category}</span>
+                               </td>
+                               <td className="py-6 text-right">
+                                  <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${rulesTab === 'pelanggaran' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                    {item.points} PT
+                                  </span>
+                               </td>
+                            </tr>
+                          ))}
+                       </tbody>
+                    </table>
+                    {(rulesTab === 'pelanggaran' ? data.violationTemplates : data.achievementTemplates).length === 0 && (
+                       <div className="py-20 text-center opacity-20">
+                          <Award size={64} className="mx-auto mb-4"/>
+                          <p className="text-[12px] font-black uppercase tracking-[0.3em]">Belum Ada Data Katalog</p>
+                       </div>
+                    )}
+                 </div>
               </div>
            )}
         </div>

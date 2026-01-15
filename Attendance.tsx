@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AttendanceStatus, Student, UserRole, Schedule, AppData } from './types.ts';
-import { UserCheck, CheckCircle, Search, Save, X, Edit3, PlusCircle, Calendar, UserPlus } from 'lucide-react';
+import { UserCheck, CheckCircle, Search, Save, X, Edit3, PlusCircle, Calendar, UserPlus, Ban } from 'lucide-react';
 import { isTeacherMatch } from './views/utils/nameMatchers.ts';
 
 const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSave: any }> = (data) => {
@@ -11,9 +11,17 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
 
   const schedules = data.schedules || [];
   const students = data.students || [];
+  const config = data.academicConfig;
 
   const isGenderRestricted = data.role === UserRole.SANTRI_OFFICER_PUTRA || data.role === UserRole.SANTRI_OFFICER_PUTRI;
   const targetGender = data.role === UserRole.SANTRI_OFFICER_PUTRA ? 'Putra' : 'Putri';
+
+  const isHoliday = (cls: string, sess: string) => {
+    if (config?.excludedClasses?.[cls]) return true;
+    if (config?.excludedSessions?.[sess]) return true;
+    if (config?.sessionClassExclusions?.[sess]?.[cls]) return true;
+    return false;
+  };
 
   const mySchedules = useMemo(() => {
     return schedules.filter(s => {
@@ -66,22 +74,31 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mySchedules.map(sch => (
-              <button 
-                key={sch.id} 
-                onClick={() => setSelectedSchedule(sch)} 
-                className="p-8 bg-white border-2 border-transparent hover:border-emerald-600 rounded-[3rem] text-left hover:shadow-xl transition-all group"
-              >
-                 <div className="flex items-center gap-2">
-                   <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-black uppercase">{sch.sessionType}</span>
-                 </div>
-                 <h4 className="text-lg font-black uppercase mt-4 text-slate-800">{sch.subject}</h4>
-                 <div className="mt-6 flex justify-between">
-                    <p className="text-xs font-black text-slate-700">Kelas: {sch.class}</p>
-                    <p className="text-xs font-black text-slate-700">{sch.time}</p>
-                 </div>
-              </button>
-            ))}
+            {mySchedules.map(sch => {
+              const holiday = isHoliday(sch.class, sch.sessionType);
+              return (
+                <button 
+                  key={sch.id} 
+                  disabled={holiday}
+                  onClick={() => setSelectedSchedule(sch)} 
+                  className={`p-8 bg-white border-2 rounded-[3rem] text-left transition-all group relative overflow-hidden ${holiday ? 'opacity-50 border-orange-100 bg-orange-50/30 cursor-not-allowed' : 'border-transparent hover:border-emerald-600 hover:shadow-xl'}`}
+                >
+                   {holiday && (
+                     <div className="absolute top-4 right-4 flex items-center gap-1 bg-orange-100 text-orange-700 px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest">
+                        <Ban size={10}/> Libur
+                     </div>
+                   )}
+                   <div className="flex items-center gap-2">
+                     <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${holiday ? 'bg-orange-100 text-orange-700' : 'bg-emerald-50 text-emerald-700'}`}>{sch.sessionType}</span>
+                   </div>
+                   <h4 className={`text-lg font-black uppercase mt-4 ${holiday ? 'text-slate-400' : 'text-slate-800'}`}>{sch.subject}</h4>
+                   <div className="mt-6 flex justify-between">
+                      <p className={`text-xs font-black ${holiday ? 'text-slate-400' : 'text-slate-700'}`}>Kelas: {sch.class}</p>
+                      <p className={`text-xs font-black ${holiday ? 'text-slate-400' : 'text-slate-700'}`}>{sch.time}</p>
+                   </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : (

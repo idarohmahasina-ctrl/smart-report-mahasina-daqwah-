@@ -45,6 +45,7 @@ export interface AcademicConfig {
   isHoliday: boolean;
   excludedClasses: Record<string, boolean>;
   excludedSessions: Record<string, boolean>;
+  sessionClassExclusions?: Record<string, Record<string, boolean>>; // { [sessionName]: { [className]: true } }
 }
 
 export interface UserProfile {
@@ -120,6 +121,7 @@ export interface TeacherAttendance {
   teacherName: string;
   subject: string;
   class: string;
+  sessionType?: string;
   startTime: string;
   endTime?: string;
   photoUrl: string;

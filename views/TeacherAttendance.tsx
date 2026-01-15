@@ -5,10 +5,11 @@ import {
 } from '../types.ts';
 import { 
   Camera, CheckCircle, Clock, AlertTriangle, Sparkles, X, 
-  MonitorCheck, RefreshCw, Zap, Calendar, UserPlus, GraduationCap, Loader2, ChevronRight
+  MonitorCheck, RefreshCw, Zap, Calendar, UserPlus, GraduationCap, Loader2, ChevronRight, History, Download, Eye, EyeOff, Ban
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { isTeacherMatch } from './utils/nameMatchers.ts';
+import { downloadCSV } from './utils/csvExport.ts';
 
 interface Props {
   data: AppData;
@@ -21,18 +22,33 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [isCameraLoading, setIsCameraLoading] = useState(false);
+  const [visiblePhotoId, setVisiblePhotoId] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const todayDay = useMemo(() => new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date()), []);
   const todayDateStr = useMemo(() => new Date().toLocaleDateString('id-ID'), []);
   const now = new Date();
+  const config = data.academicConfig;
+
+  const isHoliday = (cls: string, sess: string) => {
+    if (config?.excludedClasses?.[cls]) return true;
+    if (config?.excludedSessions?.[sess]) return true;
+    if (config?.sessionClassExclusions?.[sess]?.[cls]) return true;
+    return false;
+  };
 
   const mySchedules = useMemo(() => {
     return data.schedules.filter(s => 
       s.day === todayDay && isTeacherMatch(profile.fullName, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName)
     ).sort((a, b) => a.time.localeCompare(b.time));
   }, [data.schedules, profile.fullName, todayDay]);
+
+  const teacherLogHistory = useMemo(() => {
+    return (data.teacherAttendance || [])
+      .filter(ta => ta.teacherEmail === profile.email)
+      .sort((a,b) => b.date.localeCompare(a.date));
+  }, [data.teacherAttendance, profile.email]);
 
   useEffect(() => {
     const fetchAiGreeting = async () => {
@@ -119,12 +135,13 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
       teacherName: profile.fullName,
       subject: sch.subject,
       class: sch.class,
+      sessionType: sch.sessionType, // Menyimpan sessionType dari jadwal
       startTime: checkInTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       photoUrl: capturedPhoto,
       summary: `Hadir sebagai ${roleLabel} di kelas ${sch.class}`
     };
     onSave(record);
-    alert(`Absen ${roleLabel} Berhasil!`);
+    alert(`Absensi ${roleLabel} Berhasil!`);
     setCapturedPhoto(null);
   };
 
@@ -141,7 +158,6 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 pb-20 max-w-6xl mx-auto">
-      {/* Banner Analisis MahaAI (Pindah dari Dashboard) */}
       <div className="bg-[#064e3b] p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden text-white group">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
         <div className="relative z-10 flex gap-6 items-start">
@@ -158,27 +174,34 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
           <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 px-4">Menu Absensi Anda</h3>
           {mySchedules.length > 0 ? mySchedules.map(sch => {
             const status = checkScheduleStatus(sch.time);
+            const holiday = isHoliday(sch.class, sch.sessionType);
             const isDone = data.teacherAttendance.some(ta => ta.date === now.toLocaleDateString('id-ID') && ta.subject === sch.subject && ta.class === sch.class && ta.teacherName === profile.fullName);
             const isAssistant = isTeacherMatch(profile.fullName, sch.assistantTeacherName || "");
             const isHomeroom = isTeacherMatch(profile.fullName, sch.homeroomTeacherName || "");
 
             return (
-              <div key={sch.id} className={`bg-white p-8 rounded-[3rem] border shadow-sm flex flex-col md:flex-row justify-between items-center gap-8 ${isDone ? 'opacity-60' : ''}`}>
+              <div key={sch.id} className={`bg-white p-8 rounded-[3rem] border shadow-sm flex flex-col md:flex-row justify-between items-center gap-8 ${isDone || holiday ? 'opacity-60' : ''}`}>
                  <div className="flex items-center gap-6 flex-1 w-full">
-                    <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-inner ${isHomeroom ? 'bg-blue-50 text-blue-700' : isAssistant ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                       {isHomeroom ? <GraduationCap size={32}/> : isAssistant ? <UserPlus size={32}/> : <MonitorCheck size={32}/>}
+                    <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-inner ${holiday ? 'bg-orange-50 text-orange-700' : (isHomeroom ? 'bg-blue-50 text-blue-700' : isAssistant ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700')}`}>
+                       {holiday ? <Ban size={32}/> : (isHomeroom ? <GraduationCap size={32}/> : isAssistant ? <UserPlus size={32}/> : <MonitorCheck size={32}/>)}
                     </div>
                     <div>
                        <div className="flex items-center gap-3">
                           <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">{sch.subject}</h3>
-                          {isHomeroom && <span className="px-2 py-0.5 bg-blue-100 text-[9px] font-black text-blue-600 rounded uppercase">Walas</span>}
-                          {isAssistant && !isHomeroom && <span className="px-2 py-0.5 bg-indigo-100 text-[9px] font-black text-indigo-600 rounded uppercase">Asisten</span>}
+                          {holiday ? <span className="px-2 py-0.5 bg-orange-100 text-[9px] font-black text-orange-600 rounded uppercase">Libur</span> : (
+                            <>
+                              {isHomeroom && <span className="px-2 py-0.5 bg-blue-100 text-[9px] font-black text-blue-600 rounded uppercase">Walas</span>}
+                              {isAssistant && !isHomeroom && <span className="px-2 py-0.5 bg-indigo-100 text-[9px] font-black text-indigo-600 rounded uppercase">Asisten</span>}
+                            </>
+                          )}
                        </div>
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">UNIT: {sch.class} • {sch.time}</p>
                     </div>
                  </div>
 
-                 {isDone ? (
+                 {holiday ? (
+                   <div className="text-[9px] font-black uppercase text-orange-600 bg-orange-50 px-6 py-3 rounded-2xl">Sesi Diliburkan</div>
+                 ) : isDone ? (
                    <div className="flex items-center gap-2 text-emerald-600 font-black uppercase text-[10px] tracking-widest bg-emerald-50 px-6 py-3 rounded-2xl"><CheckCircle size={16}/> Terabsen</div>
                  ) : status === 'ready' ? (
                    <div className="flex flex-col gap-3 w-full md:w-auto">
@@ -205,7 +228,6 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
           )}
         </div>
 
-        {/* Kolom Jadwal Mengajar (Pindah dari Dashboard) */}
         <div className="bg-white p-8 rounded-[3.5rem] border border-slate-100 shadow-sm space-y-8">
            <div className="flex items-center justify-between">
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-3"><Clock size={18} className="text-emerald-600"/> Jadwal KBM Hari Ini</h3>
@@ -228,6 +250,63 @@ const TeacherAttendanceView: React.FC<Props> = ({ data, profile, onSave }) => {
               )}
            </div>
         </div>
+      </div>
+
+      {/* Log Detail Absen Guru */}
+      <div className="bg-white p-10 rounded-[4rem] border shadow-sm space-y-8">
+         <div className="flex justify-between items-center px-4 border-b pb-6">
+            <div className="flex items-center gap-3">
+               <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center"><History size={20}/></div>
+               <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Histori Absensi Anda</h3>
+            </div>
+            <button onClick={() => downloadCSV(teacherLogHistory, 'Histori_Absen_Guru')} className="flex items-center gap-2 px-6 py-3 bg-emerald-950 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-900 transition-all shadow-lg">
+               <Download size={16}/> Unduh (.CSV)
+            </button>
+         </div>
+
+         <div className="overflow-x-auto no-scrollbar">
+            <table className="w-full text-left">
+               <thead>
+                  <tr className="border-b-2 border-slate-50">
+                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Tanggal / Sesi</th>
+                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Mapel / Unit</th>
+                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Waktu Konfirmasi</th>
+                     <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Foto Bukti</th>
+                  </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-50">
+                  {teacherLogHistory.map(ta => (
+                    <tr key={ta.id} className="group hover:bg-slate-50 transition-all">
+                       <td className="py-6 pr-4">
+                          <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{ta.date}</p>
+                          <p className="text-[8px] font-bold text-slate-400 mt-2 uppercase tracking-widest">{ta.sessionType || 'PENGAJARAN'}</p>
+                       </td>
+                       <td className="py-6 pr-4">
+                          <p className="font-black uppercase text-[10px] text-slate-800">{ta.subject}</p>
+                          <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">Unit: {ta.class}</p>
+                       </td>
+                       <td className="py-6 pr-4">
+                          <div className="flex items-center gap-2 text-emerald-600">
+                             <Clock size={12} />
+                             <p className="text-[10px] font-black uppercase">{ta.startTime}</p>
+                          </div>
+                       </td>
+                       <td className="py-6 pr-4">
+                          <div className="flex items-center gap-3">
+                             <button onClick={() => setVisiblePhotoId(visiblePhotoId === ta.id ? null : ta.id)} className="p-2 bg-slate-100 rounded-lg text-slate-400 hover:text-emerald-600 transition-all">
+                                {visiblePhotoId === ta.id ? <EyeOff size={14}/> : <Eye size={14}/>}
+                             </button>
+                             {visiblePhotoId === ta.id && <img src={ta.photoUrl} className="w-12 h-12 rounded-lg object-cover shadow-lg border border-white animate-in zoom-in-95" />}
+                          </div>
+                       </td>
+                    </tr>
+                  ))}
+               </tbody>
+            </table>
+            {teacherLogHistory.length === 0 && (
+               <div className="py-20 text-center text-slate-300 font-black uppercase italic tracking-widest text-[10px]">Belum ada histori pengajaran</div>
+            )}
+         </div>
       </div>
 
       {showCamera && (

@@ -86,7 +86,6 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Pastikan video diputar setelah stream terpasang (penting untuk mobile)
         videoRef.current.onloadedmetadata = () => {
           videoRef.current?.play().catch(console.error);
           setIsCameraLoading(false);
@@ -104,7 +103,6 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
     if (videoRef.current && canvasRef.current) {
       const context = canvasRef.current.getContext('2d');
       if (context) {
-        // Gunakan ukuran asli video untuk hasil foto yang tajam
         const width = videoRef.current.videoWidth;
         const height = videoRef.current.videoHeight;
         canvasRef.current.width = width;
@@ -156,6 +154,10 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
     setCapturedPhoto(null);
     setSelectedStudent(null);
     setSearchTerm('');
+    setIncidentDescription('');
+    setSelectedRule('');
+    setPoints(0);
+    setActionNote('');
     setViewMode('history');
   };
 
@@ -243,6 +245,17 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                  </div>
               </div>
 
+              <div className="space-y-4">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">4. Keterangan Penindakan (Opsional)</label>
+                 <textarea 
+                    value={actionNote} 
+                    onChange={e => setActionNote(e.target.value)} 
+                    placeholder="Isi jika laporan ini langsung ditindak (Status akan otomatis menjadi 'Telah Ditindak')..." 
+                    className="w-full p-6 bg-slate-50 rounded-3xl outline-none font-bold text-sm shadow-inner min-h-[100px] border-2 border-transparent focus:border-blue-600 transition-all" 
+                 />
+                 <p className="text-[9px] font-bold text-slate-400 uppercase italic">* Jika dikosongkan, status laporan adalah 'Belum Ditindak' dan akan diproses oleh Idaroh.</p>
+              </div>
+
               <button type="submit" disabled={!selectedStudent} className="w-full py-7 bg-emerald-950 text-white rounded-[2.5rem] font-black uppercase text-[12px] shadow-2xl hover:bg-emerald-900 active:scale-95 transition-all disabled:opacity-30">Kirim Laporan</button>
            </form>
         </div>
@@ -263,6 +276,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                          <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight truncate">{students.find(s=>s.id===r.studentId)?.name}</h4>
                          <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{r.category} • {r.date}</p>
                          <p className="text-[10px] text-slate-600 mt-3 font-medium line-clamp-2 italic">"{r.description}"</p>
+                         {r.actionNote && <p className="text-[9px] font-bold text-blue-600 mt-2 uppercase tracking-widest flex items-center gap-2"><CheckCircle size={12}/> {r.actionNote}</p>}
                       </div>
                    </div>
                    <div className="flex items-center gap-6 w-full md:w-auto shrink-0">
@@ -270,7 +284,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
                          <span className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest ${type === 'Violation' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
                             {type === 'Violation' ? '-' : '+'}{r.points} PT
                          </span>
-                         <p className="text-[8px] font-black text-slate-300 uppercase mt-2 tracking-widest">Oleh: {r.reporter.split(' ')[0]}</p>
+                         <p className={`text-[8px] font-black uppercase mt-2 tracking-widest ${r.status === 'Ditindak' ? 'text-blue-500' : 'text-orange-500'}`}>{r.status}</p>
                       </div>
                       <ChevronRight size={20} className="text-slate-200 group-hover:text-emerald-600 transition-all"/>
                    </div>

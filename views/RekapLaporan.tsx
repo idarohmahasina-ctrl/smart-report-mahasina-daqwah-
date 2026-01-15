@@ -65,7 +65,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
           const records = activeTab === 'kbm' ? data.attendance : data.prayerAttendance;
           const filtered = records.filter((a: any) => 
             a.studentId === s.id && 
-            (sessionFilter === 'Semua' || a.sessionType === sessionFilter || a.prayerTime === sessionFilter)
+            (sessionFilter === 'Semua' || (activeTab === 'kbm' ? a.sessionType === sessionFilter : a.prayerTime === sessionFilter))
           );
           const counts = { H: 0, S: 0, I: 0, T: 0, A: 0, U: 0 };
           filtered.forEach((a: any) => {
@@ -91,7 +91,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
   }, [classFilter, sessionFilter, levelFilter, genderFilter, searchTerm, students, data, activeTab, isGenderRestricted, targetGender, isClassRestricted, myManagedClasses]);
 
   const handleDownload = () => {
-    downloadCSV(tableData, `Rekap_${activeTab}_${classFilter}`);
+    downloadCSV(tableData, `Rekap_Laporan_${activeTab}_${classFilter}`);
   };
 
   return (
@@ -112,7 +112,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
       <div className="bg-white p-10 rounded-[4rem] border border-slate-50 shadow-sm space-y-8">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
            <div className="space-y-2">
-              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Pilih Unit Kelas</label>
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Unit Kelas</label>
               <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner border-2 border-transparent focus:border-emerald-600 appearance-none cursor-pointer">
                  <option value="">-- PILIH KELAS --</option>
                  {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
@@ -132,7 +132,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
            )}
            <div className="space-y-2">
               <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Tingkatan</label>
-              <select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner cursor-pointer">
+              <select value={levelFilter} onChange={e => setLevelFilter(e.target.value as any)} className="w-full p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner cursor-pointer">
                  <option value="Semua">Semua</option>
                  <option value="MTs">MTs</option>
                  <option value="MA">MA</option>
@@ -140,7 +140,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
            </div>
            <div className="space-y-2">
               <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Gender</label>
-              <select disabled={isGenderRestricted} value={isGenderRestricted ? targetGender : genderFilter} onChange={e => setGenderFilter(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner disabled:opacity-50">
+              <select disabled={isGenderRestricted} value={isGenderRestricted ? targetGender : genderFilter} onChange={e => setGenderFilter(e.target.value as any)} className="w-full p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner disabled:opacity-50">
                  <option value="Semua">Semua</option>
                  <option value="Putra">Putra</option>
                  <option value="Putri">Putri</option>
@@ -154,13 +154,12 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
               </div>
            </div>
         </div>
-        {classFilter && (
-           <div className="flex justify-end pt-4 border-t border-slate-50">
-              <button onClick={handleDownload} className="px-8 py-4 bg-emerald-950 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-3 shadow-xl active:scale-95 transition-all">
-                 <FileSpreadsheet size={18}/> Unduh (.CSV)
-              </button>
-           </div>
-        )}
+
+        <div className="flex justify-end pt-4 border-t border-slate-50">
+           <button onClick={handleDownload} className="px-8 py-4 bg-emerald-950 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-3 shadow-xl active:scale-95 transition-all">
+              <FileSpreadsheet size={18}/> Unduh (.CSV)
+           </button>
+        </div>
       </div>
 
       <div className="bg-white p-10 rounded-[4.5rem] border border-slate-50 shadow-xl overflow-hidden min-h-[400px]">
@@ -180,8 +179,8 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
                            <th className="pb-6 text-center text-[9px] font-black uppercase text-slate-400 tracking-widest">Hadir</th>
                            <th className="pb-6 text-center text-[9px] font-black uppercase text-slate-400 tracking-widest">Sakit</th>
                            <th className="pb-6 text-center text-[9px] font-black uppercase text-slate-400 tracking-widest">Izin</th>
+                           <th className="pb-6 text-center text-[9px] font-black uppercase text-slate-400 tracking-widest">Late</th>
                            <th className="pb-6 text-center text-[9px] font-black uppercase text-slate-400 tracking-widest">Alpha</th>
-                           {activeTab === 'pondok' && <th className="pb-6 text-center text-[9px] font-black uppercase text-slate-400 tracking-widest">Udzur</th>}
                            <th className="pb-6 text-center text-[9px] font-black uppercase text-emerald-600 tracking-widest">% Hadir</th>
                          </>
                        ) : (
@@ -204,8 +203,8 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
                              <td className="py-6 text-center text-[10px] font-black text-slate-600">{row["Hadir"]}</td>
                              <td className="py-6 text-center text-[10px] font-black text-blue-500">{row["Sakit"]}</td>
                              <td className="py-6 text-center text-[10px] font-black text-amber-500">{row["Izin"]}</td>
+                             <td className="py-6 text-center text-[10px] font-black text-orange-500">{row["Late"]}</td>
                              <td className="py-6 text-center text-[10px] font-black text-red-500">{row["Alpha"]}</td>
-                             {activeTab === 'pondok' && <td className="py-6 text-center text-[10px] font-black text-indigo-500">{row["Udzur"]}</td>}
                              <td className="py-6 text-center">
                                 <span className={`px-2 py-1 rounded-lg text-[10px] font-black ${row["Persentase"] === '0%' ? 'bg-slate-100 text-slate-400' : 'bg-emerald-50 text-emerald-700'}`}>
                                    {row["Persentase"]}

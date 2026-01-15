@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { UserRole, UserProfile, AcademicConfig, AppData } from '../types.ts';
+import { UserRole, UserProfile, AcademicConfig, AppData, PrayerTime } from '../types.ts';
 import { 
   getAllUsers, registerUser, deleteUser, resetFirestoreData, clearAppData 
 } from '../services/dataService.ts';
 import { 
   User as UserIcon, Users, Cloud, RefreshCw, LogOut, Trash2, 
   ShieldCheck, ShieldAlert, Edit, Ban, Check, X, Calendar, 
-  BookOpen, Trash, Save, UserPlus, Info, DatabaseZap, Clock, Zap
+  BookOpen, Trash, Save, Info, Clock, Zap
 } from 'lucide-react';
 
 interface SettingsProps {
@@ -24,12 +24,12 @@ const Settings: React.FC<SettingsProps & { students: any[] }> = ({ userEmail, ac
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
 
+  const [selectedSessionForExclusion, setSelectedSessionForExclusion] = useState<string>('Madrasah');
+
   const isSuperAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
 
   useEffect(() => {
-    if (isSuperAdmin) {
-      loadUsers();
-    }
+    if (isSuperAdmin) loadUsers();
   }, [isSuperAdmin]);
 
   const loadUsers = async () => {
@@ -73,25 +73,29 @@ const Settings: React.FC<SettingsProps & { students: any[] }> = ({ userEmail, ac
         Object.values(s.sessionClasses).forEach((c: any) => { if(c) cls.add(c); });
       }
     });
-    return Array.from(cls).sort();
+    return Array.from(cls).sort((a,b) => a.localeCompare(b, undefined, {numeric: true}));
   }, [students]);
 
   const allAvailableSessions = useMemo(() => {
-    return ['Madrasah', 'Al-Quran', 'Kitab Kuning', 'Hadis-Aswaja'];
+    return ['Madrasah', 'Al-Quran', 'Kitab Kuning', 'Hadis-Aswaja', ...Object.values(PrayerTime)];
   }, []);
 
-  const toggleClassHoliday = (className: string) => {
-    const current = { ...academicConfig.excludedClasses };
-    if (current[className]) delete current[className];
-    else current[className] = true;
-    onUpdateAcademic({ ...academicConfig, excludedClasses: current });
-  };
-
-  const toggleSessionHoliday = (session: string) => {
+  const toggleSessionHolidayGlobal = (session: string) => {
     const current = { ...academicConfig.excludedSessions || {} };
     if (current[session]) delete current[session];
     else current[session] = true;
     onUpdateAcademic({ ...academicConfig, excludedSessions: current });
+  };
+
+  const toggleClassInSession = (session: string, className: string) => {
+    const currentExclusions = { ...academicConfig.sessionClassExclusions || {} };
+    const sessionExclusions = { ...currentExclusions[session] || {} };
+    
+    if (sessionExclusions[className]) delete sessionExclusions[className];
+    else sessionExclusions[className] = true;
+    
+    currentExclusions[session] = sessionExclusions;
+    onUpdateAcademic({ ...academicConfig, sessionClassExclusions: currentExclusions });
   };
 
   const handleFactoryReset = async () => {
@@ -151,19 +155,16 @@ const Settings: React.FC<SettingsProps & { students: any[] }> = ({ userEmail, ac
                    <div className="space-y-12 animate-in fade-in duration-500">
                       <div className="space-y-6">
                          <div className="flex justify-between items-center">
-                            <h4 className="text-sm font-black uppercase tracking-widest text-slate-800 flex items-center gap-2"><Clock size={18} className="text-blue-500"/> Manajemen Libur Sesi</h4>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Abaikan Sesi Tertentu</p>
+                            <h4 className="text-sm font-black uppercase tracking-widest text-slate-800 flex items-center gap-2"><Clock size={18} className="text-blue-500"/> 1. Libur Sesi (Global)</h4>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Semua kelas libur di sesi ini</p>
                          </div>
-                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {allAvailableSessions.map(sess => (
-                               <button key={sess} onClick={() => toggleSessionHoliday(sess)} className={`p-5 rounded-2xl border-2 text-left transition-all ${(academicConfig.excludedSessions || {})[sess] ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-200'}`}>
+                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {allAvailableSessions.slice(0, 8).map(sess => (
+                               <button key={sess} onClick={() => toggleSessionHolidayGlobal(sess)} className={`p-4 rounded-xl border-2 text-left transition-all ${(academicConfig.excludedSessions || {})[sess] ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-200'}`}>
                                   <div className="flex justify-between items-center">
                                      <span className="text-[10px] font-black uppercase text-slate-800">{sess}</span>
                                      {(academicConfig.excludedSessions || {})[sess] ? <Zap size={14} className="text-orange-600"/> : <Check size={14} className="text-blue-600"/>}
                                   </div>
-                                  <p className={`text-[8px] font-black uppercase mt-2 ${(academicConfig.excludedSessions || {})[sess] ? 'text-orange-700' : 'text-blue-700'}`}>
-                                     {(academicConfig.excludedSessions || {})[sess] ? 'SESI DILIBURKAN' : 'SESI AKTIF KBM'}
-                                  </p>
                                </button>
                             ))}
                          </div>
@@ -171,28 +172,49 @@ const Settings: React.FC<SettingsProps & { students: any[] }> = ({ userEmail, ac
 
                       <div className="space-y-6 pt-10 border-t border-slate-100">
                          <div className="flex justify-between items-center">
-                            <h4 className="text-sm font-black uppercase tracking-widest text-slate-800 flex items-center gap-2"><Users size={18} className="text-emerald-500"/> Manajemen Libur Kelas</h4>
-                            <div className="flex gap-2">
-                               <button onClick={() => onUpdateAcademic({...academicConfig, excludedClasses: {}})} className="px-3 py-1 bg-slate-100 text-[8px] font-black uppercase rounded-lg">Reset</button>
+                            <h4 className="text-sm font-black uppercase tracking-widest text-slate-800 flex items-center gap-2"><Users size={18} className="text-emerald-500"/> 2. Libur Kelas (Granular)</h4>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Atur libur kelas tertentu pada sesi tertentu saja</p>
+                         </div>
+                         
+                         <div className="bg-slate-50 p-6 rounded-[2rem] space-y-6">
+                            <div className="flex items-center gap-4">
+                               <span className="text-[9px] font-black uppercase text-slate-400">Pilih Sesi:</span>
+                               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                                  {allAvailableSessions.map(sess => (
+                                     <button 
+                                       key={sess} 
+                                       onClick={() => setSelectedSessionForExclusion(sess)}
+                                       className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${selectedSessionForExclusion === sess ? 'bg-emerald-950 text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200'}`}
+                                     >
+                                        {sess}
+                                     </button>
+                                  ))}
+                               </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                               {allAvailableClasses.map(cls => {
+                                 const isExcluded = academicConfig.sessionClassExclusions?.[selectedSessionForExclusion]?.[cls];
+                                 return (
+                                   <button 
+                                     key={cls} 
+                                     onClick={() => toggleClassInSession(selectedSessionForExclusion, cls)}
+                                     className={`p-3 rounded-xl border-2 text-center transition-all ${isExcluded ? 'bg-orange-50 border-orange-200 text-orange-800' : 'bg-white border-slate-100 text-slate-600'}`}
+                                   >
+                                      <span className="text-[9px] font-black uppercase">{cls}</span>
+                                      <div className="mt-1">
+                                         {isExcluded ? <span className="text-[7px] font-black">LIBUR</span> : <span className="text-[7px] font-black opacity-30">AKTIF</span>}
+                                      </div>
+                                   </button>
+                                 );
+                               })}
                             </div>
                          </div>
-                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {allAvailableClasses.map(cls => (
-                               <button key={cls} onClick={() => toggleClassHoliday(cls)} className={`p-5 rounded-2xl border-2 text-left transition-all ${academicConfig.excludedClasses[cls] ? 'bg-orange-50 border-orange-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                                  <div className="flex justify-between items-center">
-                                     <span className="text-[10px] font-black uppercase text-slate-800">{cls}</span>
-                                     {academicConfig.excludedClasses[cls] ? <Ban size={14} className="text-orange-600"/> : <Check size={14} className="text-emerald-600"/>}
-                                  </div>
-                                  <p className={`text-[8px] font-black uppercase mt-2 ${academicConfig.excludedClasses[cls] ? 'text-orange-700' : 'text-emerald-700'}`}>
-                                     {academicConfig.excludedClasses[cls] ? 'LIBUR' : 'AKTIF'}
-                                  </p>
-                               </button>
-                            ))}
-                         </div>
                       </div>
+
                       <div className="p-6 bg-blue-50 border border-blue-100 rounded-[2rem] flex items-start gap-4">
                          <Info size={24} className="text-blue-600 shrink-0"/>
-                         <p className="text-[9px] font-bold uppercase tracking-tight text-blue-800 leading-relaxed">PENTING: Kelas atau Sesi yang ditandai Libur tidak akan dihitung sebagai Alpha (Alpa) dalam Dashboard dan Rekap Laporan, baik untuk Santri maupun Guru.</p>
+                         <p className="text-[9px] font-bold uppercase tracking-tight text-blue-800 leading-relaxed">Catatan: Gunakan fitur (2) jika ingin meliburkan hanya 1 kelas saja pada sesi tertentu (misal: Sesi Al-Quran libur hanya untuk kelas 10A). Jika seluruh pesantren libur, gunakan fitur (1).</p>
                       </div>
                    </div>
                  )}
