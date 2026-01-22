@@ -167,7 +167,11 @@ const App: React.FC = () => {
          deleteAttendance: id => saveAppData({ attendance: currentAppData.attendance.filter(a => a.id !== id) }),
          deletePrayer: id => saveAppData({ prayerAttendance: currentAppData.prayerAttendance.filter(p => p.id !== id) }),
          deleteReport: id => saveAppData({ reports: currentAppData.reports.filter(r => r.id !== id) }),
-         deleteTeacherAttendance: id => saveAppData({ teacherAttendance: currentAppData.teacherAttendance.filter(ta => ta.id !== id) })
+         deleteTeacherAttendance: id => saveAppData({ teacherAttendance: currentAppData.teacherAttendance.filter(ta => ta.id !== id) }),
+         updateAttendance: updated => saveAppData({ attendance: currentAppData.attendance.map(a => a.id === updated.id ? updated : a) }),
+         updatePrayer: updated => saveAppData({ prayerAttendance: currentAppData.prayerAttendance.map(p => p.id === updated.id ? updated : p) }),
+         updateReport: updated => saveAppData({ reports: currentAppData.reports.map(r => r.id === updated.id ? updated : r) }),
+         updateTeacherAttendance: updated => saveAppData({ teacherAttendance: currentAppData.teacherAttendance.map(ta => ta.id === updated.id ? updated : ta) })
       }} />}
 
       {activeTab === 'pengaturan' && <Settings userEmail={profile.email} academicConfig={currentAppData.academicConfig} onUpdateAcademic={c => saveAppData({ academicConfig: c })} students={currentAppData.students} availableClasses={[]} />}

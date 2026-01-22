@@ -280,7 +280,7 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
                 <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Sesi</label>
                 <select value={sessionFilter} onChange={e => setSessionFilter(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner cursor-pointer">
                    <option value="Semua">Semua Sesi</option>
-                   {['Madrasah', 'Hadis-Aswaja', 'Kitab Kuning', 'Al-Quran'].map(s => <option key={s} value={s}>{s}</option>)}
+                   {['Madrasah', 'Hadis-Aswaja', 'Kitab Kuning', 'Al-Quran'].map(s => <option key={s} value={s}>{s}</option>) }
                 </select>
            </div>
            )}
@@ -320,12 +320,13 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
       </div>
 
       {/* Summary Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
         {activeTab === 'kbm' && (
           <>
             <StatCard label="Hadir" val={stats.H} color="emerald" />
             <StatCard label="Sakit" val={stats.S} color="blue" />
             <StatCard label="Izin" val={stats.I} color="amber" />
+            <StatCard label="Terlambat" val={stats.T} color="orange" />
             <StatCard label="Alpha" val={stats.A} color="red" />
           </>
         )}
@@ -506,14 +507,14 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
 };
 
 const StatCard = ({ label, val, color }: { label: string, val: number | string, color: string }) => (
-  <div className={`p-6 bg-${color}-50 border border-white rounded-[2.5rem] flex flex-col gap-3 transition-transform hover:scale-105 shadow-sm`}>
+  <div className={`p-4 sm:p-6 bg-${color}-50 border border-white rounded-[2rem] sm:rounded-[2.5rem] flex flex-col gap-2 sm:gap-3 transition-transform hover:scale-105 shadow-sm`}>
      <div className="flex items-center justify-between">
-        <div className={`w-10 h-10 bg-white rounded-xl flex items-center justify-center text-${color}-600 shadow-sm`}><Activity size={20}/></div>
-        <TrendingUp size={16} className="text-slate-200"/>
+        <div className={`w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-xl flex items-center justify-center text-${color}-600 shadow-sm`}><Activity size={18}/></div>
+        <TrendingUp size={14} className="text-slate-200"/>
      </div>
      <div>
-        <h4 className="text-2xl font-black text-slate-800">{val}</h4>
-        <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{label}</p>
+        <h4 className="text-xl sm:text-2xl font-black text-slate-800">{val}</h4>
+        <p className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-widest">{label}</p>
      </div>
   </div>
 );
