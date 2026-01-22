@@ -86,38 +86,50 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     const reader = new FileReader();
     reader.onload = (event) => {
       let text = event.target?.result as string;
-      text = text.replace(/^\uFEFF/, '');
+      text = text.replace(/^\uFEFF/, ''); // Remove BOM
       
       const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
       if (lines.length < 2) return;
 
       const firstLine = lines[0];
-      const delimiter = firstLine.includes(';') ? ';' : ',';
+      // Improved delimiter detection
+      const commaCount = (firstLine.match(/,/g) || []).length;
+      const semicolonCount = (firstLine.match(/;/g) || []).length;
+      const delimiter = semicolonCount > commaCount ? ';' : ',';
+
       const rawHeaders = firstLine.split(delimiter).map(h => h.replace(/["\r\n]/g, '').trim());
       const headersMap: Record<string, number> = {};
-      rawHeaders.forEach((h, i) => headersMap[h.toUpperCase().replace(/\s+/g, '')] = i);
+      
+      // Strict header cleaning: uppercase and remove all non-alphanumeric
+      rawHeaders.forEach((h, i) => {
+        const cleanHeader = h.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        headersMap[cleanHeader] = i;
+      });
 
       const getVal = (rowArr: string[], possibleNames: string[]) => {
         for (const name of possibleNames) {
-          const idx = headersMap[name.toUpperCase().replace(/\s+/g, '')];
-          if (idx !== undefined) return rowArr[idx]?.replace(/["\r\n]/g, '').trim() || '';
+          const cleanSearchName = name.toUpperCase().replace(/[^A-Z0-9]/g, '');
+          const idx = headersMap[cleanSearchName];
+          if (idx !== undefined && rowArr[idx] !== undefined) {
+            return rowArr[idx].replace(/^"|"$/g, '').trim();
+          }
         }
         return '';
       };
 
       const newData = lines.slice(1).map((line, idx) => {
-        const values = line.split(delimiter).map(v => v.replace(/^"|$/g, '').trim());
+        const values = line.split(delimiter);
         
         if (type === 'ORSAM' || type === 'ORKLAS') {
           return {
             id: `org-${Date.now()}-${idx}`,
-            name: getVal(values, ['NAMA', 'NAMALENGKAP']),
+            name: getVal(values, ['NAMA', 'NAMALENGKAP', 'SANTRI']),
             nis: getVal(values, ['NIS', 'NISN']),
-            position: getVal(values, ['JABATAN', 'POSISI']),
+            position: getVal(values, ['JABATAN', 'POSISI', 'TUGAS']),
             division: getVal(values, ['DIVISI', 'BIDANG', 'BAGIAN']),
             class: getVal(values, ['KELAS', 'UNIT']),
             gender: getVal(values, ['GENDER', 'JK', 'JENISKELAMIN']) || 'Putra',
-            level: getVal(values, ['TINGKAT', 'JENJANG']) || 'MTs',
+            level: getVal(values, ['TINGKAT', 'JENJANG', 'UNIT']) || 'MTs',
             orgType: type
           };
         }
@@ -126,9 +138,9 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
           const sessionClasses: Record<string, string> = {};
           rawHeaders.forEach((h, i) => {
             const hUpper = h.toUpperCase();
-            if (hUpper.startsWith('KELAS ') && hUpper !== 'KELAS MADRASAH (FORMAL)' && hUpper !== 'KELAS MADRASAH') {
-              const sessionName = h.replace(/Kelas /i, '').trim();
-              const val = values[i]?.trim();
+            if (hUpper.includes('KELAS') && !hUpper.includes('FORMAL') && !hUpper.includes('MADRASAH')) {
+              const sessionName = h.replace(/Kelas/i, '').trim();
+              const val = values[i]?.replace(/^"|"$/g, '').trim();
               if (val) sessionClasses[sessionName] = val;
             }
           });
@@ -138,7 +150,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             name: getVal(values, ['NAMA', 'NAMALENGKAP', 'NAMASANTRI']),
             gender: getVal(values, ['GENDER', 'JENISKELAMIN', 'JK']) || 'Putra',
             level: getVal(values, ['TINGKAT', 'JENJANG', 'UNIT']) || 'MTs',
-            formalClass: getVal(values, ['KELASMADRASAH(FORMAL)', 'KELASFORMAL', 'KELASMADRASAH', 'KELAS']),
+            formalClass: getVal(values, ['KELASMADRASAHFORMAL', 'KELASFORMAL', 'KELASMADRASAH', 'KELAS']),
             sessionClasses
           };
         }
@@ -146,10 +158,10 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
         if (type === 'Guru') {
            return {
              id: `t-${Date.now()}-${idx}`,
-             name: getVal(values, ['NAMA', 'NAMAGURU']),
-             subject: getVal(values, ['MAPEL', 'MATAPELAJARAN']),
-             phone: getVal(values, ['NOHP', 'WHATSAPP']),
-             email: getVal(values, ['EMAIL']),
+             name: getVal(values, ['NAMA', 'NAMAGURU', 'USTADZ', 'USTADZAH']),
+             subject: getVal(values, ['MAPEL', 'MATAPELAJARAN', 'MAPELUTAMA']),
+             phone: getVal(values, ['NOHP', 'WHATSAPP', 'TELEPON']),
+             email: getVal(values, ['EMAIL', 'SUREL']),
              teachingClasses: []
            };
         }
@@ -158,37 +170,39 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
           return {
             id: `sch-${Date.now()}-${idx}`,
             day: getVal(values, ['HARI']) || 'Senin',
-            time: getVal(values, ['WAKTU', 'JAM']),
-            subject: getVal(values, ['MAPEL', 'MATAPELAJARAN']),
-            teacherName: getVal(values, ['GURU', 'USTADZ', 'USTADZAH', 'GURUUTAMA']),
-            assistantTeacherName: getVal(values, ['ASISTEN', 'GURUASISTEN', 'ASISTENGURU', 'GURU2']),
-            homeroomTeacherName: getVal(values, ['WALAS', 'WALIKELAS', 'HOMEROOM', 'WALI', 'MUSYRIF', 'MUSYRIFAH']),
+            time: getVal(values, ['WAKTU', 'JAM', 'JAMPELAJARAN']),
+            subject: getVal(values, ['MAPEL', 'MATAPELAJARAN', 'PELAJARAN']),
+            teacherName: getVal(values, ['GURUUTAMA', 'GURU', 'USTADZ', 'USTADZAH']),
+            assistantTeacherName: getVal(values, ['GURUASISTEN', 'ASISTEN', 'ASISTENGURU', 'GURU2']),
+            homeroomTeacherName: getVal(values, ['WALIKELAS', 'WALAS', 'HOMEROOM', 'WALI', 'MUSYRIF', 'MUSYRIFAH']),
             class: getVal(values, ['UNIT', 'KELAS']),
-            sessionType: getVal(values, ['SESI', 'JENISKEGIATAN']) || 'Madrasah',
-            level: getVal(values, ['TINGKAT', 'JENJANG']) || 'MTs',
-            gender: getVal(values, ['GENDER', 'JK']) || 'Putra'
+            sessionType: getVal(values, ['SESI', 'JENISKEGIATAN', 'KEGIATAN']) || 'Madrasah',
+            level: getVal(values, ['TINGKAT', 'JENJANG', 'UNIT']) || 'MTs',
+            gender: getVal(values, ['GENDER', 'JK', 'PUTRAPUTRI']) || 'Putra'
           };
         }
 
         if (type === 'Peraturan') {
           return {
-            label: getVal(values, ['DESKRIPSI', 'LABEL', 'PERATURAN', 'DESKRIPSIPERATURAN']),
-            points: Number(getVal(values, ['POIN', 'POINT', 'SKOR'])) || 0,
-            category: getVal(values, ['KATEGORI', 'BIDANG']) as ViolationCategory,
-            type: getVal(values, ['TIPE', 'JENIS']) || 'Pelanggaran'
+            label: getVal(values, ['DESKRIPSI', 'LABEL', 'PERATURAN', 'NAMA']),
+            points: Number(getVal(values, ['POIN', 'POINT', 'SKOR', 'NILAI'])) || 0,
+            category: getVal(values, ['KATEGORI', 'BIDANG', 'JENIS']) as ViolationCategory,
+            type: getVal(values, ['TIPE', 'JENISLAPORAN']) || 'Pelanggaran'
           };
         }
 
-        return values;
+        return null;
       }).filter(item => {
-        if (typeof item === 'object' && 'name' in item) return !!item.name;
-        if (type === 'Peraturan' && typeof item === 'object') return !!(item as any).label;
+        if (!item) return false;
+        if (type === 'Peraturan') return !!(item as any).label;
+        if (type === 'Siswa' || type === 'Guru' || type === 'ORSAM' || type === 'ORKLAS') return !!(item as any).name;
+        if (type === 'Jadwal') return !!(item as any).subject;
         return true;
       });
 
-      if (confirm(`Impor ${newData.length} baris data ${type}?`)) {
+      if (confirm(`Sinkronisasi ${newData.length} baris data ${type}?`)) {
         onUpdateData(type, newData);
-        alert("Sinkronisasi Berhasil!");
+        alert("Sinkronisasi Berhasil! Data telah diperbarui.");
       }
     };
     reader.readAsText(file);
@@ -196,13 +210,12 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
 
   const downloadTemplate = (type: string) => {
     let content = "";
-    if (type === 'Siswa') content = "NIS,Nama,Gender,Tingkat,Kelas Madrasah (Formal),Kelas Al-Quran,Kelas Kitab Kuning\n2024001,Ahmad Santri,Putra,MTs,7A,Yanbu'a 3,Safinatun Najah";
-    else if (type === 'Guru') content = "Nama,No HP,Email,Mapel Utama\nUstadz Zulkifli,081234,zulkifli@gmail.com,Nahwu Shorof";
+    if (type === 'Siswa') content = "NIS,Nama,Gender,Tingkat,Kelas Madrasah (Formal),Kelas Al-Quran,Kelas Kitab Kuning\n2024001,Ahmad Fauzi,Putra,MTs,7A,Yanbu'a 3,Safinatun Najah";
+    else if (type === 'Guru') content = "Nama,No HP,Email,Mapel Utama\nUstadz Zulkifli,0812345678,zulkifli@gmail.com,Nahwu Shorof";
     else if (type === 'Jadwal') {
       content = "Hari,Waktu,Mapel,Guru Utama,Guru Asisten,Wali Kelas,Unit,Sesi,Tingkat,Gender\n";
-      content += "Senin,07:30 - 09:00,Nahwu,Guru A,Guru B,Guru E,7A,Madrasah,MTs,Putra\n";
-      content += "Senin,07:30 - 09:00,Shorof,Guru B,,Guru C,7B,Madrasah,MTs,Putra\n";
-      content += "Senin,13:00 - 14:30,Alfiyah J2,Guru X,Guru D,Guru E,10A,Hadis,MA,Putra";
+      content += "Senin,07:30 - 09:00,Nahwu,Ustadz A,Ustadz B,Ustadz E,7A,Madrasah,MTs,Putra\n";
+      content += "Senin,07:30 - 09:00,Shorof,Ustadz B,,Ustadz C,7B,Madrasah,MTs,Putra";
     }
     else if (type === 'ORSAM' || type === 'ORKLAS') content = "Nama,NIS,Jabatan,Divisi,Kelas,Gender,Tingkat\nZaid Al-Khair,2024002,Ketua,Pusat,10-IPA,Putra,MA";
     else if (type === 'Peraturan') content = "Deskripsi Peraturan,Poin,Kategori,Tipe\nTerlambat Masuk Kelas,10,Kedisiplinan,Pelanggaran\nMenjuarai Lomba Pidato,50,Akademik,Prestasi";
@@ -241,8 +254,8 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
           "No HP": t.phone,
           "Email": t.email,
           "Mapel Utama": t.subject,
-          "Wali Kelas": walas.join(', ') || '-',
-          "Musyrif/ah": musyrif.join(', ') || '-'
+          "Wali Kelas": Array.from(new Set(walas)).join(', ') || '-',
+          "Musyrif/ah": Array.from(new Set(musyrif)).join(', ') || '-'
         };
       });
     } else if (selectedCategory === 'Jadwal') {
