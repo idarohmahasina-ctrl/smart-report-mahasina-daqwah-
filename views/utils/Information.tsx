@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { ExtraDataList } from '../../services/dataService.ts';
 import { downloadCSV } from './csvExport.ts';
-import { isTeacherMatch } from './nameMatchers.ts';
+import { isTeacherMatch, normalizeSessionName } from './nameMatchers.ts';
 import * as XLSX from 'xlsx';
 
 interface InformationProps {
@@ -52,7 +52,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     const sessSet = new Set<string>(['Madrasah', 'Hadis-Aswaja', 'Kitab Kuning', 'Al-Quran']);
     data.students.forEach(s => {
       if (s.sessionClasses) {
-        Object.keys(s.sessionClasses).forEach(key => sessSet.add(key));
+        Object.keys(s.sessionClasses).forEach(key => sessSet.add(normalizeSessionName(key)));
       }
     });
     return Array.from(sessSet).sort();
@@ -69,7 +69,8 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
   const filteredSchedules = useMemo(() => {
     return data.schedules.filter(s => {
       const matchDay = schDayFilter === 'Semua' || s.day === schDayFilter;
-      const matchSess = schSessionFilter === 'Semua' || s.sessionType === schSessionFilter;
+      // Perbaikan filter sesi: normalize agar match meskipun beda case/spasi
+      const matchSess = schSessionFilter === 'Semua' || normalizeSessionName(s.sessionType) === normalizeSessionName(schSessionFilter);
       const matchCls = schClassFilter === 'Semua' || s.class === schClassFilter;
       const matchSearch = s.teacherName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           s.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -138,7 +139,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             if (hUpper.includes('KELAS') && !hUpper.includes('FORMAL') && !hUpper.includes('MADRASAH')) {
               const sessionName = h.replace(/Kelas/i, '').trim();
               const val = String(row[i] || '').trim();
-              if (val) sessionClasses[sessionName] = val;
+              if (val) sessionClasses[normalizeSessionName(sessionName)] = val;
             }
           });
           return {
@@ -173,7 +174,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             assistantTeacherName: getVal(row, ['GURUASISTEN', 'ASISTEN', 'ASISTENGURU', 'GURU2', 'ASSISTANT', 'MUSYRIF', 'MUSYRIFAH']),
             homeroomTeacherName: getVal(row, ['WALIKELAS', 'WALAS', 'HOMEROOM', 'WALI']),
             class: getVal(row, ['UNIT', 'KELAS', 'CLASS', 'ROOM', 'UNITKELAS']),
-            sessionType: getVal(row, ['SESI', 'JENISKEGIATAN', 'KEGIATAN', 'SESSION', 'JENISSESI']) || 'Madrasah',
+            sessionType: normalizeSessionName(getVal(row, ['SESI', 'JENISKEGIATAN', 'KEGIATAN', 'SESSION', 'JENISSESI']) || 'Madrasah'),
             level: getVal(row, ['TINGKAT', 'JENJANG', 'UNITLEVEL', 'LEVEL']) || 'MTs',
             gender: getVal(row, ['GENDER', 'JK', 'PUTRAPUTRI', 'SEX']) || 'Putra'
           };
@@ -407,10 +408,12 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                    </thead>
                    <tbody className="divide-y divide-slate-50">
                       {data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).map((item, idx) => {
+                        // Perbaikan pencocokan jadwal untuk guru: gunakan isTeacherMatch agar lebih akurat
                         const assignments = data.schedules.filter(s => isTeacherMatch(item.name, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName));
                         const teachingDetails = Array.from(new Set(assignments.filter(s => isTeacherMatch(item.name, s.teacherName)).map(a => `${a.subject} (${a.class})`))).join(' • ');
-                        const walasClasses = Array.from(new Set(assignments.filter(s => s.homeroomTeacherName === item.name).map(a => a.class)));
-                        const musyrifClasses = Array.from(new Set(assignments.filter(s => isTeacherMatch(item.name, s.assistantTeacherName || "")).map(a => a.class)));
+                        const walasClasses = Array.from(new Set(assignments.filter(s => s.homeroomTeacherName && isTeacherMatch(item.name, s.homeroomTeacherName)).map(a => a.class)));
+                        const musyrifClasses = Array.from(new Set(assignments.filter(s => s.assistantTeacherName && isTeacherMatch(item.name, s.assistantTeacherName)).map(a => a.class)));
+                        
                         return (
                           <tr key={idx} className="hover:bg-slate-50 transition-all">
                              <td className="py-6">
@@ -480,24 +483,28 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                         {data.students.filter(s => (isGenderRestricted ? s.gender === targetGender : true) && s.name.toLowerCase().includes(searchTerm.toLowerCase())).map(s => (
-                           <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                             <td className="py-6">
-                                 <p className="text-sm font-black uppercase text-slate-800">{s.name}</p>
-                                 <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{s.nis} • {s.gender}</p>
-                             </td>
-                             <td className="py-6">
-                                 <span className="px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-lg text-[10px] font-black uppercase">{s.formalClass}</span>
-                             </td>
-                             <td className="py-6">
-                                 { (studentSessionFilter === 'Madrasah' ? s.formalClass : s.sessionClasses?.[studentSessionFilter]) ? (
-                                   <span className="px-3 py-1.5 bg-blue-50 text-blue-800 rounded-lg text-[10px] font-black uppercase">
-                                     {studentSessionFilter === 'Madrasah' ? s.formalClass : s.sessionClasses?.[studentSessionFilter]}
-                                   </span>
-                                 ) : '-'}
-                             </td>
-                           </tr>
-                         ))}
+                         {data.students.filter(s => (isGenderRestricted ? s.gender === targetGender : true) && s.name.toLowerCase().includes(searchTerm.toLowerCase())).map(s => {
+                           // Perbaikan pemetaan kelas per sesi: normalize session key
+                           const sessionClass = studentSessionFilter === 'Madrasah' ? s.formalClass : s.sessionClasses?.[normalizeSessionName(studentSessionFilter)];
+                           return (
+                            <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="py-6">
+                                  <p className="text-sm font-black uppercase text-slate-800">{s.name}</p>
+                                  <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{s.nis} • {s.gender}</p>
+                              </td>
+                              <td className="py-6">
+                                  <span className="px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-lg text-[10px] font-black uppercase">{s.formalClass}</span>
+                              </td>
+                              <td className="py-6">
+                                  { sessionClass ? (
+                                    <span className="px-3 py-1.5 bg-blue-50 text-blue-800 rounded-lg text-[10px] font-black uppercase">
+                                      {sessionClass}
+                                    </span>
+                                  ) : '-'}
+                              </td>
+                            </tr>
+                           )
+                         })}
                       </tbody>
                    </table>
                 </div>

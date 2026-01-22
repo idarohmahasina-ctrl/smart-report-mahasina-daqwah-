@@ -110,7 +110,15 @@ const App: React.FC = () => {
         />
       )}
 
-      {activeTab === 'absen-kbm' && <Attendance {...currentAppData} role={profile.role} currentUser={profile.fullName} onSave={(recs:any) => saveAppData({ attendance: [...currentAppData.attendance, ...recs] })} />}
+      {activeTab === 'absen-kbm' && (
+        <Attendance 
+          {...currentAppData} 
+          role={profile.role} 
+          currentUser={profile.fullName} 
+          userEmail={profile.email}
+          onSave={(recs:any) => saveAppData({ attendance: [...currentAppData.attendance, ...recs] })} 
+        />
+      )}
       
       {activeTab === 'absen-sholat' && (
         <PrayerAttendance 

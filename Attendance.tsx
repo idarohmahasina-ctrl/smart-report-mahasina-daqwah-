@@ -1,11 +1,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { AttendanceStatus, Student, UserRole, Schedule, AppData } from './types.ts';
-// Added missing 'Users' import from lucide-react
 import { UserCheck, CheckCircle, Search, Save, X, Edit3, PlusCircle, Calendar, UserPlus, Ban, Users } from 'lucide-react';
-import { isTeacherMatch } from './views/utils/nameMatchers.ts';
+import { isTeacherMatch, normalizeSessionName } from './views/utils/nameMatchers.ts';
 
-const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSave: any }> = (data) => {
+const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSave: any, userEmail?: string }> = (data) => {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [tempRecords, setTempRecords] = useState<Record<string, { status: AttendanceStatus, note: string }>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -14,8 +13,9 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
   const students = data.students || [];
   const config = data.academicConfig;
 
-  const isIdaroh = data.role === UserRole.IDAROH || data.role === UserRole.PENGASUH;
-  const isGenderRestricted = data.role === UserRole.SANTRI_OFFICER_PUTRA || data.role === UserRole.SANTRI_OFFICER_PUTRI;
+  // Cek admin idaroh melalui role ATAU email
+  const isIdaroh = data.role === UserRole.IDAROH || data.role === UserRole.PENGASUH || data.userEmail?.toLowerCase().trim() === 'idarohmahasina@gmail.com';
+  const isGenderRestricted = !isIdaroh && (data.role === UserRole.SANTRI_OFFICER_PUTRA || data.role === UserRole.SANTRI_OFFICER_PUTRI);
   const targetGender = data.role === UserRole.SANTRI_OFFICER_PUTRA ? 'Putra' : 'Putri';
 
   const isHoliday = (cls: string, sess: string) => {
@@ -27,9 +27,9 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
 
   const mySchedules = useMemo(() => {
     return schedules.filter(s => {
-      // Idaroh bisa melihat semua jadwal
+      // Idaroh memintas semua filter jadwal
       const matchTeacher = isIdaroh || isTeacherMatch(data.currentUser, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName);
-      const matchGender = !isGenderRestricted || s.gender === targetGender;
+      const matchGender = isIdaroh || !isGenderRestricted || s.gender === targetGender;
       return matchTeacher && matchGender;
     }).sort((a,b) => a.time.localeCompare(b.time));
   }, [schedules, data.currentUser, isGenderRestricted, targetGender, isIdaroh]);
@@ -38,16 +38,19 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
     if (!selectedSchedule) return [];
     return students
       .filter(s => {
-        const matchGender = !isGenderRestricted || s.gender === targetGender;
-        const matchClass = selectedSchedule.sessionType === 'Madrasah' 
+        const matchGender = isIdaroh || !isGenderRestricted || s.gender === targetGender;
+        
+        // Perbaikan: Gunakan normalisasi untuk mencocokkan sesi
+        const scheduleSess = normalizeSessionName(selectedSchedule.sessionType);
+        const matchClass = scheduleSess === 'Madrasah' 
           ? s.formalClass === selectedSchedule.class 
-          : s.sessionClasses?.[selectedSchedule.sessionType] === selectedSchedule.class;
+          : s.sessionClasses?.[scheduleSess] === selectedSchedule.class;
+          
         return matchGender && matchClass;
       })
       .filter(s => (s.name || "").toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [selectedSchedule, students, searchTerm, isGenderRestricted, targetGender]);
+  }, [selectedSchedule, students, searchTerm, isGenderRestricted, targetGender, isIdaroh]);
 
-  // Efek untuk menginisialisasi status H untuk semua santri saat jadwal dipilih
   useEffect(() => {
     if (selectedSchedule && targetStudents.length > 0) {
       const initial: Record<string, { status: AttendanceStatus, note: string }> = {};
@@ -115,7 +118,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
             {mySchedules.length === 0 && (
               <div className="lg:col-span-3 py-20 text-center opacity-30">
                  <Calendar size={64} className="mx-auto text-slate-300"/>
-                 <p className="mt-4 font-black uppercase text-[12px]">Jadwal Kosong</p>
+                 <p className="mt-4 font-black uppercase text-[12px]">Jadwal Kosong atau Belum Dimuat</p>
               </div>
             )}
           </div>
@@ -177,7 +180,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
               {targetStudents.length === 0 && (
                 <div className="py-20 text-center opacity-20">
                    <Users size={48} className="mx-auto"/>
-                   <p className="mt-4 font-black uppercase text-[10px]">Santri tidak ditemukan</p>
+                   <p className="mt-4 font-black uppercase text-[10px]">Santri tidak ditemukan di unit/sesi ini</p>
                 </div>
               )}
            </div>
