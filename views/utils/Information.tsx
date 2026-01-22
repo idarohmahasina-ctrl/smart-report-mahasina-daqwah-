@@ -3,7 +3,8 @@ import React, { useState, useMemo } from 'react';
 import { UserRole, Student, Teacher, Schedule, OrganizationMember, TemplateItem, Announcement, ViolationCategory } from '../../types.ts';
 import { 
   Search, Download, Upload, FileText, Info as InfoIcon, Users, 
-  Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark, UserPlus, GraduationCap, LayoutGrid, Award, FileDown, BookOpen, Phone, Mail
+  Shield, Calendar, UserCheck, Database, ArrowLeft, UserCheck2, Filter, ChevronRight, FileSpreadsheet, Trash2, AlertCircle, Bookmark, UserPlus, GraduationCap, LayoutGrid, Award, FileDown, BookOpen, Phone, Mail,
+  User
 } from 'lucide-react';
 import { ExtraDataList } from '../../services/dataService.ts';
 import { downloadCSV } from './csvExport.ts';
@@ -79,7 +80,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     });
   }, [data.schedules, schDayFilter, schSessionFilter, schClassFilter, searchTerm]);
 
-  // Robust CSV Line Splitter (Handles quotes and delimiters inside quotes)
+  // Robust CSV Line Splitter (Handles quotes, nested commas, and empty fields correctly)
   const parseCSVLine = (line: string, delimiter: string) => {
     const result = [];
     let current = '';
@@ -87,7 +88,12 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
       if (char === '"') {
-        inQuotes = !inQuotes;
+        if (inQuotes && line[i + 1] === '"') { // Handle escaped quotes ""
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
       } else if (char === delimiter && !inQuotes) {
         result.push(current.trim());
         current = '';
@@ -119,6 +125,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
       const rawHeaders = parseCSVLine(firstLine, delimiter);
       const headersMap: Record<string, number> = {};
       
+      // Strict header normalization
       rawHeaders.forEach((h, i) => {
         const cleanHeader = h.toUpperCase().replace(/[^A-Z0-9]/g, '');
         headersMap[cleanHeader] = i;
@@ -137,11 +144,12 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
 
       const newData = lines.slice(1).map((line, idx) => {
         const values = parseCSVLine(line, delimiter);
-        
+        if (values.length === 0 || (values.length === 1 && values[0] === "")) return null;
+
         if (type === 'ORSAM' || type === 'ORKLAS') {
           return {
             id: `org-${Date.now()}-${idx}`,
-            name: getVal(values, ['NAMA', 'NAMALENGKAP', 'NAMASANTRI']),
+            name: getVal(values, ['NAMA', 'NAMALENGKAP', 'NAMASANTRI', 'SANTRI']),
             nis: getVal(values, ['NIS', 'NISN']),
             position: getVal(values, ['JABATAN', 'POSISI', 'TUGAS']),
             division: getVal(values, ['DIVISI', 'BIDANG', 'BAGIAN']),
@@ -168,7 +176,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             name: getVal(values, ['NAMA', 'NAMALENGKAP', 'NAMASANTRI']),
             gender: getVal(values, ['GENDER', 'JENISKELAMIN', 'JK']) || 'Putra',
             level: getVal(values, ['TINGKAT', 'JENJANG', 'UNIT']) || 'MTs',
-            formalClass: getVal(values, ['KELASMADRASAHFORMAL', 'KELASFORMAL', 'KELASMADRASAH', 'KELAS']),
+            formalClass: getVal(values, ['KELASMADRASAHFORMAL', 'KELASFORMAL', 'KELASMADRASAH', 'KELAS', 'UNIT']),
             sessionClasses
           };
         }
@@ -176,53 +184,56 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
         if (type === 'Guru') {
            return {
              id: `t-${Date.now()}-${idx}`,
-             name: getVal(values, ['NAMA', 'NAMAGURU', 'USTADZ', 'USTADZAH']),
-             subject: getVal(values, ['MAPEL', 'MATAPELAJARAN', 'MAPELUTAMA']),
-             phone: getVal(values, ['NOHP', 'WHATSAPP', 'TELEPON']),
+             name: getVal(values, ['NAMA', 'NAMAGURU', 'USTADZ', 'USTADZAH', 'GURU']),
+             subject: getVal(values, ['MAPEL', 'MATAPELAJARAN', 'MAPELUTAMA', 'PELAJARAN']),
+             phone: getVal(values, ['NOHP', 'WHATSAPP', 'TELEPON', 'WA']),
              email: getVal(values, ['EMAIL', 'SUREL']),
              teachingClasses: []
            };
         }
 
         if (type === 'Jadwal') {
+          const subject = getVal(values, ['MAPEL', 'MATAPELAJARAN', 'PELAJARAN', 'SUBJECT']);
+          const teacher = getVal(values, ['GURUUTAMA', 'GURU', 'USTADZ', 'USTADZAH', 'PENGAJAR']);
+          
           return {
             id: `sch-${Date.now()}-${idx}`,
-            day: getVal(values, ['HARI']) || 'Senin',
-            time: getVal(values, ['WAKTU', 'JAM', 'JAMPELAJARAN', 'WAKTUKBM']),
-            subject: getVal(values, ['MAPEL', 'MATAPELAJARAN', 'PELAJARAN', 'SUBJECT']),
-            teacherName: getVal(values, ['GURUUTAMA', 'GURU', 'USTADZ', 'USTADZAH', 'PENGAJAR']),
-            assistantTeacherName: getVal(values, ['GURUASISTEN', 'ASISTEN', 'ASISTENGURU', 'GURU2']),
+            day: getVal(values, ['HARI', 'DAY']) || 'Senin',
+            time: getVal(values, ['WAKTU', 'JAM', 'JAMPELAJARAN', 'WAKTUKBM', 'TIME']),
+            subject: subject,
+            teacherName: teacher,
+            assistantTeacherName: getVal(values, ['GURUASISTEN', 'ASISTEN', 'ASISTENGURU', 'GURU2', 'ASSISTANT']),
             homeroomTeacherName: getVal(values, ['WALIKELAS', 'WALAS', 'HOMEROOM', 'WALI']),
-            class: getVal(values, ['UNIT', 'KELAS', 'CLASS']),
+            class: getVal(values, ['UNIT', 'KELAS', 'CLASS', 'ROOM']),
             sessionType: getVal(values, ['SESI', 'JENISKEGIATAN', 'KEGIATAN', 'SESSION']) || 'Madrasah',
-            level: getVal(values, ['TINGKAT', 'JENJANG', 'UNITLEVEL']) || 'MTs',
-            gender: getVal(values, ['GENDER', 'JK', 'PUTRAPUTRI']) || 'Putra'
+            level: getVal(values, ['TINGKAT', 'JENJANG', 'UNITLEVEL', 'LEVEL']) || 'MTs',
+            gender: getVal(values, ['GENDER', 'JK', 'PUTRAPUTRI', 'SEX']) || 'Putra'
           };
         }
 
         if (type === 'Peraturan') {
           return {
-            label: getVal(values, ['DESKRIPSI', 'LABEL', 'PERATURAN', 'NAMA']),
+            label: getVal(values, ['DESKRIPSI', 'LABEL', 'PERATURAN', 'NAMA', 'RULE']),
             points: Number(getVal(values, ['POIN', 'POINT', 'SKOR', 'NILAI'])) || 0,
-            category: getVal(values, ['KATEGORI', 'BIDANG', 'JENIS']) as ViolationCategory,
-            type: getVal(values, ['TIPE', 'JENISLAPORAN']) || 'Pelanggaran'
+            category: getVal(values, ['KATEGORI', 'BIDANG', 'JENIS', 'CATEGORY']) as ViolationCategory,
+            type: getVal(values, ['TIPE', 'JENISLAPORAN', 'TYPE']) || 'Pelanggaran'
           };
         }
 
         return null;
       }).filter(item => {
         if (!item) return false;
-        // Validasi minimal data agar baris kosong tidak masuk
         const obj = item as any;
+        // Filter row dropping only if absolutely essential fields are missing
         if (type === 'Siswa') return !!obj.name;
         if (type === 'Jadwal') return !!obj.subject || !!obj.teacherName;
         if (type === 'Guru') return !!obj.name;
         return true;
       });
 
-      if (confirm(`Impor ${newData.length} baris data ${type}?`)) {
+      if (confirm(`Sinkronisasi ${newData.length} baris data ${type} ke sistem?`)) {
         onUpdateData(type, newData);
-        alert("Sinkronisasi Berhasil!");
+        alert("Data berhasil diproses! Silakan cek kembali di tabel.");
       }
     };
     reader.readAsText(file);
@@ -234,9 +245,9 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     else if (type === 'Guru') content = "Nama,No HP,Email,Mapel Utama\nUstadz Zulkifli,081234,zulkifli@gmail.com,Nahwu Shorof";
     else if (type === 'Jadwal') {
       content = "Hari,Waktu,Mapel,Guru Utama,Guru Asisten,Wali Kelas,Unit,Sesi,Tingkat,Gender\n";
-      content += "Senin,07:30 - 09:00,Nahwu,Guru A,Guru B,Guru E,7A,Madrasah,MTs,Putra\n";
-      content += "Senin,07:30 - 09:00,Shorof,Guru B,,Guru C,7B,Madrasah,MTs,Putra\n";
-      content += "Senin,13:00 - 14:30,Alfiyah J2,Guru X,Guru D,Guru E,10A,Hadis,MA,Putra";
+      content += "Senin,07:30 - 09:00,Nahwu,Ustadz A,Ustadz B,Ustadz E,7A,Madrasah,MTs,Putra\n";
+      content += "Senin,07:30 - 09:00,Shorof,Ustadz B,,Ustadz C,7B,Madrasah,MTs,Putra\n";
+      content += "Senin,13:00 - 14:30,Alfiyah J2,Ustadz X,Ustadz D,Ustadz E,10A,Hadis-Aswaja,MA,Putra";
     }
     else if (type === 'ORSAM' || type === 'ORKLAS') content = "Nama,NIS,Jabatan,Divisi,Kelas,Gender,Tingkat\nZaid Al-Khair,2024002,Ketua,Pusat,10-IPA,Putra,MA";
     else if (type === 'Peraturan') content = "Deskripsi Peraturan,Poin,Kategori,Tipe\nTerlambat Masuk Kelas,10,Kedisiplinan,Pelanggaran\nMenjuarai Lomba Pidato,50,Akademik,Prestasi";
@@ -378,7 +389,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                             <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Waktu & Sesi</th>
                             <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Mata Pelajaran</th>
                             <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Guru Utama</th>
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Guru Asisten</th>
+                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Guru Asisten / Walas</th>
                             <th className="pb-6 text-[10px] font-black uppercase text-slate-400 text-center">Unit / Target</th>
                          </tr>
                       </thead>
@@ -396,7 +407,12 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                                 <p className="font-black text-emerald-800 text-[10px] uppercase">{sch.teacherName}</p>
                               </td>
                               <td className="py-6">
-                                <p className="text-[10px] font-black uppercase text-slate-400">{sch.assistantTeacherName || '-'}</p>
+                                <div className="space-y-1">
+                                   {/* Fix: Added missing User icon import */}
+                                   {sch.assistantTeacherName && <p className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-1"><User size={10} className="text-slate-300"/> AS: {sch.assistantTeacherName}</p>}
+                                   {sch.homeroomTeacherName && <p className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-1"><GraduationCap size={10} className="text-blue-300"/> WL: {sch.homeroomTeacherName}</p>}
+                                   {!sch.assistantTeacherName && !sch.homeroomTeacherName && <p className="text-[10px] text-slate-300">-</p>}
+                                </div>
                               </td>
                               <td className="py-6 text-center">
                                 <div className="flex flex-col gap-1 items-center">
