@@ -15,12 +15,12 @@ export const normalizeName = (name: string): string => {
 
 export const normalizeClassName = (cls: string): string => {
   if (!cls) return "";
-  // Menghapus kata "Kelas", "Unit", "Ruang", spasi, dan simbol
+  // Menghapus semua yang bukan huruf dan angka, serta kata-kata umum
   return cls.toLowerCase()
     .replace(/kelas/gi, "")
     .replace(/unit/gi, "")
     .replace(/ruang/gi, "")
-    .replace(/[^a-z0-9]/gi, "")
+    .replace(/[^a-z0-9]/gi, "") // Hanya sisakan alphanumeric (7a, 8b, 10ipa)
     .trim();
 };
 
