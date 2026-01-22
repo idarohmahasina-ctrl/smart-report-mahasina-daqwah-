@@ -79,6 +79,26 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     });
   }, [data.schedules, schDayFilter, schSessionFilter, schClassFilter, searchTerm]);
 
+  // Robust CSV Line Splitter (Handles quotes and delimiters inside quotes)
+  const parseCSVLine = (line: string, delimiter: string) => {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === delimiter && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result.map(v => v.replace(/^"|"$/g, '').trim());
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -92,15 +112,13 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
       if (lines.length < 2) return;
 
       const firstLine = lines[0];
-      // Improved delimiter detection
       const commaCount = (firstLine.match(/,/g) || []).length;
       const semicolonCount = (firstLine.match(/;/g) || []).length;
       const delimiter = semicolonCount > commaCount ? ';' : ',';
 
-      const rawHeaders = firstLine.split(delimiter).map(h => h.replace(/["\r\n]/g, '').trim());
+      const rawHeaders = parseCSVLine(firstLine, delimiter);
       const headersMap: Record<string, number> = {};
       
-      // Strict header cleaning: uppercase and remove all non-alphanumeric
       rawHeaders.forEach((h, i) => {
         const cleanHeader = h.toUpperCase().replace(/[^A-Z0-9]/g, '');
         headersMap[cleanHeader] = i;
@@ -111,19 +129,19 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
           const cleanSearchName = name.toUpperCase().replace(/[^A-Z0-9]/g, '');
           const idx = headersMap[cleanSearchName];
           if (idx !== undefined && rowArr[idx] !== undefined) {
-            return rowArr[idx].replace(/^"|"$/g, '').trim();
+            return rowArr[idx];
           }
         }
         return '';
       };
 
       const newData = lines.slice(1).map((line, idx) => {
-        const values = line.split(delimiter);
+        const values = parseCSVLine(line, delimiter);
         
         if (type === 'ORSAM' || type === 'ORKLAS') {
           return {
             id: `org-${Date.now()}-${idx}`,
-            name: getVal(values, ['NAMA', 'NAMALENGKAP', 'SANTRI']),
+            name: getVal(values, ['NAMA', 'NAMALENGKAP', 'NAMASANTRI']),
             nis: getVal(values, ['NIS', 'NISN']),
             position: getVal(values, ['JABATAN', 'POSISI', 'TUGAS']),
             division: getVal(values, ['DIVISI', 'BIDANG', 'BAGIAN']),
@@ -140,7 +158,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             const hUpper = h.toUpperCase();
             if (hUpper.includes('KELAS') && !hUpper.includes('FORMAL') && !hUpper.includes('MADRASAH')) {
               const sessionName = h.replace(/Kelas/i, '').trim();
-              const val = values[i]?.replace(/^"|"$/g, '').trim();
+              const val = values[i];
               if (val) sessionClasses[sessionName] = val;
             }
           });
@@ -170,14 +188,14 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
           return {
             id: `sch-${Date.now()}-${idx}`,
             day: getVal(values, ['HARI']) || 'Senin',
-            time: getVal(values, ['WAKTU', 'JAM', 'JAMPELAJARAN']),
-            subject: getVal(values, ['MAPEL', 'MATAPELAJARAN', 'PELAJARAN']),
-            teacherName: getVal(values, ['GURUUTAMA', 'GURU', 'USTADZ', 'USTADZAH']),
+            time: getVal(values, ['WAKTU', 'JAM', 'JAMPELAJARAN', 'WAKTUKBM']),
+            subject: getVal(values, ['MAPEL', 'MATAPELAJARAN', 'PELAJARAN', 'SUBJECT']),
+            teacherName: getVal(values, ['GURUUTAMA', 'GURU', 'USTADZ', 'USTADZAH', 'PENGAJAR']),
             assistantTeacherName: getVal(values, ['GURUASISTEN', 'ASISTEN', 'ASISTENGURU', 'GURU2']),
-            homeroomTeacherName: getVal(values, ['WALIKELAS', 'WALAS', 'HOMEROOM', 'WALI', 'MUSYRIF', 'MUSYRIFAH']),
-            class: getVal(values, ['UNIT', 'KELAS']),
-            sessionType: getVal(values, ['SESI', 'JENISKEGIATAN', 'KEGIATAN']) || 'Madrasah',
-            level: getVal(values, ['TINGKAT', 'JENJANG', 'UNIT']) || 'MTs',
+            homeroomTeacherName: getVal(values, ['WALIKELAS', 'WALAS', 'HOMEROOM', 'WALI']),
+            class: getVal(values, ['UNIT', 'KELAS', 'CLASS']),
+            sessionType: getVal(values, ['SESI', 'JENISKEGIATAN', 'KEGIATAN', 'SESSION']) || 'Madrasah',
+            level: getVal(values, ['TINGKAT', 'JENJANG', 'UNITLEVEL']) || 'MTs',
             gender: getVal(values, ['GENDER', 'JK', 'PUTRAPUTRI']) || 'Putra'
           };
         }
@@ -194,15 +212,17 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
         return null;
       }).filter(item => {
         if (!item) return false;
-        if (type === 'Peraturan') return !!(item as any).label;
-        if (type === 'Siswa' || type === 'Guru' || type === 'ORSAM' || type === 'ORKLAS') return !!(item as any).name;
-        if (type === 'Jadwal') return !!(item as any).subject;
+        // Validasi minimal data agar baris kosong tidak masuk
+        const obj = item as any;
+        if (type === 'Siswa') return !!obj.name;
+        if (type === 'Jadwal') return !!obj.subject || !!obj.teacherName;
+        if (type === 'Guru') return !!obj.name;
         return true;
       });
 
-      if (confirm(`Sinkronisasi ${newData.length} baris data ${type}?`)) {
+      if (confirm(`Impor ${newData.length} baris data ${type}?`)) {
         onUpdateData(type, newData);
-        alert("Sinkronisasi Berhasil! Data telah diperbarui.");
+        alert("Sinkronisasi Berhasil!");
       }
     };
     reader.readAsText(file);
@@ -210,12 +230,13 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
 
   const downloadTemplate = (type: string) => {
     let content = "";
-    if (type === 'Siswa') content = "NIS,Nama,Gender,Tingkat,Kelas Madrasah (Formal),Kelas Al-Quran,Kelas Kitab Kuning\n2024001,Ahmad Fauzi,Putra,MTs,7A,Yanbu'a 3,Safinatun Najah";
-    else if (type === 'Guru') content = "Nama,No HP,Email,Mapel Utama\nUstadz Zulkifli,0812345678,zulkifli@gmail.com,Nahwu Shorof";
+    if (type === 'Siswa') content = "NIS,Nama,Gender,Tingkat,Kelas Madrasah (Formal),Kelas Al-Quran,Kelas Kitab Kuning\n2024001,Ahmad Santri,Putra,MTs,7A,Yanbu'a 3,Safinatun Najah";
+    else if (type === 'Guru') content = "Nama,No HP,Email,Mapel Utama\nUstadz Zulkifli,081234,zulkifli@gmail.com,Nahwu Shorof";
     else if (type === 'Jadwal') {
       content = "Hari,Waktu,Mapel,Guru Utama,Guru Asisten,Wali Kelas,Unit,Sesi,Tingkat,Gender\n";
-      content += "Senin,07:30 - 09:00,Nahwu,Ustadz A,Ustadz B,Ustadz E,7A,Madrasah,MTs,Putra\n";
-      content += "Senin,07:30 - 09:00,Shorof,Ustadz B,,Ustadz C,7B,Madrasah,MTs,Putra";
+      content += "Senin,07:30 - 09:00,Nahwu,Guru A,Guru B,Guru E,7A,Madrasah,MTs,Putra\n";
+      content += "Senin,07:30 - 09:00,Shorof,Guru B,,Guru C,7B,Madrasah,MTs,Putra\n";
+      content += "Senin,13:00 - 14:30,Alfiyah J2,Guru X,Guru D,Guru E,10A,Hadis,MA,Putra";
     }
     else if (type === 'ORSAM' || type === 'ORKLAS') content = "Nama,NIS,Jabatan,Divisi,Kelas,Gender,Tingkat\nZaid Al-Khair,2024002,Ketua,Pusat,10-IPA,Putra,MA";
     else if (type === 'Peraturan') content = "Deskripsi Peraturan,Poin,Kategori,Tipe\nTerlambat Masuk Kelas,10,Kedisiplinan,Pelanggaran\nMenjuarai Lomba Pidato,50,Akademik,Prestasi";
