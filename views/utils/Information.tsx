@@ -9,6 +9,7 @@ import {
 import { ExtraDataList } from '../../services/dataService.ts';
 import { downloadCSV } from './csvExport.ts';
 import { isTeacherMatch } from './nameMatchers.ts';
+import * as XLSX from 'xlsx';
 
 interface InformationProps {
   role: UserRole;
@@ -35,23 +36,20 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
   const [studentSessionFilter, setStudentSessionFilter] = useState<string>('Madrasah');
   const [rulesTab, setRulesTab] = useState<'pelanggaran' | 'prestasi'>('pelanggaran');
   
-  // States for ORSAM/ORKLAS Filters
   const [orgGenderFilter, setOrgGenderFilter] = useState<'Semua' | 'Putra' | 'Putri'>('Semua');
   const [orgLevelFilter, setOrgLevelFilter] = useState<'Semua' | 'MTs' | 'MA'>('Semua');
   const [orgClassFilter, setOrgClassFilter] = useState('Semua');
 
-  // States for Schedule Filters
   const [schDayFilter, setSchDayFilter] = useState('Semua');
   const [schSessionFilter, setSchSessionFilter] = useState('Semua');
   const [schClassFilter, setSchClassFilter] = useState('Semua');
 
   const isSuperAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com';
-  
   const isGenderRestricted = role === UserRole.SANTRI_OFFICER_PUTRA || role === UserRole.SANTRI_OFFICER_PUTRI;
   const targetGender = role === UserRole.SANTRI_OFFICER_PUTRA ? 'Putra' : 'Putri';
 
   const dynamicSessions = useMemo(() => {
-    const sessSet = new Set<string>(['Madrasah']);
+    const sessSet = new Set<string>(['Madrasah', 'Hadis-Aswaja', 'Kitab Kuning', 'Al-Quran']);
     data.students.forEach(s => {
       if (s.sessionClasses) {
         Object.keys(s.sessionClasses).forEach(key => sessSet.add(key));
@@ -65,7 +63,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     data.students.forEach(s => {
       if (s.formalClass) cls.add(s.formalClass);
     });
-    return Array.from(cls).sort();
+    return Array.from(cls).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [data.students]);
 
   const filteredSchedules = useMemo(() => {
@@ -80,82 +78,55 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     });
   }, [data.schedules, schDayFilter, schSessionFilter, schClassFilter, searchTerm]);
 
-  // Robust CSV Line Splitter (Handles quotes, nested commas, and empty fields correctly)
-  const parseCSVLine = (line: string, delimiter: string) => {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') { // Handle escaped quotes ""
-          current += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (char === delimiter && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    result.push(current.trim());
-    return result.map(v => v.replace(/^"|"$/g, '').trim());
-  };
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      let text = event.target?.result as string;
-      text = text.replace(/^\uFEFF/, ''); // Remove BOM
-      
-      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
-      if (lines.length < 2) return;
+      const bstr = event.target?.result;
+      const workbook = XLSX.read(bstr, { type: 'binary' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-      const firstLine = lines[0];
-      const commaCount = (firstLine.match(/,/g) || []).length;
-      const semicolonCount = (firstLine.match(/;/g) || []).length;
-      const delimiter = semicolonCount > commaCount ? ';' : ',';
+      if (jsonData.length < 2) {
+        alert("File kosong atau tidak memiliki baris data.");
+        return;
+      }
 
-      const rawHeaders = parseCSVLine(firstLine, delimiter);
+      const rawHeaders = (jsonData[0] as any[]).map(h => String(h || '').trim());
       const headersMap: Record<string, number> = {};
       
-      // Strict header normalization
       rawHeaders.forEach((h, i) => {
         const cleanHeader = h.toUpperCase().replace(/[^A-Z0-9]/g, '');
         headersMap[cleanHeader] = i;
       });
 
-      const getVal = (rowArr: string[], possibleNames: string[]) => {
+      const getVal = (rowArr: any[], possibleNames: string[]) => {
         for (const name of possibleNames) {
           const cleanSearchName = name.toUpperCase().replace(/[^A-Z0-9]/g, '');
           const idx = headersMap[cleanSearchName];
           if (idx !== undefined && rowArr[idx] !== undefined) {
-            return rowArr[idx];
+            return String(rowArr[idx]).trim();
           }
         }
         return '';
       };
 
-      const newData = lines.slice(1).map((line, idx) => {
-        const values = parseCSVLine(line, delimiter);
-        if (values.length === 0 || (values.length === 1 && values[0] === "")) return null;
+      const newData = jsonData.slice(1).map((row: any, idx) => {
+        if (!row || row.length === 0) return null;
 
         if (type === 'ORSAM' || type === 'ORKLAS') {
           return {
             id: `org-${Date.now()}-${idx}`,
-            name: getVal(values, ['NAMA', 'NAMALENGKAP', 'NAMASANTRI', 'SANTRI']),
-            nis: getVal(values, ['NIS', 'NISN']),
-            position: getVal(values, ['JABATAN', 'POSISI', 'TUGAS']),
-            division: getVal(values, ['DIVISI', 'BIDANG', 'BAGIAN']),
-            class: getVal(values, ['KELAS', 'UNIT']),
-            gender: getVal(values, ['GENDER', 'JK', 'JENISKELAMIN']) || 'Putra',
-            level: getVal(values, ['TINGKAT', 'JENJANG', 'UNIT']) || 'MTs',
+            name: getVal(row, ['NAMA', 'NAMALENGKAP', 'NAMASANTRI', 'SANTRI']),
+            nis: getVal(row, ['NIS', 'NISN']),
+            position: getVal(row, ['JABATAN', 'POSISI', 'TUGAS']),
+            division: getVal(row, ['DIVISI', 'BIDANG', 'BAGIAN']),
+            class: getVal(row, ['KELAS', 'UNIT']),
+            gender: getVal(row, ['GENDER', 'JK', 'JENISKELAMIN']) || 'Putra',
+            level: getVal(row, ['TINGKAT', 'JENJANG', 'UNIT']) || 'MTs',
             orgType: type
           };
         }
@@ -166,17 +137,17 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             const hUpper = h.toUpperCase();
             if (hUpper.includes('KELAS') && !hUpper.includes('FORMAL') && !hUpper.includes('MADRASAH')) {
               const sessionName = h.replace(/Kelas/i, '').trim();
-              const val = values[i];
+              const val = String(row[i] || '').trim();
               if (val) sessionClasses[sessionName] = val;
             }
           });
           return {
             id: `std-${Date.now()}-${idx}`,
-            nis: getVal(values, ['NIS', 'NISN', 'NOMORINDUK']),
-            name: getVal(values, ['NAMA', 'NAMALENGKAP', 'NAMASANTRI']),
-            gender: getVal(values, ['GENDER', 'JENISKELAMIN', 'JK']) || 'Putra',
-            level: getVal(values, ['TINGKAT', 'JENJANG', 'UNIT']) || 'MTs',
-            formalClass: getVal(values, ['KELASMADRASAHFORMAL', 'KELASFORMAL', 'KELASMADRASAH', 'KELAS', 'UNIT']),
+            nis: getVal(row, ['NIS', 'NISN', 'NOMORINDUK']),
+            name: getVal(row, ['NAMA', 'NAMALENGKAP', 'NAMASANTRI']),
+            gender: getVal(row, ['GENDER', 'JENISKELAMIN', 'JK']) || 'Putra',
+            level: getVal(row, ['TINGKAT', 'JENJANG', 'UNIT']) || 'MTs',
+            formalClass: getVal(row, ['KELASMADRASAHFORMAL', 'KELASFORMAL', 'KELASMADRASAH', 'KELAS', 'UNIT']),
             sessionClasses
           };
         }
@@ -184,121 +155,111 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
         if (type === 'Guru') {
            return {
              id: `t-${Date.now()}-${idx}`,
-             name: getVal(values, ['NAMA', 'NAMAGURU', 'USTADZ', 'USTADZAH', 'GURU']),
-             subject: getVal(values, ['MAPEL', 'MATAPELAJARAN', 'MAPELUTAMA', 'PELAJARAN']),
-             phone: getVal(values, ['NOHP', 'WHATSAPP', 'TELEPON', 'WA']),
-             email: getVal(values, ['EMAIL', 'SUREL']),
+             name: getVal(row, ['NAMA', 'NAMAGURU', 'USTADZ', 'USTADZAH', 'GURU']),
+             subject: getVal(row, ['MAPEL', 'MATAPELAJARAN', 'MAPELUTAMA', 'PELAJARAN']),
+             phone: getVal(row, ['NOHP', 'WHATSAPP', 'TELEPON', 'WA']),
+             email: getVal(row, ['EMAIL', 'SUREL']),
              teachingClasses: []
            };
         }
 
         if (type === 'Jadwal') {
-          const subject = getVal(values, ['MAPEL', 'MATAPELAJARAN', 'PELAJARAN', 'SUBJECT']);
-          const teacher = getVal(values, ['GURUUTAMA', 'GURU', 'USTADZ', 'USTADZAH', 'PENGAJAR']);
-          
           return {
             id: `sch-${Date.now()}-${idx}`,
-            day: getVal(values, ['HARI', 'DAY']) || 'Senin',
-            time: getVal(values, ['WAKTU', 'JAM', 'JAMPELAJARAN', 'WAKTUKBM', 'TIME']),
-            subject: subject,
-            teacherName: teacher,
-            assistantTeacherName: getVal(values, ['GURUASISTEN', 'ASISTEN', 'ASISTENGURU', 'GURU2', 'ASSISTANT']),
-            homeroomTeacherName: getVal(values, ['WALIKELAS', 'WALAS', 'HOMEROOM', 'WALI']),
-            class: getVal(values, ['UNIT', 'KELAS', 'CLASS', 'ROOM']),
-            sessionType: getVal(values, ['SESI', 'JENISKEGIATAN', 'KEGIATAN', 'SESSION']) || 'Madrasah',
-            level: getVal(values, ['TINGKAT', 'JENJANG', 'UNITLEVEL', 'LEVEL']) || 'MTs',
-            gender: getVal(values, ['GENDER', 'JK', 'PUTRAPUTRI', 'SEX']) || 'Putra'
+            day: getVal(row, ['HARI', 'DAY']) || 'Senin',
+            time: getVal(row, ['WAKTU', 'JAM', 'JAMPELAJARAN', 'WAKTUKBM', 'TIME']),
+            subject: getVal(row, ['MAPEL', 'MATAPELAJARAN', 'PELAJARAN', 'SUBJECT']),
+            teacherName: getVal(row, ['GURUUTAMA', 'GURU', 'USTADZ', 'USTADZAH', 'PENGAJAR']),
+            assistantTeacherName: getVal(row, ['GURUASISTEN', 'ASISTEN', 'ASISTENGURU', 'GURU2', 'ASSISTANT']),
+            homeroomTeacherName: getVal(row, ['WALIKELAS', 'WALAS', 'HOMEROOM', 'WALI']),
+            class: getVal(row, ['UNIT', 'KELAS', 'CLASS', 'ROOM']),
+            sessionType: getVal(row, ['SESI', 'JENISKEGIATAN', 'KEGIATAN', 'SESSION']) || 'Madrasah',
+            level: getVal(row, ['TINGKAT', 'JENJANG', 'UNITLEVEL', 'LEVEL']) || 'MTs',
+            gender: getVal(row, ['GENDER', 'JK', 'PUTRAPUTRI', 'SEX']) || 'Putra'
           };
         }
 
         if (type === 'Peraturan') {
           return {
-            label: getVal(values, ['DESKRIPSI', 'LABEL', 'PERATURAN', 'NAMA', 'RULE']),
-            points: Number(getVal(values, ['POIN', 'POINT', 'SKOR', 'NILAI'])) || 0,
-            category: getVal(values, ['KATEGORI', 'BIDANG', 'JENIS', 'CATEGORY']) as ViolationCategory,
-            type: getVal(values, ['TIPE', 'JENISLAPORAN', 'TYPE']) || 'Pelanggaran'
+            label: getVal(row, ['DESKRIPSI', 'LABEL', 'PERATURAN', 'NAMA', 'RULE']),
+            points: Number(getVal(row, ['POIN', 'POINT', 'SKOR', 'NILAI'])) || 0,
+            category: getVal(row, ['KATEGORI', 'BIDANG', 'JENIS', 'CATEGORY']) as ViolationCategory,
+            type: getVal(row, ['TIPE', 'JENISLAPORAN', 'TYPE']) || 'Pelanggaran'
           };
         }
-
         return null;
       }).filter(item => {
         if (!item) return false;
         const obj = item as any;
-        // Filter row dropping only if absolutely essential fields are missing
         if (type === 'Siswa') return !!obj.name;
-        if (type === 'Jadwal') return !!obj.subject || !!obj.teacherName;
         if (type === 'Guru') return !!obj.name;
+        if (type === 'Jadwal') return !!obj.subject && !!obj.teacherName;
         return true;
       });
 
-      if (confirm(`Sinkronisasi ${newData.length} baris data ${type} ke sistem?`)) {
+      if (confirm(`Berhasil membaca ${newData.length} baris data ${type}. Sinkronisasi ke sistem?`)) {
         onUpdateData(type, newData);
-        alert("Data berhasil diproses! Silakan cek kembali di tabel.");
+        alert("Sinkronisasi Berhasil!");
       }
     };
-    reader.readAsText(file);
+    reader.readAsBinaryString(file);
   };
 
   const downloadTemplate = (type: string) => {
-    let content = "";
-    if (type === 'Siswa') content = "NIS,Nama,Gender,Tingkat,Kelas Madrasah (Formal),Kelas Al-Quran,Kelas Kitab Kuning\n2024001,Ahmad Santri,Putra,MTs,7A,Yanbu'a 3,Safinatun Najah";
-    else if (type === 'Guru') content = "Nama,No HP,Email,Mapel Utama\nUstadz Zulkifli,081234,zulkifli@gmail.com,Nahwu Shorof";
-    else if (type === 'Jadwal') {
-      content = "Hari,Waktu,Mapel,Guru Utama,Guru Asisten,Wali Kelas,Unit,Sesi,Tingkat,Gender\n";
-      content += "Senin,07:30 - 09:00,Nahwu,Ustadz A,Ustadz B,Ustadz E,7A,Madrasah,MTs,Putra\n";
-      content += "Senin,07:30 - 09:00,Shorof,Ustadz B,,Ustadz C,7B,Madrasah,MTs,Putra\n";
-      content += "Senin,13:00 - 14:30,Alfiyah J2,Ustadz X,Ustadz D,Ustadz E,10A,Hadis-Aswaja,MA,Putra";
+    let headers = [];
+    let example = [];
+
+    if (type === 'Siswa') {
+      headers = ["NIS", "Nama", "Gender", "Tingkat", "Unit Formal", "Kelas Al-Quran", "Kelas Kitab Kuning"];
+      example = ["2024001", "Ahmad Santri", "Putra", "MTs", "7A", "Yanbu'a 1", "Safinah"];
+    } else if (type === 'Guru') {
+      headers = ["Nama", "No HP", "Email", "Mapel Utama"];
+      example = ["Ustadz Ahmad", "081234567", "ahmad@gmail.com", "Nahwu"];
+    } else if (type === 'Jadwal') {
+      headers = ["Hari", "Waktu", "Mapel", "Guru Utama", "Guru Asisten", "Wali Kelas", "Unit", "Sesi", "Tingkat", "Gender"];
+      example = ["Senin", "07:30 - 09:00", "Fiqih", "Guru A", "Guru B", "Guru C", "7A", "Madrasah", "MTs", "Putra"];
+    } else if (type === 'ORSAM' || type === 'ORKLAS') {
+      headers = ["Nama", "NIS", "Jabatan", "Divisi", "Kelas", "Gender", "Tingkat"];
+      example = ["Zaid", "2024002", "Ketua", "Kebersihan", "10A", "Putra", "MA"];
+    } else {
+      headers = ["Deskripsi", "Poin", "Kategori", "Tipe"];
+      example = ["Terlambat", "10", "Kedisiplinan", "Pelanggaran"];
     }
-    else if (type === 'ORSAM' || type === 'ORKLAS') content = "Nama,NIS,Jabatan,Divisi,Kelas,Gender,Tingkat\nZaid Al-Khair,2024002,Ketua,Pusat,10-IPA,Putra,MA";
-    else if (type === 'Peraturan') content = "Deskripsi Peraturan,Poin,Kategori,Tipe\nTerlambat Masuk Kelas,10,Kedisiplinan,Pelanggaran\nMenjuarai Lomba Pidato,50,Akademik,Prestasi";
-    
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Template_${type}_Mahasina.csv`;
-    a.click();
+
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, example]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+    XLSX.writeFile(workbook, `Template_Impor_${type}_Mahasina.xlsx`);
   };
 
   const handleExportCurrentView = () => {
     if (!selectedCategory) return;
     let exportData: any[] = [];
-    let filename = `Data_${selectedCategory}_Export`;
-
     if (selectedCategory === 'ORSAM' || selectedCategory === 'ORKLAS') {
       exportData = selectedCategory === 'ORSAM' ? data.orsam : data.orklas;
     } else if (selectedCategory === 'Siswa') {
       exportData = data.students.map(s => ({
-        NIS: s.nis,
-        Nama: s.name,
-        Gender: s.gender,
-        Tingkat: s.level,
-        "Unit Formal": s.formalClass,
+        NIS: s.nis, Nama: s.name, Gender: s.gender, Tingkat: s.level, "Unit Formal": s.formalClass,
         [`Sesi ${studentSessionFilter}`]: studentSessionFilter === 'Madrasah' ? s.formalClass : s.sessionClasses?.[studentSessionFilter] || '-'
       }));
     } else if (selectedCategory === 'Guru') {
       exportData = data.teachers.map(t => {
         const assignments = data.schedules.filter(s => isTeacherMatch(t.name, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName));
-        const walas = assignments.filter(s => s.homeroomTeacherName === t.name).map(s => s.class);
-        const musyrif = assignments.filter(s => s.assistantTeacherName === t.name).map(s => s.class);
         return {
-          "Nama Guru": t.name,
-          "No HP": t.phone,
-          "Email": t.email,
-          "Mapel Utama": t.subject,
-          "Wali Kelas": Array.from(new Set(walas)).join(', ') || '-',
-          "Musyrif/ah": Array.from(new Set(musyrif)).join(', ') || '-'
+          "Nama Guru": t.name, "No HP": t.phone, "Email": t.email, "Mapel Utama": t.subject,
+          "Wali Kelas": Array.from(new Set(assignments.filter(s => s.homeroomTeacherName === t.name).map(s => s.class))).join(', ') || '-',
+          "Musyrif/ah": Array.from(new Set(assignments.filter(s => s.assistantTeacherName === t.name).map(s => s.class))).join(', ') || '-'
         };
       });
     } else if (selectedCategory === 'Jadwal') {
       exportData = filteredSchedules;
     }
 
-    if (exportData.length === 0) {
-      alert("Tidak ada data untuk diekspor.");
-      return;
-    }
-    downloadCSV(exportData, filename);
+    if (exportData.length === 0) { alert("Tidak ada data."); return; }
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+    XLSX.writeFile(workbook, `Export_${selectedCategory}_Mahasina.xlsx`);
   };
 
   return (
@@ -329,21 +290,21 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                  <button onClick={() => {setSelectedCategory(null); setSearchTerm('');}} className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-50 hover:text-emerald-600 transition-all"><ArrowLeft size={24}/></button>
                  <div>
                     <h2 className="text-2xl font-black uppercase tracking-tight">{selectedCategory}</h2>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Master Data Terpusat</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Sistem Impor Excel Akurat</p>
                  </div>
               </div>
               <div className="flex flex-wrap gap-3 w-full md:w-auto">
                  <button onClick={handleExportCurrentView} className="px-6 py-4 bg-blue-50 text-blue-700 border border-blue-100 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-100 transition-all shadow-sm">
-                    <FileDown size={16}/> Ekspor Data
+                    <FileDown size={16}/> Ekspor Excel
                  </button>
                  {isSuperAdmin && (
                    <>
                      <button onClick={() => downloadTemplate(selectedCategory)} className="px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2">
-                        <Download size={16}/> Template
+                        <Download size={16}/> Template Excel
                      </button>
                      <label className="px-6 py-4 bg-emerald-950 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 cursor-pointer shadow-lg">
-                        <Upload size={16}/> Impor CSV
-                        <input type="file" accept=".csv" className="hidden" onChange={(e) => handleFileUpload(e, selectedCategory)} />
+                        <Upload size={16}/> Impor Excel/CSV
+                        <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleFileUpload(e, selectedCategory)} />
                      </label>
                    </>
                  )}
@@ -408,7 +369,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                               </td>
                               <td className="py-6">
                                 <div className="space-y-1">
-                                   {/* Fix: Added missing User icon import */}
                                    {sch.assistantTeacherName && <p className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-1"><User size={10} className="text-slate-300"/> AS: {sch.assistantTeacherName}</p>}
                                    {sch.homeroomTeacherName && <p className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-1"><GraduationCap size={10} className="text-blue-300"/> WL: {sch.homeroomTeacherName}</p>}
                                    {!sch.assistantTeacherName && !sch.homeroomTeacherName && <p className="text-[10px] text-slate-300">-</p>}
@@ -428,7 +388,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                       </tbody>
                    </table>
                    {filteredSchedules.length === 0 && (
-                     <div className="py-20 text-center text-slate-300 font-black uppercase italic tracking-widest text-[10px]">Tidak ada jadwal yang sesuai filter</div>
+                     <div className="py-20 text-center text-slate-300 font-black uppercase italic tracking-widest text-[10px]">Data tidak tersedia atau filter belum sesuai</div>
                    )}
                 </div>
              </div>
@@ -448,11 +408,9 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                    <tbody className="divide-y divide-slate-50">
                       {data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).map((item, idx) => {
                         const assignments = data.schedules.filter(s => isTeacherMatch(item.name, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName));
-                        
                         const teachingDetails = Array.from(new Set(assignments.filter(s => s.teacherName === item.name).map(a => `${a.subject} (${a.class})`))).join(' • ');
                         const walasClasses = Array.from(new Set(assignments.filter(s => s.homeroomTeacherName === item.name).map(a => a.class)));
                         const musyrifClasses = Array.from(new Set(assignments.filter(s => s.assistantTeacherName === item.name).map(a => a.class)));
-                        
                         return (
                           <tr key={idx} className="hover:bg-slate-50 transition-all">
                              <td className="py-6">
@@ -472,28 +430,18 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                              </td>
                              <td className="py-6">
                                 <div className="space-y-1">
-                                   {walasClasses.length > 0 && (
-                                     <div className="flex items-center gap-2">
-                                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[8px] font-black uppercase">Walas: {walasClasses.join(', ')}</span>
-                                     </div>
-                                   )}
-                                   {musyrifClasses.length > 0 && (
-                                     <div className="flex items-center gap-2">
-                                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[8px] font-black uppercase">Musyrif/ah: {musyrifClasses.join(', ')}</span>
-                                     </div>
-                                   )}
+                                   {walasClasses.length > 0 && <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[8px] font-black uppercase block w-fit">Walas: {walasClasses.join(', ')}</span>}
+                                   {musyrifClasses.length > 0 && <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[8px] font-black uppercase block w-fit">Musyrif/ah: {musyrifClasses.join(', ')}</span>}
                                    {walasClasses.length === 0 && musyrifClasses.length === 0 && <span className="text-[8px] font-black text-slate-300 uppercase italic">Tidak Ada Tugas Khusus</span>}
                                 </div>
                              </td>
                              <td className="py-6">
                                 <div className="space-y-1">
-                                   <div className="flex items-center gap-2 text-slate-400 hover:text-emerald-600 cursor-pointer">
-                                      <Phone size={12}/>
-                                      <p className="text-[9px] font-black uppercase">{item.phone || '-'}</p>
+                                   <div className="flex items-center gap-2 text-slate-400">
+                                      <Phone size={12}/><p className="text-[9px] font-black uppercase">{item.phone || '-'}</p>
                                    </div>
                                    <div className="flex items-center gap-2 text-slate-400">
-                                      <Mail size={12}/>
-                                      <p className="text-[9px] font-bold lowercase truncate max-w-[120px]">{item.email || '-'}</p>
+                                      <Mail size={12}/><p className="text-[9px] font-bold lowercase truncate max-w-[120px]">{item.email || '-'}</p>
                                    </div>
                                 </div>
                              </td>
@@ -556,102 +504,12 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
              </div>
            )}
 
-           {selectedCategory === 'ORSAM' || selectedCategory === 'ORKLAS' && (
-             <div className="bg-white p-10 rounded-[4rem] border shadow-sm space-y-10">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                   <div className="space-y-1">
-                      <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Gender</label>
-                      <select disabled={isGenderRestricted} value={isGenderRestricted ? targetGender : orgGenderFilter} onChange={e => setOrgGenderFilter(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner disabled:opacity-50">
-                         <option value="Semua">Semua</option>
-                         <option value="Putra">Putra</option>
-                         <option value="Putri">Putri</option>
-                      </select>
-                   </div>
-                   {selectedCategory === 'ORKLAS' && (
-                     <>
-                       <div className="space-y-1">
-                          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Tingkatan</label>
-                          <select value={orgLevelFilter} onChange={e => setOrgLevelFilter(e.target.value as any)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner">
-                             <option value="Semua">Semua</option>
-                             <option value="MTs">MTs</option>
-                             <option value="MA">MA</option>
-                          </select>
-                       </div>
-                       <div className="space-y-1">
-                          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Unit Kelas</label>
-                          <select value={orgClassFilter} onChange={e => setOrgClassFilter(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner">
-                             <option value="Semua">Semua Kelas</option>
-                             {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                       </div>
-                     </>
-                   )}
-                   <div className="space-y-1 col-span-2 md:col-span-1">
-                      <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Cari Pengurus</label>
-                      <div className="relative">
-                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14}/>
-                         <input type="text" placeholder="Ketik nama..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-xl text-[10px] font-bold outline-none shadow-inner" />
-                      </div>
-                   </div>
-                </div>
-                <div className="overflow-x-auto no-scrollbar">
-                   <table className="w-full text-left">
-                      <thead>
-                         <tr className="border-b-2 border-slate-50">
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Pengurus</th>
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Jabatan</th>
-                            <th className="pb-6 text-[10px] font-black uppercase text-slate-400">Bidang / Kelas</th>
-                            <th className="pb-6 text-center text-[10px] font-black uppercase text-slate-400">Gender</th>
-                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                         { (selectedCategory === 'ORSAM' ? data.orsam : data.orklas).filter(item => {
-                             const matchSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-                             const matchGender = (isGenderRestricted ? item.gender === targetGender : (orgGenderFilter === 'Semua' || item.gender === orgGenderFilter));
-                             const matchLvl = orgLevelFilter === 'Semua' || item.level === orgLevelFilter;
-                             const matchCls = orgClassFilter === 'Semua' || item.class === orgClassFilter;
-                             return matchSearch && matchGender && (selectedCategory === 'ORSAM' ? true : matchLvl && matchCls);
-                         }).map((item, idx) => (
-                           <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                             <td className="py-6">
-                                 <p className="text-sm font-black uppercase text-slate-800">{item.name}</p>
-                                 <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{item.nis}</p>
-                             </td>
-                             <td className="py-6">
-                                 <span className="px-3 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-[10px] font-black uppercase">{item.position}</span>
-                             </td>
-                             <td className="py-6">
-                                 <p className="text-[11px] font-black text-slate-700 uppercase">{item.division || item.class}</p>
-                                 {selectedCategory === 'ORKLAS' && <p className="text-[8px] font-bold text-slate-400 uppercase">{item.level}</p>}
-                             </td>
-                             <td className="py-6 text-center">
-                                 <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${item.gender === 'Putra' ? 'bg-blue-50 text-blue-600' : 'bg-pink-50 text-pink-600'}`}>{item.gender}</span>
-                             </td>
-                           </tr>
-                         ))}
-                      </tbody>
-                   </table>
-                </div>
-             </div>
-           )}
-
            {selectedCategory === 'Peraturan' && (
               <div className="space-y-6">
                  <div className="flex bg-slate-100 p-1.5 rounded-[2rem] w-fit shadow-inner">
-                    <button 
-                      onClick={() => setRulesTab('pelanggaran')} 
-                      className={`px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase transition-all ${rulesTab === 'pelanggaran' ? 'bg-white text-emerald-950 shadow-lg scale-105' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                      Pelanggaran
-                    </button>
-                    <button 
-                      onClick={() => setRulesTab('prestasi')} 
-                      className={`px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase transition-all ${rulesTab === 'prestasi' ? 'bg-white text-emerald-950 shadow-lg scale-105' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                      Prestasi
-                    </button>
+                    <button onClick={() => setRulesTab('pelanggaran')} className={`px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase transition-all ${rulesTab === 'pelanggaran' ? 'bg-white text-emerald-950 shadow-lg scale-105' : 'text-slate-400 hover:text-slate-600'}`}>Pelanggaran</button>
+                    <button onClick={() => setRulesTab('prestasi')} className={`px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase transition-all ${rulesTab === 'prestasi' ? 'bg-white text-emerald-950 shadow-lg scale-105' : 'text-slate-400 hover:text-slate-600'}`}>Prestasi</button>
                  </div>
-
                  <div className="bg-white p-10 rounded-[4rem] border shadow-sm overflow-x-auto no-scrollbar">
                     <table className="w-full text-left">
                        <thead>
@@ -664,17 +522,9 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                        <tbody className="divide-y divide-slate-50">
                           {(rulesTab === 'pelanggaran' ? data.violationTemplates : data.achievementTemplates).map((item, idx) => (
                             <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                               <td className="py-6">
-                                  <p className="text-sm font-black uppercase text-slate-800 leading-tight">{item.label}</p>
-                               </td>
-                               <td className="py-6">
-                                  <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">{item.category}</span>
-                               </td>
-                               <td className="py-6 text-right">
-                                  <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${rulesTab === 'pelanggaran' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                                    {item.points} PT
-                                  </span>
-                               </td>
+                               <td className="py-6"><p className="text-sm font-black uppercase text-slate-800 leading-tight">{item.label}</p></td>
+                               <td className="py-6"><span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">{item.category}</span></td>
+                               <td className="py-6 text-right"><span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${rulesTab === 'pelanggaran' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{item.points} PT</span></td>
                             </tr>
                           ))}
                        </tbody>
