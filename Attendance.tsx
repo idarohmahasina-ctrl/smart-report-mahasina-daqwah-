@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { AttendanceStatus, Student, UserRole, Schedule, AppData } from './types.ts';
 import { UserCheck, CheckCircle, Search, Save, X, Edit3, PlusCircle, Calendar, UserPlus, Ban, Users } from 'lucide-react';
-import { isTeacherMatch, normalizeSessionName } from './views/utils/nameMatchers.ts';
+import { isTeacherMatch, normalizeSessionName, normalizeClassName } from './views/utils/nameMatchers.ts';
 
 const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSave: any, userEmail?: string }> = (data) => {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
@@ -13,7 +13,6 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
   const students = data.students || [];
   const config = data.academicConfig;
 
-  // Cek admin idaroh melalui role ATAU email
   const isIdaroh = data.role === UserRole.IDAROH || data.role === UserRole.PENGASUH || data.userEmail?.toLowerCase().trim() === 'idarohmahasina@gmail.com';
   const isGenderRestricted = !isIdaroh && (data.role === UserRole.SANTRI_OFFICER_PUTRA || data.role === UserRole.SANTRI_OFFICER_PUTRI);
   const targetGender = data.role === UserRole.SANTRI_OFFICER_PUTRA ? 'Putra' : 'Putri';
@@ -27,7 +26,6 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
 
   const mySchedules = useMemo(() => {
     return schedules.filter(s => {
-      // Idaroh memintas semua filter jadwal
       const matchTeacher = isIdaroh || isTeacherMatch(data.currentUser, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName);
       const matchGender = isIdaroh || !isGenderRestricted || s.gender === targetGender;
       return matchTeacher && matchGender;
@@ -36,16 +34,23 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
 
   const targetStudents = useMemo(() => {
     if (!selectedSchedule) return [];
+    const scheduleSess = normalizeSessionName(selectedSchedule.sessionType);
+    const scheduleClsNormalized = normalizeClassName(selectedSchedule.class);
+    
     return students
       .filter(s => {
         const matchGender = isIdaroh || !isGenderRestricted || s.gender === targetGender;
+        let matchClass = false;
         
-        // Perbaikan: Gunakan normalisasi untuk mencocokkan sesi
-        const scheduleSess = normalizeSessionName(selectedSchedule.sessionType);
-        const matchClass = scheduleSess === 'Madrasah' 
-          ? s.formalClass === selectedSchedule.class 
-          : s.sessionClasses?.[scheduleSess] === selectedSchedule.class;
-          
+        if (scheduleSess === 'Madrasah') {
+          matchClass = normalizeClassName(s.formalClass) === scheduleClsNormalized;
+        } else {
+          // Cari di sessionClasses dengan normalisasi
+          matchClass = Object.entries(s.sessionClasses || {}).some(([sessKey, clsVal]) => 
+            // Fix: Cast clsVal to string because Object.entries can infer it as unknown on some environments
+            normalizeSessionName(sessKey) === scheduleSess && normalizeClassName(clsVal as string) === scheduleClsNormalized
+          );
+        }
         return matchGender && matchClass;
       })
       .filter(s => (s.name || "").toLowerCase().includes(searchTerm.toLowerCase()));
@@ -82,17 +87,17 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
   };
 
   return (
-    <div className="space-y-8 animate-in slide-in-from-bottom-6 pb-20">
+    <div className="space-y-8 animate-in slide-in-from-bottom-6 pb-20 px-2 sm:px-4">
       {!selectedSchedule ? (
         <div className="space-y-6">
-          <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
-             <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Pilih Jadwal KBM</h3>
-             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-1">
-               {isIdaroh ? 'Akses Idaroh: Menampilkan Seluruh Jadwal Pesantren' : (isGenderRestricted ? `Hanya Menampilkan Jadwal Santri ${targetGender}` : 'Menampilkan Jadwal Anda')}
+          <div className="bg-white p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-sm">
+             <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Presensi Kelas (KBM)</h3>
+             <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mt-1">
+               {isIdaroh ? 'Mode Admin: Pilih Jadwal manapun untuk mengisi absen' : 'Silakan pilih jadwal mengajar Anda'}
              </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {mySchedules.map(sch => {
               const holiday = isHoliday(sch.class, sch.sessionType);
               return (
@@ -100,58 +105,58 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
                   key={sch.id} 
                   disabled={holiday}
                   onClick={() => setSelectedSchedule(sch)} 
-                  className={`p-8 bg-white border-2 rounded-[3rem] text-left transition-all group relative overflow-hidden ${holiday ? 'opacity-50 border-orange-100 bg-orange-50/30 cursor-not-allowed' : 'border-transparent hover:border-emerald-600 hover:shadow-xl'}`}
+                  className={`p-6 sm:p-8 bg-white border-2 rounded-[2.5rem] text-left transition-all group relative overflow-hidden ${holiday ? 'opacity-50 border-orange-100 bg-orange-50/30 cursor-not-allowed' : 'border-transparent hover:border-emerald-600 hover:shadow-xl'}`}
                 >
-                   <div className="flex items-center justify-between">
-                     <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${holiday ? 'bg-orange-100 text-orange-700' : 'bg-emerald-50 text-emerald-700'}`}>{sch.sessionType}</span>
-                     {isIdaroh && <span className="text-[8px] font-black text-blue-500 uppercase">Idaroh Mode</span>}
+                   <div className="flex items-center justify-between gap-2">
+                     <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase truncate ${holiday ? 'bg-orange-100 text-orange-700' : 'bg-emerald-50 text-emerald-700'}`}>{sch.sessionType}</span>
+                     {isIdaroh && <span className="text-[7px] font-black text-blue-500 uppercase shrink-0">Admin</span>}
                    </div>
-                   <h4 className={`text-lg font-black uppercase mt-4 ${holiday ? 'text-slate-400' : 'text-slate-800'}`}>{sch.subject}</h4>
-                   <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">GURU: {sch.teacherName}</p>
-                   <div className="mt-6 flex justify-between">
-                      <p className={`text-xs font-black ${holiday ? 'text-slate-400' : 'text-slate-700'}`}>Unit: {sch.class}</p>
-                      <p className={`text-xs font-black ${holiday ? 'text-slate-400' : 'text-slate-700'}`}>{sch.time}</p>
+                   <h4 className={`text-base sm:text-lg font-black uppercase mt-4 line-clamp-1 ${holiday ? 'text-slate-400' : 'text-slate-800'}`}>{sch.subject}</h4>
+                   <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 truncate">UST: {sch.teacherName}</p>
+                   <div className="mt-6 flex justify-between items-center">
+                      <p className={`text-[10px] font-black ${holiday ? 'text-slate-400' : 'text-slate-700'}`}>Unit: {sch.class}</p>
+                      <p className={`text-[10px] font-black ${holiday ? 'text-slate-400' : 'text-slate-700'}`}>{sch.time}</p>
                    </div>
                 </button>
               );
             })}
             {mySchedules.length === 0 && (
               <div className="lg:col-span-3 py-20 text-center opacity-30">
-                 <Calendar size={64} className="mx-auto text-slate-300"/>
-                 <p className="mt-4 font-black uppercase text-[12px]">Jadwal Kosong atau Belum Dimuat</p>
+                 <Calendar size={48} className="mx-auto text-slate-300"/>
+                 <p className="mt-4 font-black uppercase text-[10px]">Belum ada jadwal yang sesuai</p>
               </div>
             )}
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-[4rem] border shadow-2xl overflow-hidden max-w-4xl mx-auto">
-           <div className="p-10 bg-[#064e3b] text-white flex justify-between items-center">
-              <div>
-                <h3 className="text-2xl font-black uppercase tracking-tight">{selectedSchedule.subject}</h3>
-                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mt-2">Unit: {selectedSchedule.class} • Sesi: {selectedSchedule.sessionType}</p>
+        <div className="bg-white rounded-[2.5rem] sm:rounded-[4rem] border shadow-2xl overflow-hidden max-w-4xl mx-auto">
+           <div className="p-6 sm:p-10 bg-[#064e3b] text-white flex justify-between items-center">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight truncate">{selectedSchedule.subject}</h3>
+                <p className="text-[8px] sm:text-[10px] font-bold text-emerald-400 uppercase tracking-widest mt-2 truncate">Unit: {selectedSchedule.class} • {selectedSchedule.sessionType}</p>
               </div>
-              <button onClick={() => setSelectedSchedule(null)} className="p-4 bg-white/10 rounded-2xl hover:bg-white/20 transition-all"><X/></button>
+              <button onClick={() => setSelectedSchedule(null)} className="p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-all shrink-0"><X/></button>
            </div>
            
-           <div className="p-6 border-b bg-slate-50 flex items-center gap-4">
-              <Search className="text-slate-400" size={20}/>
-              <input type="text" placeholder="Cari santri di kelas ini..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-transparent outline-none font-bold text-sm" />
+           <div className="p-5 border-b bg-slate-50 flex items-center gap-4">
+              <Search className="text-slate-400 shrink-0" size={18}/>
+              <input type="text" placeholder="Cari nama santri..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-transparent outline-none font-bold text-sm" />
            </div>
 
-           <div className="p-4 sm:p-8 space-y-4 max-h-[60vh] overflow-y-auto no-scrollbar">
+           <div className="p-4 sm:p-8 space-y-3 max-h-[55vh] overflow-y-auto no-scrollbar">
               {targetStudents.map(s => {
                 const curr = tempRecords[s.id] || { status: AttendanceStatus.H, note: '' };
                 return (
-                  <div key={s.id} className="flex flex-col md:flex-row items-center justify-between p-6 bg-white border border-slate-100 rounded-3xl hover:border-emerald-500 transition-all gap-4">
-                     <div className="flex items-center gap-4 flex-1 w-full">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs shadow-inner ${curr.status === AttendanceStatus.H ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>{s.name[0]}</div>
-                        <div className="min-w-0">
-                           <p className="text-sm font-black uppercase truncate">{s.name}</p>
-                           <p className="text-[9px] font-bold text-slate-400 uppercase">{s.nis || '-'}</p>
+                  <div key={s.id} className="flex flex-col md:flex-row items-center justify-between p-4 sm:p-6 bg-white border border-slate-100 rounded-3xl hover:border-emerald-500 transition-all gap-4">
+                     <div className="flex items-center gap-4 flex-1 w-full min-w-0">
+                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center font-black text-xs shrink-0 shadow-inner ${curr.status === AttendanceStatus.H ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>{s.name[0]}</div>
+                        <div className="min-w-0 flex-1">
+                           <p className="text-[12px] sm:text-[14px] font-black uppercase truncate">{s.name}</p>
+                           <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">{s.nis || '-'}</p>
                         </div>
                      </div>
-                     <div className="flex flex-wrap gap-2 items-center w-full md:w-auto">
-                        <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner shrink-0">
+                     <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center w-full md:w-auto">
+                        <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner shrink-0 w-full sm:w-auto justify-between sm:justify-start">
                           {['H', 'S', 'I', 'T', 'A'].map(l => {
                             const status = l === 'H' ? AttendanceStatus.H : l === 'S' ? AttendanceStatus.S : l === 'I' ? AttendanceStatus.I : l === 'T' ? AttendanceStatus.T : AttendanceStatus.A;
                             const isActive = curr.status === status;
@@ -171,7 +176,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
                           placeholder="Ket..." 
                           value={curr.note}
                           onChange={e => setTempRecords({...tempRecords, [s.id]: { ...curr, note: e.target.value }})}
-                          className="flex-1 md:w-32 px-4 py-3 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none focus:border-emerald-500"
+                          className="flex-1 min-w-[80px] px-3 py-3 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none focus:border-emerald-500"
                         />
                      </div>
                   </div>
@@ -179,15 +184,15 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
               })}
               {targetStudents.length === 0 && (
                 <div className="py-20 text-center opacity-20">
-                   <Users size={48} className="mx-auto"/>
-                   <p className="mt-4 font-black uppercase text-[10px]">Santri tidak ditemukan di unit/sesi ini</p>
+                   <Users size={40} className="mx-auto"/>
+                   <p className="mt-4 font-black uppercase text-[9px] tracking-widest">Santri tidak ditemukan di unit ini</p>
                 </div>
               )}
            </div>
 
-           <div className="p-8 border-t bg-slate-50">
-              <button onClick={handleSave} className="w-full py-6 bg-emerald-950 text-white rounded-3xl font-black uppercase text-[12px] shadow-xl hover:bg-emerald-900 active:scale-95 transition-all flex items-center justify-center gap-4">
-                <CheckCircle size={20}/> Simpan Absensi KBM
+           <div className="p-6 sm:p-8 border-t bg-slate-50">
+              <button disabled={targetStudents.length === 0} onClick={handleSave} className="w-full py-5 bg-emerald-950 text-white rounded-2xl sm:rounded-3xl font-black uppercase text-[10px] sm:text-[12px] shadow-xl hover:bg-emerald-900 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30">
+                <CheckCircle size={18}/> Simpan Presensi KBM
               </button>
            </div>
         </div>

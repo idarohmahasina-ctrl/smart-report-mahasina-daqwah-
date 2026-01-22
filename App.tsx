@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Layout from './components/Layout.tsx';
 import Registration from './views/utils/Registration.tsx';
 import Dashboard from './views/Dashboard.tsx';
@@ -15,6 +15,7 @@ import { UserProfile, AppData, UserRole, TeacherAttendance, AcademicConfig, Temp
 import { 
   saveAppData, getActiveSession, subscribeToAppData, setActiveSession 
 } from './services/dataService.ts';
+import { isTeacherMatch } from './views/utils/nameMatchers.ts';
 import { ShieldAlert, UserCheck } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -24,33 +25,18 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (loading) setLoading(false);
-    }, 5000);
-
+    const timer = setTimeout(() => { if (loading) setLoading(false); }, 5000);
     const unsubscribe = subscribeToAppData((data) => {
       if (data) setAppData(data);
       setLoading(false);
     });
-
-    return () => {
-      unsubscribe();
-      clearTimeout(timer);
-    };
+    return () => { unsubscribe(); clearTimeout(timer); };
   }, [loading]);
 
-  const handleLogout = () => {
-    setActiveSession(null);
-    setProfile(null);
-    window.location.reload();
-  };
+  const handleLogout = () => { setActiveSession(null); setProfile(null); window.location.reload(); };
 
   const defaultAcademicConfig: AcademicConfig = { 
-    schoolYear: '2024/2025', 
-    semester: 'II (Genap)', 
-    isHoliday: false, 
-    excludedClasses: {},
-    excludedSessions: {} 
+    schoolYear: '2024/2025', semester: 'II (Genap)', isHoliday: false, excludedClasses: {}, excludedSessions: {} 
   };
 
   const currentAppData: AppData = {
@@ -70,6 +56,28 @@ const App: React.FC = () => {
     academicConfig: appData?.academicConfig || defaultAcademicConfig
   };
 
+  // Deteksi Kelas Binaan (Walas/Musyrif)
+  const myManagedClasses = useMemo(() => {
+    if (!profile) return [];
+    const isAdmin = profile.email.toLowerCase().trim() === 'idarohmahasina@gmail.com';
+    if (isAdmin || profile.role === UserRole.PENGASUH) return [];
+
+    const classes = new Set<string>();
+    // Cari dari jadwal KBM
+    currentAppData.schedules.forEach(s => {
+      if (isTeacherMatch(profile.fullName, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName)) {
+        classes.add(s.class);
+      }
+    });
+    // Cari dari data Walas/Musyrif khusus (extraDataLists)
+    currentAppData.extraDataLists.forEach((e: any) => {
+      if (isTeacherMatch(profile.fullName, e.name)) {
+        classes.add(e.class);
+      }
+    });
+    return Array.from(classes);
+  }, [currentAppData.schedules, currentAppData.extraDataLists, profile]);
+
   if (loading && !appData) return (
     <div className="h-screen bg-[#064e3b] flex flex-col items-center justify-center text-white space-y-6">
       <div className="w-16 h-16 border-4 border-emerald-400 border-t-white rounded-full animate-spin" />
@@ -78,15 +86,6 @@ const App: React.FC = () => {
   );
 
   if (!profile) return <Registration onComplete={(p) => setProfile(p)} />;
-
-  if (profile.isBlocked) return (
-    <div className="h-screen bg-red-950 flex flex-col items-center justify-center text-white p-10 text-center space-y-6">
-       <ShieldAlert size={80} className="text-red-500 animate-bounce" />
-       <h1 className="text-2xl font-black uppercase tracking-tight">Akses Anda Diblokir</h1>
-       <p className="text-sm font-medium opacity-60 max-w-md">Akun Anda telah dinonaktifkan oleh Admin Idaroh Mahasina.</p>
-       <button onClick={handleLogout} className="px-8 py-4 bg-white text-red-950 rounded-2xl font-black text-xs uppercase tracking-widest">Logout</button>
-    </div>
-  );
 
   return (
     <Layout
@@ -164,6 +163,10 @@ const App: React.FC = () => {
          if (type === 'Jadwal') update.schedules = newData;
          if (type === 'ORSAM') update.orsam = newData;
          if (type === 'ORKLAS') update.orklas = newData;
+         if (type === 'Walas' || type === 'Musyrif') {
+           const existing = currentAppData.extraDataLists.filter((e: any) => e.type !== type);
+           update.extraDataLists = [...existing, ...newData];
+         }
          if (type === 'Peraturan') {
             update.violationTemplates = newData.filter((n: any) => n.type === 'Pelanggaran').map(({type, ...rest}) => rest);
             update.achievementTemplates = newData.filter((n: any) => n.type === 'Prestasi').map(({type, ...rest}) => rest);
