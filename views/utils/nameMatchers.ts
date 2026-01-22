@@ -6,6 +6,7 @@ export const normalizeName = (name: string): string => {
     /ustadz/gi, /ustadzah/gi, /bu /gi, /pak /gi, /kyai/gi, /nyai/gi,
     /s\.ag/gi, /lc/gi, /m\.pd/gi, /s\.pd/gi, /m\.ag/gi, /s\.hum/gi, 
     /h\./gi, /hj\./gi, /dr\./gi, /dra\./gi, /drs\./gi, /m\.si/gi,
+    /st\./gi, /s\.h\./gi, /s\.kom/gi, /m\.kom/gi,
     /,/g, /\./g 
   ];
 
@@ -14,20 +15,23 @@ export const normalizeName = (name: string): string => {
     cleanName = cleanName.replace(pattern, "");
   });
 
-  return cleanName.trim();
+  // Hapus spasi ganda dan trim
+  return cleanName.replace(/\s+/g, ' ').trim();
 };
 
 /**
  * Mengecek apakah nama user cocok dengan nama pengajar di jadwal 
- * Mendukung: Guru Utama, Asisten, dan Wali Kelas (Walas)
+ * Menggunakan fuzzy matching: Jika nama yang dinormalisasi terkandung satu sama lain
  */
 export const isTeacherMatch = (userName: string, scheduleTeacher: string, scheduleAssistant?: string, homeroomTeacher?: string): boolean => {
   const normalizedUser = normalizeName(userName);
-  if (normalizedUser.length < 3) return false;
+  if (normalizedUser.length < 2) return false;
 
-  const matchPrimary = normalizeName(scheduleTeacher).includes(normalizedUser) || normalizedUser.includes(normalizeName(scheduleTeacher));
-  const matchAssistant = scheduleAssistant ? (normalizeName(scheduleAssistant).includes(normalizedUser) || normalizedUser.includes(normalizeName(scheduleAssistant))) : false;
-  const matchHomeroom = homeroomTeacher ? (normalizeName(homeroomTeacher).includes(normalizedUser) || normalizedUser.includes(normalizeName(homeroomTeacher))) : false;
+  const check = (target: string | undefined) => {
+    if (!target) return false;
+    const normalizedTarget = normalizeName(target);
+    return normalizedTarget.includes(normalizedUser) || normalizedUser.includes(normalizedTarget);
+  };
 
-  return matchPrimary || matchAssistant || matchHomeroom;
+  return check(scheduleTeacher) || check(scheduleAssistant) || check(homeroomTeacher);
 };

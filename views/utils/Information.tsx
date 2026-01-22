@@ -124,7 +124,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             nis: getVal(row, ['NIS', 'NISN']),
             position: getVal(row, ['JABATAN', 'POSISI', 'TUGAS']),
             division: getVal(row, ['DIVISI', 'BIDANG', 'BAGIAN']),
-            class: getVal(row, ['KELAS', 'UNIT']),
+            class: getVal(row, ['KELAS', 'UNIT', 'RUANG']),
             gender: getVal(row, ['GENDER', 'JK', 'JENISKELAMIN']) || 'Putra',
             level: getVal(row, ['TINGKAT', 'JENJANG', 'UNIT']) || 'MTs',
             orgType: type
@@ -155,9 +155,9 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
         if (type === 'Guru') {
            return {
              id: `t-${Date.now()}-${idx}`,
-             name: getVal(row, ['NAMA', 'NAMAGURU', 'USTADZ', 'USTADZAH', 'GURU']),
-             subject: getVal(row, ['MAPEL', 'MATAPELAJARAN', 'MAPELUTAMA', 'PELAJARAN']),
-             phone: getVal(row, ['NOHP', 'WHATSAPP', 'TELEPON', 'WA']),
+             name: getVal(row, ['NAMA', 'NAMAGURU', 'USTADZ', 'USTADZAH', 'GURU', 'PENGAJAR']),
+             subject: getVal(row, ['MAPEL', 'MATAPELAJARAN', 'MAPELUTAMA', 'PELAJARAN', 'SUBJECT']),
+             phone: getVal(row, ['NOHP', 'WHATSAPP', 'TELEPON', 'WA', 'KONTAK']),
              email: getVal(row, ['EMAIL', 'SUREL']),
              teachingClasses: []
            };
@@ -168,12 +168,12 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
             id: `sch-${Date.now()}-${idx}`,
             day: getVal(row, ['HARI', 'DAY']) || 'Senin',
             time: getVal(row, ['WAKTU', 'JAM', 'JAMPELAJARAN', 'WAKTUKBM', 'TIME']),
-            subject: getVal(row, ['MAPEL', 'MATAPELAJARAN', 'PELAJARAN', 'SUBJECT']),
+            subject: getVal(row, ['MAPEL', 'MATAPELAJARAN', 'PELAJARAN', 'SUBJECT', 'NAMAPELAJARAN']),
             teacherName: getVal(row, ['GURUUTAMA', 'GURU', 'USTADZ', 'USTADZAH', 'PENGAJAR']),
-            assistantTeacherName: getVal(row, ['GURUASISTEN', 'ASISTEN', 'ASISTENGURU', 'GURU2', 'ASSISTANT']),
+            assistantTeacherName: getVal(row, ['GURUASISTEN', 'ASISTEN', 'ASISTENGURU', 'GURU2', 'ASSISTANT', 'MUSYRIF', 'MUSYRIFAH']),
             homeroomTeacherName: getVal(row, ['WALIKELAS', 'WALAS', 'HOMEROOM', 'WALI']),
-            class: getVal(row, ['UNIT', 'KELAS', 'CLASS', 'ROOM']),
-            sessionType: getVal(row, ['SESI', 'JENISKEGIATAN', 'KEGIATAN', 'SESSION']) || 'Madrasah',
+            class: getVal(row, ['UNIT', 'KELAS', 'CLASS', 'ROOM', 'UNITKELAS']),
+            sessionType: getVal(row, ['SESI', 'JENISKEGIATAN', 'KEGIATAN', 'SESSION', 'JENISSESI']) || 'Madrasah',
             level: getVal(row, ['TINGKAT', 'JENJANG', 'UNITLEVEL', 'LEVEL']) || 'MTs',
             gender: getVal(row, ['GENDER', 'JK', 'PUTRAPUTRI', 'SEX']) || 'Putra'
           };
@@ -181,7 +181,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
 
         if (type === 'Peraturan') {
           return {
-            label: getVal(row, ['DESKRIPSI', 'LABEL', 'PERATURAN', 'NAMA', 'RULE']),
+            label: getVal(row, ['DESKRIPSI', 'LABEL', 'PERATURAN', 'NAMA', 'RULE', 'PELANGGARAN', 'PRESTASI']),
             points: Number(getVal(row, ['POIN', 'POINT', 'SKOR', 'NILAI'])) || 0,
             category: getVal(row, ['KATEGORI', 'BIDANG', 'JENIS', 'CATEGORY']) as ViolationCategory,
             type: getVal(row, ['TIPE', 'JENISLAPORAN', 'TYPE']) || 'Pelanggaran'
@@ -193,13 +193,13 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
         const obj = item as any;
         if (type === 'Siswa') return !!obj.name;
         if (type === 'Guru') return !!obj.name;
-        if (type === 'Jadwal') return !!obj.subject && !!obj.teacherName;
+        if (type === 'Jadwal') return !!obj.subject || !!obj.teacherName;
         return true;
       });
 
       if (confirm(`Berhasil membaca ${newData.length} baris data ${type}. Sinkronisasi ke sistem?`)) {
         onUpdateData(type, newData);
-        alert("Sinkronisasi Berhasil!");
+        alert("Sinkronisasi Master Data Berhasil!");
       }
     };
     reader.readAsBinaryString(file);
@@ -290,7 +290,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                  <button onClick={() => {setSelectedCategory(null); setSearchTerm('');}} className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-50 hover:text-emerald-600 transition-all"><ArrowLeft size={24}/></button>
                  <div>
                     <h2 className="text-2xl font-black uppercase tracking-tight">{selectedCategory}</h2>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Sistem Impor Excel Akurat</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Sistem Data Mahasina</p>
                  </div>
               </div>
               <div className="flex flex-wrap gap-3 w-full md:w-auto">
@@ -303,8 +303,8 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                         <Download size={16}/> Template Excel
                      </button>
                      <label className="px-6 py-4 bg-emerald-950 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 cursor-pointer shadow-lg">
-                        <Upload size={16}/> Impor Excel/CSV
-                        <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleFileUpload(e, selectedCategory)} />
+                        <Upload size={16}/> Impor Excel
+                        <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => handleFileUpload(e, selectedCategory)} />
                      </label>
                    </>
                  )}
@@ -388,7 +388,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                       </tbody>
                    </table>
                    {filteredSchedules.length === 0 && (
-                     <div className="py-20 text-center text-slate-300 font-black uppercase italic tracking-widest text-[10px]">Data tidak tersedia atau filter belum sesuai</div>
+                     <div className="py-20 text-center text-slate-300 font-black uppercase italic tracking-widest text-[10px]">Data tidak ditemukan (Mohon periksa data jadwal Anda)</div>
                    )}
                 </div>
              </div>
@@ -408,9 +408,9 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                    <tbody className="divide-y divide-slate-50">
                       {data.teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).map((item, idx) => {
                         const assignments = data.schedules.filter(s => isTeacherMatch(item.name, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName));
-                        const teachingDetails = Array.from(new Set(assignments.filter(s => s.teacherName === item.name).map(a => `${a.subject} (${a.class})`))).join(' • ');
+                        const teachingDetails = Array.from(new Set(assignments.filter(s => isTeacherMatch(item.name, s.teacherName)).map(a => `${a.subject} (${a.class})`))).join(' • ');
                         const walasClasses = Array.from(new Set(assignments.filter(s => s.homeroomTeacherName === item.name).map(a => a.class)));
-                        const musyrifClasses = Array.from(new Set(assignments.filter(s => s.assistantTeacherName === item.name).map(a => a.class)));
+                        const musyrifClasses = Array.from(new Set(assignments.filter(s => isTeacherMatch(item.name, s.assistantTeacherName || "")).map(a => a.class)));
                         return (
                           <tr key={idx} className="hover:bg-slate-50 transition-all">
                              <td className="py-6">
@@ -425,14 +425,14 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                              <td className="py-6 max-w-[200px]">
                                 <div className="flex items-center gap-2 text-slate-600">
                                    <BookOpen size={14} className="shrink-0 text-emerald-600"/>
-                                   <p className="text-[9px] font-bold uppercase leading-relaxed line-clamp-2">{teachingDetails || 'Belum Ada Jadwal KBM'}</p>
+                                   <p className="text-[9px] font-bold uppercase leading-relaxed line-clamp-2">{teachingDetails || 'Cek Jadwal (Atau perbaiki nama di Jadwal)'}</p>
                                 </div>
                              </td>
                              <td className="py-6">
                                 <div className="space-y-1">
                                    {walasClasses.length > 0 && <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[8px] font-black uppercase block w-fit">Walas: {walasClasses.join(', ')}</span>}
-                                   {musyrifClasses.length > 0 && <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[8px] font-black uppercase block w-fit">Musyrif/ah: {musyrifClasses.join(', ')}</span>}
-                                   {walasClasses.length === 0 && musyrifClasses.length === 0 && <span className="text-[8px] font-black text-slate-300 uppercase italic">Tidak Ada Tugas Khusus</span>}
+                                   {musyrifClasses.length > 0 && <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[8px] font-black uppercase block w-fit">Asisten: {musyrifClasses.join(', ')}</span>}
+                                   {walasClasses.length === 0 && musyrifClasses.length === 0 && <span className="text-[8px] font-black text-slate-300 uppercase italic">Tugas Khusus (-)</span>}
                                 </div>
                              </td>
                              <td className="py-6">
