@@ -61,6 +61,8 @@ export const DEMO_TEACHER_ATTENDANCE: TeacherAttendance[] = [
   { 
     id: 'ta1', date: dateStr, teacherEmail: 'zulkifli@gmail.com', teacherName: 'Ustadz Zulkifli', 
     subject: 'Nahwu Shorof', class: '7A', startTime: '07:25', summary: 'Hadir tepat waktu, materi pembukaan Jurumiyah',
+    // Fix missing status property
+    status: AttendanceStatus.H,
     photoUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop' 
   }
 ];
