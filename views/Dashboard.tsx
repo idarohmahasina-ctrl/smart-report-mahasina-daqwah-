@@ -135,7 +135,12 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
         }
       });
     } else if (activeTab === 'guru' && isAdminOrPengasuh) {
-      filteredGuru.forEach(ta => {
+      // Perubahan: Menampilkan guru dengan Izin, Sakit, atau Alpha terbanyak (indikator kinerja negatif)
+      filteredGuru.filter(ta => 
+        ta.status === AttendanceStatus.S || 
+        ta.status === AttendanceStatus.I || 
+        ta.status === AttendanceStatus.A
+      ).forEach(ta => {
         const entry = teacherMap.get(ta.teacherName) || { name: ta.teacherName, count: 0 };
         entry.count++;
         teacherMap.set(ta.teacherName, entry);
@@ -240,7 +245,7 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
          </div>
          <div className="space-y-1">
             <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Kelas</label>
-            <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[9px] font-black uppercase outline-none shadow-inner border border-slate-100"><option value="Semua">Semua Kelas</option>{dynamicClasses.map(c => <option key={c} value={c}>{c}</option>)}</select>
+            <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border border-slate-100"><option value="Semua">Semua Kelas</option>{dynamicClasses.map(c => <option key={c} value={c}>{c}</option>)}</select>
          </div>
          <div className="space-y-1">
             <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Gender</label>
@@ -280,7 +285,7 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
             <div className="bg-white p-8 rounded-[3.5rem] border shadow-sm space-y-6">
                <div className="flex justify-between items-center">
                   <h3 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                    {activeTab === 'guru' ? <><Zap size={16} className="text-amber-500"/> Top 10 Guru</> : <><Trophy size={16} className="text-amber-500"/> Top 10 Santri</>}
+                    {activeTab === 'guru' ? <><AlertTriangle size={16} className="text-red-500"/> Ketidakhadiran Guru</> : <><Trophy size={16} className="text-amber-500"/> Top 10 Santri</>}
                   </h3>
                   {activeTab === 'kbm' && (
                     <select value={kbmRankStatus} onChange={e=>setKbmRankStatus(e.target.value as any)} className="bg-slate-50 text-[8px] font-black border rounded p-1 outline-none">
@@ -304,12 +309,12 @@ const Dashboard: React.FC<AppData & { profile: any }> = ({ profile, ...data }) =
                     </div>
                   ))}
                   {activeTab === 'guru' && isAdminOrPengasuh && rankings.teachers.map((r, i) => (
-                    <div key={i} className="flex justify-between items-center p-3 bg-emerald-50/50 rounded-2xl border border-emerald-100 hover:border-emerald-500 transition-all">
+                    <div key={i} className="flex justify-between items-center p-3 bg-red-50/50 rounded-2xl border border-red-100 hover:border-red-500 transition-all">
                        <div className="flex items-center gap-3 overflow-hidden">
-                          <span className={`w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-[10px] font-black ${i === 0 ? 'bg-emerald-600 text-white' : 'bg-white border text-slate-400'}`}>{i+1}</span>
+                          <span className={`w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-[10px] font-black ${i === 0 ? 'bg-red-600 text-white' : 'bg-white border text-slate-400'}`}>{i+1}</span>
                           <span className="text-[10px] font-black text-slate-800 uppercase truncate block">{r.name}</span>
                        </div>
-                       <span className="text-[10px] font-black text-emerald-700 bg-white px-2 py-1 rounded shadow-sm whitespace-nowrap ml-2">{r.count} Sesi</span>
+                       <span className="text-[10px] font-black text-red-700 bg-white px-2 py-1 rounded shadow-sm whitespace-nowrap ml-2">{r.count} Sesi</span>
                     </div>
                   )}
                </div>
