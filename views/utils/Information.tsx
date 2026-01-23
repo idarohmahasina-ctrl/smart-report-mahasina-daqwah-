@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { UserRole, Student, Teacher, Schedule, OrganizationMember, TemplateItem, Announcement } from '../../types.ts';
 import { 
-  Search, Upload, Users, Calendar, ArrowLeft, UserCheck2, GraduationCap, Award, Heart, ShieldCheck
+  Search, Upload, Users, Calendar, ArrowLeft, UserCheck2, GraduationCap, Award, Heart, ShieldCheck, User as UserIcon
 } from 'lucide-react';
 import { ExtraDataList } from '../../services/dataService.ts';
 import { isTeacherMatch, normalizeSessionName } from './nameMatchers.ts';
@@ -29,7 +29,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const [schDayFilter, setSchDayFilter] = useState('Semua');
   const [schSessionFilter, setSchSessionFilter] = useState('Semua');
   const [schClassFilter, setSchClassFilter] = useState('Semua');
 
@@ -38,46 +37,38 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
   const dynamicSessions = useMemo(() => {
     const sessSet = new Set<string>();
     data.schedules.forEach(s => { if(s.sessionType) sessSet.add(normalizeSessionName(s.sessionType)); });
-    data.students.forEach(s => {
-      if (s.sessionClasses) {
-        Object.keys(s.sessionClasses).forEach(key => sessSet.add(normalizeSessionName(key)));
-      }
-    });
     return Array.from(sessSet).sort();
-  }, [data.schedules, data.students]);
+  }, [data.schedules]);
 
-  // FILTER DEPENDEN: Kelas hanya muncul jika ada di sesi yang dipilih
+  // CASCADE FILTER: Kelas menyesuaikan sesi yang dipilih
   const availableClasses = useMemo(() => {
-    const cls = new Set<string>();
+    const clsSet = new Set<string>();
     const schedulesToScan = schSessionFilter === 'Semua' 
       ? data.schedules 
       : data.schedules.filter(s => normalizeSessionName(s.sessionType) === schSessionFilter);
     
-    schedulesToScan.forEach(s => cls.add(s.class));
+    schedulesToScan.forEach(s => clsSet.add(s.class));
     
-    // Jika Madrash dipilih, tambahkan formalClass santri
     if (schSessionFilter === 'Semua' || schSessionFilter.toLowerCase().includes('madrasah')) {
-      data.students.forEach(s => { if (s.formalClass) cls.add(s.formalClass); });
+      data.students.forEach(s => { if (s.formalClass) clsSet.add(s.formalClass); });
     }
     
-    return Array.from(cls).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    return Array.from(clsSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [data.students, data.schedules, schSessionFilter]);
 
   const pembinaData = useMemo(() => {
-    // Basis data adalah Kelas/Unit unik dari Santri dan Jadwal
-    const classes = Array.from(new Set([
+    const allUnitClasses = Array.from(new Set([
       ...data.students.map(s => s.formalClass),
       ...data.schedules.map(s => s.class)
     ])).filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-    return classes.map(cls => {
+    return allUnitClasses.map(cls => {
       const walas = data.extraDataLists.find(e => (e as any).type === 'Walas' && (e as any).class === cls);
       const musyrif = data.extraDataLists.find(e => (e as any).type === 'Musyrif' && (e as any).class === cls);
       return {
         class: cls,
         walas: walas ? (walas as any).name : '-',
         musyrif: musyrif ? (musyrif as any).name : '-',
-        gender: walas ? (walas as any).gender : (musyrif ? (musyrif as any).gender : '-')
       };
     });
   }, [data.students, data.schedules, data.extraDataLists]);
@@ -103,7 +94,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
       };
 
       const newData = jsonData.slice(1).map((row: any, idx) => {
-        // Fix: Changed parameter type from number[] to string[] to resolve type mismatch errors
         const val = (idxArr: string[]) => {
           const realIdx = getIdx(idxArr);
           return realIdx !== -1 ? String(row[realIdx] || '').trim() : '';
@@ -127,7 +117,6 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
              formalClass: val(['KELASFORMAL', 'UNIT']),
              sessionClasses: {}
            };
-           // Dynamic Session Classes from Headers
            (jsonData[0] as any[]).forEach((h, i) => {
              const head = String(h).toUpperCase();
              if (head.includes('KELAS') && !head.includes('FORMAL')) {
@@ -194,7 +183,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                  {isSuperAdmin && (selectedCategory !== 'Pembina' && selectedCategory !== 'Peraturan') && (
                    <label className="px-6 py-4 bg-emerald-950 text-white rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 cursor-pointer shadow-lg">
                       <Upload size={16}/> Impor Excel
-                      <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => handleFileUpload(e, selectedCategory === 'Pembina' ? 'Walas' : selectedCategory)} />
+                      <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => handleFileUpload(e, selectedCategory)} />
                    </label>
                  )}
                  {isSuperAdmin && selectedCategory === 'Pembina' && (

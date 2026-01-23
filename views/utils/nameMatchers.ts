@@ -36,6 +36,6 @@ export const isTeacherMatch = (userName: string, scheduleTeacher: string, schedu
 
 export const normalizeSessionName = (session: string): string => {
   if (!session) return "Umum";
-  // Menghapus normalisasi paksa Hadis-Aswaja. Sekarang hanya trimming dan kapitalisasi ringan.
+  // Menghapus penggabungan otomatis Hadis-Aswaja agar sesuai data asli user
   return session.trim();
 };
