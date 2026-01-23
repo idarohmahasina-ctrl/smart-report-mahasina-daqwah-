@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { AttendanceStatus, Student, UserRole, Schedule, AppData } from './types.ts';
+import { AttendanceStatus, Student, UserRole, Schedule, AppData, AttendanceRecord } from './types.ts';
 import { UserCheck, CheckCircle, Search, Save, X, Edit3, PlusCircle, Calendar, UserPlus, Ban, Users, Clock, ArrowLeft } from 'lucide-react';
 import { isTeacherMatch, normalizeSessionName, normalizeClassName } from './views/utils/nameMatchers.ts';
 
@@ -12,7 +12,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
   const schedules = data.schedules || [];
   const students = data.students || [];
   const todayDay = useMemo(() => new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date()), []);
-  const todayDateStr = useMemo(() => new Date().toLocaleDateString('id-ID'), []);
+  const todayDateStr = useMemo(() => new Date().toLocaleDateString('id-ID'));
 
   const isIdaroh = data.role === UserRole.IDAROH || data.role === UserRole.PENGASUH || data.userEmail?.toLowerCase().trim() === 'idarohmahasina@gmail.com';
   const isGenderRestricted = !isIdaroh && (data.role === UserRole.SANTRI_OFFICER_PUTRA || data.role === UserRole.SANTRI_OFFICER_PUTRI);
@@ -22,27 +22,32 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
 
   const mySchedules = useMemo(() => {
     return schedules.filter(s => {
-      // Filter Hari Ini saja
       const matchDay = normalizeDay(s.day) === normalizeDay(todayDay) || 
                        (normalizeDay(todayDay) === 'minggu' && normalizeDay(s.day) === 'ahad');
       if (!matchDay) return false;
 
-      // Filter Identitas
       const matchTeacher = isIdaroh || isTeacherMatch(data.currentUser, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName);
       const matchGender = isIdaroh || !isGenderRestricted || s.gender === targetGender;
       
-      // Filter Selesai: Sembunyikan jika sudah diisi hari ini (khusus non-idaroh)
+      // Filter Selesai atau LIBUR
       const isDone = data.attendance.some(a => 
         a.date === todayDateStr && 
         a.class === s.class && 
         normalizeSessionName(a.sessionType) === normalizeSessionName(s.sessionType)
       );
 
-      if (isDone && !isIdaroh) return false;
+      const isHoliday = data.teacherAttendance.some(ta =>
+        ta.date === todayDateStr &&
+        ta.class === s.class &&
+        normalizeSessionName(ta.sessionType || "") === normalizeSessionName(s.sessionType) &&
+        ta.status === AttendanceStatus.LIBUR
+      );
+
+      if ((isDone || isHoliday) && !isIdaroh) return false;
 
       return matchTeacher && matchGender;
     }).sort((a,b) => a.time.localeCompare(b.time));
-  }, [schedules, data.currentUser, isGenderRestricted, targetGender, isIdaroh, todayDay, data.attendance, todayDateStr]);
+  }, [schedules, data.currentUser, isGenderRestricted, targetGender, isIdaroh, todayDay, data.attendance, data.teacherAttendance, todayDateStr]);
 
   const targetStudents = useMemo(() => {
     if (!selectedSchedule) return [];
@@ -128,7 +133,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-2 tracking-widest">{sch.time}</p>
                    
                    <div className="mt-8 flex justify-between items-center border-t border-slate-50 pt-6">
-                      <p className="text-[12px] font-black text-slate-800">UNIT: {sch.class}</p>
+                      <p className="text-[12px] font-black text-slate-800">KELAS: {sch.class}</p>
                       <PlusCircle size={20} className="text-slate-200 group-hover:text-emerald-600 transition-all" />
                    </div>
                 </button>
@@ -138,7 +143,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
                  <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center"><Calendar size={48} className="text-slate-400"/></div>
                  <div className="space-y-2">
                     <p className="font-black uppercase text-[12px] tracking-[0.3em]">Antrian Selesai</p>
-                    <p className="text-[10px] italic">Tidak ada jadwal KBM yang perlu diisi saat ini.</p>
+                    <p className="text-[10px] italic">Tidak ada jadwal KBM atau sesi mungkin sedang libur.</p>
                  </div>
               </div>
             )}
@@ -152,7 +157,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
                    <button onClick={() => setSelectedSchedule(null)} className="p-2 hover:bg-white/10 rounded-xl transition-all"><ArrowLeft size={20}/></button>
                    <h3 className="text-2xl font-black uppercase tracking-tight truncate">{selectedSchedule.subject}</h3>
                 </div>
-                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.3em] mt-3 ml-11">UNIT {selectedSchedule.class} • {selectedSchedule.sessionType} • {targetStudents.length} SANTRI</p>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.3em] mt-3 ml-11">KELAS {selectedSchedule.class} • {selectedSchedule.sessionType} • {targetStudents.length} SANTRI</p>
               </div>
               <button onClick={() => setSelectedSchedule(null)} className="p-4 bg-white/10 rounded-2xl hover:bg-white/20 transition-all shrink-0"><X/></button>
            </div>
@@ -185,7 +190,7 @@ const Attendance: React.FC<AppData & { role: UserRole, currentUser: string, onSa
                               <button 
                                 key={l} 
                                 onClick={() => setTempRecords({...tempRecords, [s.id]: { ...curr, status: status }})} 
-                                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg text-[10px] font-black transition-all ${isActive ? (status === AttendanceStatus.H ? 'bg-emerald-600 text-white shadow-xl scale-110' : 'bg-red-600 text-white shadow-xl scale-110') : 'text-slate-400 hover:text-slate-600'}`}
+                                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg text-[9px] sm:text-[10px] font-black transition-all ${isActive ? (status === AttendanceStatus.H ? 'bg-emerald-600 text-white shadow-xl scale-110' : 'bg-red-600 text-white shadow-xl scale-110') : 'text-slate-400 hover:text-slate-600'}`}
                               >
                                 {l}
                               </button>

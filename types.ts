@@ -13,7 +13,8 @@ export enum AttendanceStatus {
   S = 'Sakit',
   I = 'Izin',
   T = 'Terlambat',
-  A = 'Alpha'
+  A = 'Alpha',
+  LIBUR = 'Libur'
 }
 
 export enum PrayerTime {
@@ -25,6 +26,7 @@ export enum PrayerTime {
   ISYA = 'Isya',
   LALARAN = 'Lalaran Ahad Malam',
   KHATAMAN = 'Khataman Al-Quran',
+  MAJLIS = 'Majlis Malam Jumat',
   SENAM = 'Senam Pagi'
 }
 
@@ -146,7 +148,7 @@ export interface ReportItem {
 }
 
 export enum PrayerStatus {
-  JAMAAH = "Berjama'ah",
+  JAMAAH = "Hadir",
   UDZUR = 'Udzur',
   SAKIT = 'Sakit',
   IZIN = 'Izin',

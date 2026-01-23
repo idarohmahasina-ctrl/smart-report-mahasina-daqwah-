@@ -36,6 +36,6 @@ export const isTeacherMatch = (userName: string, scheduleTeacher: string, schedu
 
 export const normalizeSessionName = (session: string): string => {
   if (!session) return "Umum";
-  // Menghapus penggabungan otomatis Hadis-Aswaja agar sesuai data asli user
+  // Strictly return the name as provided in the uploaded data
   return session.trim();
 };

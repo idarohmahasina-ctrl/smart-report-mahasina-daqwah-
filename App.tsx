@@ -11,7 +11,7 @@ import Settings from './views/Settings.tsx';
 import ControlPanel from './views/ControlPanel.tsx';
 import RekapLaporan from './views/RekapLaporan.tsx';
 import PrayerAttendance from './views/utils/PrayerAttendance.tsx';
-import { UserProfile, AppData, UserRole, TeacherAttendance, AcademicConfig, TemplateItem } from './types.ts';
+import { UserProfile, AppData, UserRole, TeacherAttendance, AcademicConfig, TemplateItem, AttendanceRecord } from './types.ts';
 import { 
   saveAppData, getActiveSession, subscribeToAppData, setActiveSession 
 } from './services/dataService.ts';
@@ -56,28 +56,6 @@ const App: React.FC = () => {
     academicConfig: appData?.academicConfig || defaultAcademicConfig
   };
 
-  // Deteksi Kelas Binaan (Walas/Musyrif)
-  const myManagedClasses = useMemo(() => {
-    if (!profile) return [];
-    const isAdmin = profile.email.toLowerCase().trim() === 'idarohmahasina@gmail.com';
-    if (isAdmin || profile.role === UserRole.PENGASUH) return [];
-
-    const classes = new Set<string>();
-    // Cari dari jadwal KBM
-    currentAppData.schedules.forEach(s => {
-      if (isTeacherMatch(profile.fullName, s.teacherName, s.assistantTeacherName, s.homeroomTeacherName)) {
-        classes.add(s.class);
-      }
-    });
-    // Cari dari data Walas/Musyrif khusus (extraDataLists)
-    currentAppData.extraDataLists.forEach((e: any) => {
-      if (isTeacherMatch(profile.fullName, e.name)) {
-        classes.add(e.class);
-      }
-    });
-    return Array.from(classes);
-  }, [currentAppData.schedules, currentAppData.extraDataLists, profile]);
-
   if (loading && !appData) return (
     <div className="h-screen bg-[#064e3b] flex flex-col items-center justify-center text-white space-y-6">
       <div className="w-16 h-16 border-4 border-emerald-400 border-t-white rounded-full animate-spin" />
@@ -103,8 +81,14 @@ const App: React.FC = () => {
         <TeacherAttendanceView 
           data={currentAppData} 
           profile={profile} 
-          onSave={(record: TeacherAttendance) => {
-            saveAppData({ teacherAttendance: [...(currentAppData.teacherAttendance || []), record] });
+          onSave={(teacherRecord: TeacherAttendance, kbmHolidayRecord?: AttendanceRecord) => {
+            const updates: Partial<AppData> = {
+              teacherAttendance: [...(currentAppData.teacherAttendance || []), teacherRecord]
+            };
+            if (kbmHolidayRecord) {
+              updates.attendance = [...(currentAppData.attendance || []), kbmHolidayRecord];
+            }
+            saveAppData(updates);
           }} 
         />
       )}
@@ -185,7 +169,7 @@ const App: React.FC = () => {
          updateTeacherAttendance: updated => saveAppData({ teacherAttendance: currentAppData.teacherAttendance.map(ta => ta.id === updated.id ? updated : ta) })
       }} />}
 
-      {activeTab === 'pengaturan' && <Settings userEmail={profile.email} academicConfig={currentAppData.academicConfig} onUpdateAcademic={c => saveAppData({ academicConfig: c })} students={currentAppData.students} availableClasses={[]} />}
+      {activeTab === 'pengaturan' && <Settings userEmail={profile.email} academicConfig={currentAppData.academicConfig} onUpdateAcademic={c => saveAppData({ academicConfig: c })} students={currentAppData.students} schedules={currentAppData.schedules} availableClasses={[]} />}
     </Layout>
   );
 };

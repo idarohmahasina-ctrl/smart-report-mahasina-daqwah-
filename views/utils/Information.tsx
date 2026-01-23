@@ -210,7 +210,7 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                          {dynamicSessions.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                       <select value={schClassFilter} onChange={e => setSchClassFilter(e.target.value)} className="p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none border border-slate-100">
-                         <option value="Semua">Semua Unit</option>
+                         <option value="Semua">Semua Kelas</option>
                          {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                    </div>
@@ -227,14 +227,14 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                       <tr>
                         {selectedCategory === 'Pembina' ? (
                           <>
-                            <th className="pb-5 text-[9px] font-black uppercase text-slate-400">Unit / Kelas</th>
+                            <th className="pb-5 text-[9px] font-black uppercase text-slate-400">Kelas</th>
                             <th className="pb-5 text-[9px] font-black uppercase text-slate-400">Wali Kelas</th>
                             <th className="pb-5 text-[9px] font-black uppercase text-slate-400">Musyrif/ah</th>
                           </>
                         ) : (
                           <>
                             <th className="pb-5 text-[9px] font-black uppercase text-slate-400">Identitas</th>
-                            <th className="pb-5 text-[9px] font-black uppercase text-slate-400">Unit / Kelas</th>
+                            <th className="pb-5 text-[9px] font-black uppercase text-slate-400">Kelas</th>
                             <th className="pb-5 text-[9px] font-black uppercase text-slate-400">Detail</th>
                           </>
                         )}

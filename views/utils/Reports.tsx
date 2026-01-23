@@ -32,7 +32,7 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const isAdminOrPengasuh = role === UserRole.IDAROH || role === UserRole.PENGASUH;
+  const isIdaroh = role === UserRole.IDAROH || role === UserRole.PENGASUH;
   const isGenderRestricted = role === UserRole.SANTRI_OFFICER_PUTRA || role === UserRole.SANTRI_OFFICER_PUTRI;
   const targetGender = role === UserRole.SANTRI_OFFICER_PUTRA ? 'Putra' : 'Putri';
 
@@ -130,9 +130,14 @@ const Reports: React.FC<ReportsProps> = ({ type, onSave, role, currentUser, stud
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/95 p-6 backdrop-blur-md">
            <div className="bg-white rounded-[3.5rem] w-full max-w-lg p-10 space-y-8 animate-in zoom-in-95 shadow-2xl">
               <div className="flex justify-between items-center"><h3 className="text-sm font-black uppercase text-slate-800">Kamera Laporan</h3><button onClick={stopCamera} className="p-3 bg-slate-100 rounded-2xl"><X/></button></div>
-              <div className="relative aspect-video bg-slate-900 rounded-[2.5rem] overflow-hidden">{isCameraLoading && <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-white"/></div>}<video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${isCameraLoading ? 'opacity-0' : 'opacity-100'}`}/></div>
+              <div className="relative aspect-video bg-slate-900 rounded-[2.5rem] overflow-hidden">
+                {isCameraLoading && <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-white"/></div>}
+                <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${isCameraLoading ? 'opacity-0' : 'opacity-100'}`}/>
+              </div>
               <div className="flex gap-4">
-                 <button onClick={() => { setFacingMode(facingMode === 'user' ? 'environment' : 'user'); stopCamera(); setTimeout(startCamera, 100); }} className="flex-1 py-5 bg-slate-50 text-slate-600 rounded-[1.5rem] font-black uppercase text-[9px] flex items-center justify-center gap-2"><RefreshCw size={18}/> Ganti Kamera</button>
+                 <button onClick={() => { setFacingMode(facingMode === 'user' ? 'environment' : 'user'); stopCamera(); setTimeout(startCamera, 100); }} className="flex-1 py-5 bg-slate-50 text-slate-600 rounded-[1.5rem] font-black uppercase text-[9px] flex items-center justify-center gap-2">
+                    <RefreshCw size={18}/> Ganti Kamera
+                 </button>
                  <button onClick={takePhoto} className="flex-[2] py-5 bg-emerald-950 text-white rounded-[1.5rem] font-black uppercase text-[11px]">Ambil Foto</button>
               </div>
            </div>

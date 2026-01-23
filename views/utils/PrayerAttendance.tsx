@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { PrayerTime, PrayerStatus, Student, PrayerRecord, SessionType } from '../../types.ts';
 import { 
   PlusCircle, History, Zap, Search, Users, ChevronRight, Save, Clock, Filter,
-  Activity, CheckCircle, FileText, Download, Award, AlertTriangle, User
+  Activity, CheckCircle, FileText, Download, Award, AlertTriangle, User, Calendar as CalendarIcon
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend 
@@ -80,6 +80,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
   // State Input
   const [selectedPrayer, setSelectedPrayer] = useState<PrayerTime>(PrayerTime.SUBUH);
   const [selectedClass, setSelectedClass] = useState('');
+  const [inputDate, setInputDate] = useState(new Date().toISOString().split('T')[0]);
   const [tempRecords, setTempRecords] = useState<Record<string, { status: PrayerStatus, note: string }>>({});
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -127,7 +128,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
   }, [allPrayerRecords, reportRange, reportCustomDate, reportPrayer, reportClass, reportLevel, reportGender, students]);
 
   const stats = {
-    JAMAAH: filteredRecords.filter(r => r.status === PrayerStatus.JAMAAH).length,
+    HADIR: filteredRecords.filter(r => r.status === PrayerStatus.JAMAAH).length,
     UDZUR: filteredRecords.filter(r => r.status === PrayerStatus.UDZUR).length,
     SAKIT: filteredRecords.filter(r => r.status === PrayerStatus.SAKIT).length,
     IZIN: filteredRecords.filter(r => r.status === PrayerStatus.IZIN).length,
@@ -151,10 +152,14 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
     if (!selectedClass) { alert("Pilih kelas terlebih dahulu."); return; }
     
     const now = new Date();
+    const [y, m, d] = inputDate.split('-');
+    const formattedTargetDate = `${d}/${m}/${y}`;
+    const realTimeAudit = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
     const records: PrayerRecord[] = filteredStudentsForInput.map(s => ({
       id: Math.random().toString(36).substr(2, 9),
-      date: now.toLocaleDateString('id-ID'),
-      recordedTime: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      date: formattedTargetDate, // Tanggal laporan (bisa backdate)
+      recordedTime: realTimeAudit, // Waktu kirim asli (untuk audit)
       studentId: s.id,
       status: tempRecords[s.id]?.status || PrayerStatus.JAMAAH,
       note: tempRecords[s.id]?.note || '',
@@ -164,21 +169,22 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
     }));
 
     onSave(records);
-    alert(`Absensi ${selectedPrayer} berhasil disimpan.`);
+    alert(`Absensi ${selectedPrayer} untuk tanggal ${formattedTargetDate} berhasil disimpan. (Audit Log: ${realTimeAudit} oleh ${currentUser})`);
     setTempRecords({});
   };
 
   const handleExportLog = () => {
     const csvData = filteredRecords.map(r => ({
       "Nama Santri": students.find(s => s.id === r.studentId)?.name || 'N/A',
-      "Tanggal": r.date,
+      "Tanggal Laporan": r.date,
+      "Jam Input Asli": r.recordedTime,
       "Kegiatan": r.prayerTime,
       "Kelas": r.class,
       "Status": r.status,
       "Keterangan": r.note || '-',
-      "Petugas": r.recordedBy
+      "Petugas Penginput": r.recordedBy
     }));
-    downloadCSV(csvData, `Log_Absen_Pondok`);
+    downloadCSV(csvData, `Log_Absen_Pondok_Audit`);
   };
 
   return (
@@ -193,7 +199,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
               </div>
               <div>
                  <h2 className="text-2xl font-black uppercase tracking-tight leading-none">Absensi Pondok Santri</h2>
-                 <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em] mt-3">Sholat • Khataman • Lalaran • Senam</p>
+                 <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em] mt-3">Sholat • Khataman • Majlis • Senam</p>
               </div>
            </div>
            
@@ -202,13 +208,13 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                 onClick={() => setActiveSubTab('input')} 
                 className={`flex items-center gap-3 px-8 py-3 rounded-[1.2rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'input' ? 'bg-white text-emerald-950 shadow-xl scale-105' : 'text-white/60 hover:text-white'}`}
               >
-                <PlusCircle size={18}/> Input Baru
+                <PlusCircle size={18}/> Form Input
               </button>
               <button 
                 onClick={() => setActiveSubTab('report')} 
                 className={`flex items-center gap-3 px-8 py-3 rounded-[1.2rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'report' ? 'bg-white text-emerald-950 shadow-xl scale-105' : 'text-white/60 hover:text-white'}`}
               >
-                <History size={18}/> Laporan Detail
+                <History size={18}/> Laporan Audit
               </button>
            </div>
         </div>
@@ -216,31 +222,40 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
 
       {activeSubTab === 'input' ? (
         <div className="space-y-8 animate-in slide-in-from-bottom-6">
-           <div className="bg-white p-8 rounded-[3rem] border border-slate-50 shadow-sm space-y-6">
-              <div className="space-y-3">
-                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jenis Kegiatan Pondok</label>
+           <div className="bg-white p-8 rounded-[3rem] border border-slate-50 shadow-sm space-y-8">
+              <div className="space-y-4">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">1. Jenis Kegiatan Pondok</label>
                  <div className="flex flex-wrap gap-2">
                     {(Object.values(PrayerTime) as string[]).map(pt => (
                       <button 
                         key={pt} 
                         onClick={() => setSelectedPrayer(pt as PrayerTime)} 
-                        className={`px-4 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${selectedPrayer === pt ? 'bg-emerald-800 border-emerald-800 text-white shadow-lg' : 'bg-slate-50 border-transparent text-slate-400 hover:border-slate-200'}`}
+                        className={`px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${selectedPrayer === pt ? 'bg-emerald-800 border-emerald-800 text-white shadow-lg' : 'bg-slate-50 border-transparent text-slate-400 hover:border-slate-200'}`}
                       >
                          {pt}
                       </button>
                     ))}
                  </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-3">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Unit Kelas</label>
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2"><CalendarIcon size={14}/> 2. Tanggal Laporan</label>
+                   <input 
+                     type="date" 
+                     value={inputDate} 
+                     onChange={e => setInputDate(e.target.value)} 
+                     className="w-full p-5 bg-slate-50 rounded-2xl outline-none font-black text-[11px] uppercase tracking-widest shadow-inner border-2 border-transparent focus:border-emerald-600"
+                   />
+                </div>
+                <div className="space-y-3">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">3. Pilih Kelas</label>
                    <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="w-full p-5 bg-slate-50 rounded-2xl outline-none font-black text-[11px] uppercase tracking-widest shadow-inner border-2 border-transparent focus:border-emerald-600 appearance-none cursor-pointer">
-                      <option value="">-- PILIH KELAS UNTUK ABSEN --</option>
+                      <option value="">-- PILIH KELAS --</option>
                       {availableClassesForInput.map(c => <option key={c} value={c}>{c}</option>)}
                    </select>
                 </div>
                 <div className="space-y-3">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cari Santri</label>
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">4. Cari Santri</label>
                    <div className="relative">
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
                       <input type="text" placeholder="Ketik nama..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-5 bg-slate-50 rounded-2xl text-[11px] font-bold outline-none shadow-inner" />
@@ -267,7 +282,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                                <div className="flex items-center gap-4 w-full md:w-auto">
                                   <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner shrink-0">
                                      {[
-                                       { s: PrayerStatus.JAMAAH, l: 'J' }, 
+                                       { s: PrayerStatus.JAMAAH, l: 'H' }, 
                                        { s: PrayerStatus.UDZUR, l: 'U' }, 
                                        { s: PrayerStatus.SAKIT, l: 'S' }, 
                                        { s: PrayerStatus.IZIN, l: 'I' }, 
@@ -299,7 +314,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
               ) : (
                 <div className="py-32 text-center space-y-6 opacity-20 flex flex-col items-center">
                    <Users size={64}/>
-                   <p className="text-[12px] font-black uppercase tracking-[0.3em]">Silakan Pilih Kelas</p>
+                   <p className="text-[12px] font-black uppercase tracking-[0.3em]">Silakan Pilih Kelas & Sesi</p>
                 </div>
               )}
            </div>
@@ -316,7 +331,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
               <div className="space-y-1">
                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Rentang Waktu</label>
                  <select value={reportRange} onChange={e => setReportRange(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none">
-                    {['Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Semester', 'Pilih Tanggal'].map(r => <option key={r} value={r}>{r}</option>)}
+                    {['Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Semester Ini', 'Pilih Tanggal'].map(r => <option key={r} value={r}>{r}</option>)}
                  </select>
               </div>
               <div className="space-y-1">
@@ -343,7 +358,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                  </select>
               </div>
               <div className="space-y-1">
-                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Unit Kelas</label>
+                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Kelas</label>
                  <select value={reportClass} onChange={e => setReportClass(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none">
                     <option value="Semua">SEMUA KELAS</option>
                     {availableClassesForReport.map(c => <option key={c} value={c}>{c}</option>)}
@@ -353,7 +368,7 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
 
            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {[
-                { label: 'Berjamaah', val: stats.JAMAAH, color: 'emerald', icon: CheckCircle },
+                { label: 'Hadir', val: stats.HADIR, color: 'emerald', icon: CheckCircle },
                 { label: 'Udzur', val: stats.UDZUR, color: 'blue', icon: Activity },
                 { label: 'Sakit', val: stats.SAKIT, color: 'indigo', icon: FileText },
                 { label: 'Izin', val: stats.IZIN, color: 'amber', icon: Clock },
@@ -399,13 +414,13 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
               </div>
               
               <div className="bg-white p-10 rounded-[3.5rem] border shadow-sm flex flex-col items-center justify-center min-h-[400px]">
-                 <h3 className="text-[11px] font-black uppercase tracking-widest mb-8">Visualisasi Komposisi</h3>
+                 <h3 className="text-[11px] font-black uppercase tracking-widest mb-8">Audit Visual Komposisi</h3>
                  <div className="w-full h-64">
                     <ResponsiveContainer width="100%" height="100%">
                        <PieChart>
                           <Pie 
                             data={[
-                              { name: 'Jamaah', val: stats.JAMAAH },
+                              { name: 'Hadir', val: stats.HADIR },
                               { name: 'Udzur', val: stats.UDZUR },
                               { name: 'Sakit', val: stats.SAKIT },
                               { name: 'Izin', val: stats.IZIN },
@@ -430,24 +445,24 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                  <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center"><History size={24}/></div>
                     <div>
-                       <h3 className="text-xl font-black uppercase tracking-tight text-slate-800">Detail Log Aktivitas</h3>
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Histori lengkap laporan absen pondok berdasarkan filter</p>
+                       <h3 className="text-xl font-black uppercase tracking-tight text-slate-800">Detail Log Audit Aktivitas</h3>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Histori lengkap laporan absen pondok beserta identitas petugas penginput</p>
                     </div>
                  </div>
                  <button onClick={handleExportLog} className="px-8 py-4 bg-emerald-950 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-xl flex items-center gap-3 hover:bg-emerald-900 transition-all active:scale-95">
-                    <Download size={18}/> Unduh Detail CSV
+                    <Download size={18}/> Unduh Detail Audit
                  </button>
               </div>
 
               <div className="overflow-x-auto no-scrollbar">
-                 <table className="w-full text-left">
+                 <table className="w-full text-left min-w-[900px]">
                     <thead>
                        <tr className="border-b-2 border-slate-50">
-                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Santri / Unit</th>
-                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Waktu / Tanggal</th>
-                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Kegiatan</th>
+                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Santri / Kelas</th>
+                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Kegiatan Pondok</th>
+                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-emerald-600">Audit Petugas & Jam</th>
                           <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status / Keterangan</th>
-                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Petugas</th>
+                          <th className="pb-6 pr-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Tanggal Laporan</th>
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -455,20 +470,30 @@ const PrayerAttendance: React.FC<PrayerAttendanceProps> = ({ students, onSave, a
                           <tr key={r.id} className="group hover:bg-slate-50 transition-all">
                              <td className="py-6 pr-4">
                                 <p className="text-[12px] font-black text-slate-800 uppercase leading-none">{students.find(s=>s.id===r.studentId)?.name || 'N/A'}</p>
-                                <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase">Unit: {r.class}</p>
+                                <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">Unit: {r.class}</p>
                              </td>
                              <td className="py-6 pr-4">
-                                <p className="text-[11px] font-black text-slate-700">{r.date}</p>
-                                <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">{r.recordedTime}</p>
+                                <span className="px-2.5 py-1 bg-slate-100 rounded-lg font-black uppercase text-[10px] text-slate-500 tracking-tight">{r.prayerTime}</span>
                              </td>
                              <td className="py-6 pr-4">
-                                <p className="font-black uppercase text-[10px] text-slate-500">{r.prayerTime}</p>
+                                <div className="flex flex-col gap-1">
+                                   <div className="flex items-center gap-2 text-slate-800">
+                                      <User size={12} className="text-emerald-500" />
+                                      <p className="text-[10px] font-black uppercase truncate max-w-[120px]">{r.recordedBy}</p>
+                                   </div>
+                                   <div className="flex items-center gap-2 text-slate-400">
+                                      <Clock size={12} />
+                                      <p className="text-[9px] font-bold uppercase">{r.recordedTime} WIB</p>
+                                   </div>
+                                </div>
                              </td>
                              <td className="py-6 pr-4">
                                 <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${r.status === PrayerStatus.JAMAAH ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>{r.status}</span>
-                                <p className="text-[8px] italic text-slate-400 mt-1.5 line-clamp-1">"{r.note || '-'}"</p>
+                                <p className="text-[8px] italic text-slate-400 mt-1.5 line-clamp-1 max-w-[150px]">"{r.note || '-'}"</p>
                              </td>
-                             <td className="py-6 pr-4 text-[9px] font-black text-slate-400 uppercase truncate max-w-[100px]">{r.recordedBy}</td>
+                             <td className="py-6 pr-4 text-right">
+                                <p className="text-[11px] font-black text-slate-700">{r.date}</p>
+                             </td>
                           </tr>
                        ))}
                        {filteredRecords.length === 0 && (

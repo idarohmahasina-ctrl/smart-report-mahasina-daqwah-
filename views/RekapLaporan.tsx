@@ -81,9 +81,9 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
       <div className="bg-white p-8 rounded-[3.5rem] border shadow-sm space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
            <div className="space-y-1">
-              <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Pilih Unit</label>
+              <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Pilih Kelas</label>
               <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="w-full p-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase outline-none shadow-inner border border-slate-100">
-                 <option value="">-- PILIH UNIT --</option>
+                 <option value="">-- PILIH KELAS --</option>
                  {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
            </div>
@@ -110,7 +110,7 @@ const RekapLaporan: React.FC<RekapLaporanProps> = ({ data, profile }) => {
          {!classFilter ? (
            <div className="flex flex-col items-center justify-center py-24 opacity-20">
               <Users size={64}/>
-              <p className="text-[12px] font-black uppercase tracking-widest mt-4">Silakan Tentukan Unit Kelas</p>
+              <p className="text-[12px] font-black uppercase tracking-widest mt-4">Silakan Tentukan Kelas</p>
            </div>
          ) : (
            <div className="overflow-x-auto">
