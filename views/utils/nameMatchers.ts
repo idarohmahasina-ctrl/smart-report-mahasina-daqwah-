@@ -15,12 +15,11 @@ export const normalizeName = (name: string): string => {
 
 export const normalizeClassName = (cls: string): string => {
   if (!cls) return "";
-  // Menghapus semua yang bukan huruf dan angka, serta kata-kata umum
   return cls.toLowerCase()
     .replace(/kelas/gi, "")
     .replace(/unit/gi, "")
     .replace(/ruang/gi, "")
-    .replace(/[^a-z0-9]/gi, "") // Hanya sisakan alphanumeric (7a, 8b, 10ipa)
+    .replace(/[^a-z0-9]/gi, "") 
     .trim();
 };
 
@@ -36,11 +35,7 @@ export const isTeacherMatch = (userName: string, scheduleTeacher: string, schedu
 };
 
 export const normalizeSessionName = (session: string): string => {
-  if (!session) return "Madrasah";
-  const s = session.trim().toLowerCase();
-  if (s === 'madrasah' || s === 'sekolah' || s === 'kbm') return 'Madrasah';
-  if (s.includes('al-quran') || s.includes('quran')) return 'Al-Quran';
-  if (s.includes('kitab') || s.includes('kuning')) return 'Kitab Kuning';
-  if (s.includes('hadis') || s.includes('aswaja')) return 'Hadis-Aswaja';
+  if (!session) return "Umum";
+  // Menghapus normalisasi paksa Hadis-Aswaja. Sekarang hanya trimming dan kapitalisasi ringan.
   return session.trim();
 };
