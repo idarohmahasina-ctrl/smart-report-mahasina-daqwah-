@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { UserRole, Student, Teacher, Schedule, OrganizationMember, TemplateItem, Announcement, ViolationCategory } from '../../types.ts';
 import { 
-  Search, Upload, Users, Calendar, ArrowLeft, UserCheck2, GraduationCap, Award, Heart, ShieldCheck, User as UserIcon, Download, FileText, Zap, BookOpen, ShieldAlert
+  Search, Upload, Users, Calendar, ArrowLeft, UserCheck2, GraduationCap, Award, Heart, ShieldCheck, User as UserIcon, Download, FileText, Zap, BookOpen, ShieldAlert, ChevronDown
 } from 'lucide-react';
 import { ExtraDataList } from '../../services/dataService.ts';
 import { isTeacherMatch, normalizeSessionName } from './nameMatchers.ts';
@@ -26,12 +26,15 @@ interface InformationProps {
   onUpdateData: (type: string, newData: any[]) => void;
 }
 
+const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'];
+
 const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpdateData }) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
   const [schSessionFilter, setSchSessionFilter] = useState('Semua');
   const [schClassFilter, setSchClassFilter] = useState('Semua');
+  const [schDayFilter, setSchDayFilter] = useState('Semua');
 
   const isSuperAdmin = userEmail.toLowerCase().trim() === 'idarohmahasina@gmail.com' || role === UserRole.IDAROH;
 
@@ -73,8 +76,8 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
     else if (type === 'Guru') headers = ['NAMA', 'MAPEL', 'NOHP'];
     else if (type === 'Jadwal') headers = ['HARI', 'WAKTU', 'MAPEL', 'GURU', 'UNIT', 'SESI'];
     else if (type === 'ORSAM' || type === 'ORKLAS') headers = ['NAMA', 'NIS', 'KELAS', 'JABATAN', 'DIVISI', 'GENDER'];
-    else if (type === 'Pembina') headers = ['NAMA', 'UNIT', 'GENDER', 'TIPE']; // Tipe: Walas atau Musyrif
-    else if (type === 'Peraturan') headers = ['JUDUL', 'POIN', 'KATEGORI', 'TIPE']; // Tipe: Pelanggaran atau Prestasi
+    else if (type === 'Pembina') headers = ['NAMA', 'UNIT', 'GENDER', 'TIPE'];
+    else if (type === 'Peraturan') headers = ['JUDUL', 'POIN', 'KATEGORI', 'TIPE'];
     
     const csvContent = headers.join(',') + '\n';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -197,13 +200,16 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
            </div>
 
            <div className="bg-white p-8 md:p-10 rounded-[4rem] border shadow-sm space-y-8 overflow-hidden border-slate-50">
-              <div className="flex flex-col md:flex-row gap-6">
+              <div className="flex flex-col md:flex-row gap-4">
                  {selectedCategory === 'Jadwal' && (
-                   <div className="flex gap-2">
-                      <select value={schSessionFilter} onChange={e => { setSchSessionFilter(e.target.value); setSchClassFilter('Semua'); }} className="p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner">
+                   <div className="flex flex-wrap gap-2">
+                      <select value={schDayFilter} onChange={e => setSchDayFilter(e.target.value)} className="p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner border-r-8 border-transparent">
+                         <option value="Semua">Semua Hari</option>{DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <select value={schSessionFilter} onChange={e => { setSchSessionFilter(e.target.value); setSchClassFilter('Semua'); }} className="p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner border-r-8 border-transparent">
                          <option value="Semua">Semua Sesi</option>{dynamicSessions.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
-                      <select value={schClassFilter} onChange={e => setSchClassFilter(e.target.value)} className="p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner">
+                      <select value={schClassFilter} onChange={e => setSchClassFilter(e.target.value)} className="p-4 bg-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner border-r-8 border-transparent">
                          <option value="Semua">Semua Kelas</option>{availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                    </div>
@@ -272,9 +278,11 @@ const Information: React.FC<InformationProps> = ({ role, userEmail, data, onUpda
                       ))}
 
                       {selectedCategory === 'Jadwal' && data.schedules.filter(s => {
+                        const matchDay = schDayFilter === 'Semua' || s.day === schDayFilter;
                         const matchSess = schSessionFilter === 'Semua' || normalizeSessionName(s.sessionType) === schSessionFilter;
                         const matchCls = schClassFilter === 'Semua' || s.class === schClassFilter;
-                        return matchSess && matchCls && (s.subject.toLowerCase().includes(searchTerm.toLowerCase()) || s.teacherName.toLowerCase().includes(searchTerm.toLowerCase()));
+                        const matchSearch = s.subject.toLowerCase().includes(searchTerm.toLowerCase()) || s.teacherName.toLowerCase().includes(searchTerm.toLowerCase());
+                        return matchDay && matchSess && matchCls && matchSearch;
                       }).map((item, idx) => (
                         <tr key={idx} className="hover:bg-slate-50">
                            <td className="py-7 pr-4"><p className="font-black uppercase text-[13px] text-slate-800">{item.subject}</p><p className="text-[10px] font-bold text-emerald-600 mt-1 uppercase tracking-widest truncate">{item.teacherName}</p></td>
